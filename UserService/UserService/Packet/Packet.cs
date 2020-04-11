@@ -2,9 +2,9 @@
 {
     class PacketBase
     {
-        public int cmdID { get; set; }
+        public int CmdID { get; set; }
 
-        public string data { get; set; }
+        public string Data { get; set; }
 
     }
 }
@@ -30,7 +30,7 @@ namespace Packet.ServerToClient
         * 2: 密碼錯誤
         * 3: 帳號格式不符
         */
-        public int result { get; set; }
+        public int Result { get; set; }
     }
 
     // 使用者登入結果
@@ -41,7 +41,7 @@ namespace Packet.ServerToClient
         * 1: 帳號錯誤
         * 2: 密碼錯誤
         */
-        public int result { get; set; }
+        public int Result { get; set; }
     }
 
     // 使用者登入結果
@@ -51,7 +51,7 @@ namespace Packet.ServerToClient
         * 0: 登出成功
         * 1: 登出失敗
         */
-        public int result { get; set; }
+        public int Result { get; set; }
     }
 
     // 更新使用者資訊結果
@@ -61,7 +61,7 @@ namespace Packet.ServerToClient
         * 0: 更新成功
         * 1: 更新失敗
         */
-        public int result { get; set; }
+        public int Result { get; set; }
     }
 }
 
@@ -83,13 +83,22 @@ namespace Packet.ClientToServer
     class UserRegistered
     {
         // Email
-        public string email { get; set; }
+        public string Email { get; set; }
 
         // 密碼
-        public string password { get; set; }
+        public string Password { get; set; }
 
         // 確認密碼
-        public string checkPassword { get; set; }
+        public string CheckPassword { get; set; }
+
+        // FB Token
+        public string FBToken { get; set; }
+
+        // Google Token
+        public string GoogleToken { get; set; }
+
+        // 註冊來源
+        public string RegisterSource { get; set; }
     }
 
     /*
@@ -98,10 +107,10 @@ namespace Packet.ClientToServer
     class UserLogin
     {
         // Email
-        public string email { get; set; }
+        public string Email { get; set; }
 
         // 密碼
-        public string password { get; set; }
+        public string Password { get; set; }
 
     }
 
@@ -111,23 +120,47 @@ namespace Packet.ClientToServer
     class UserLogout
     {
         // Email
-        public string email { get; set; }
+        public string Email { get; set; }
 
     }
 
     /*
     * 更新使用者資訊
     */
-    class UpsateUserInfo
+    class UpdateUserInfo
     {
+        // Email
+        public string Email { get; set; }
+
         // 暱稱
-        public string nikeName { get; set; }
+        public string NickName { get; set; }
+
+        // 登入資料
+        public string LoginData { get; set; }
 
         // 生日
-        public string birthday { get; set; }
+        public string Birthday { get; set; }
+
+        // 身高
+        public float BodyHeight { get; set; }
+
+        // 體重
+        public float BodyWeight { get; set; }
+
+        //
+        public string FrontCoverUrl { get; set; }
+
+        //
+        public string PhotoUrl { get; set; }
+
+        // 手機認證
+        public string Mobile { get; set; }
+
+        //
+        public int Gender { get; set; }
 
         // 國家
-        public string country { get; set; }
+        public int Country { get; set; }
 
     }
 

@@ -87,18 +87,18 @@ namespace UserService
             string sReturn = string.Empty;
 
             // TODO Lock ??
-            
+
             if (msg != string.Empty)
             {
                 JsonDocument jsonDoc = JsonDocument.Parse(msg);
 
                 JsonElement jsMain = jsonDoc.RootElement;
 
-                if (jsMain.TryGetProperty("cmdID", out JsonElement jsName))
+                if (jsMain.TryGetProperty("CmdID", out JsonElement jsName))
                 {
                     int cmdID = jsName.GetInt32();
 
-                    string packetData = jsMain.GetProperty("data").GetString();
+                    string packetData = jsMain.GetProperty("Data").GetString();
 
                     switch (cmdID)
                     {
@@ -113,6 +113,13 @@ namespace UserService
                             UserLogin loginMsg = JsonSerializer.Deserialize<UserLogin>(packetData);
 
                             sReturn = OnUserLogin(loginMsg);
+
+                            break;
+
+                        case (int)C2S_CmdID.emUpdateUserInfo:
+                            UpdateUserInfo updateMsg = JsonSerializer.Deserialize<UpdateUserInfo>(packetData);
+
+                            sReturn = OnUpdateUserInfo(updateMsg);
 
                             break;
 
@@ -139,51 +146,81 @@ namespace UserService
 
         }
 
+        /**
+         * 建立新帳號
+         */
         private string OnCreateNewAccount(UserRegistered packet)
         {
             UserRegisteredResult rData = new UserRegisteredResult();
 
-            if (packet.password == packet.checkPassword)
+            if (packet.Password == packet.CheckPassword)
             {
-                List<UserInfo> accountList = dbConnect.GetSql().Queryable<UserInfo>().Where(it => it.Email == packet.email).ToList();
-                   
+                List<UserAccount> accountList = dbConnect.GetSql().Queryable<UserAccount>().Where(it => it.Email == packet.Email).ToList();
+
                 // 未包含該Email
-                if (accountList.Count() == 0 )
+                if (accountList.Count() == 0)
                 {
                     try
-
                     {
-                        UserInfo info = new UserInfo();
-                        info.Email = packet.email;
-                        info.Password = packet.password;
-                        info.CREATE_DATE = DateTime.Now.ToString("yyyy-MM-dd hh:mm:ss");
+                        string dateTime = DateTime.Now.ToString("yyyy-MM-dd hh:mm:ss");
 
-                        int ID = dbConnect.GetSql().Insertable(info).ExecuteReturnIdentity();
 
-                        Console.WriteLine(ID);
+                        string guidAll = Guid.NewGuid().ToString();
+
+                        string[] guidList = guidAll.Split('-');
+
+                        UserAccount account = new UserAccount
+                        {
+                            UserID = "Dblha-" + guidList[0],        // 取GUID前8碼
+                            Email = packet.Email,
+                            Password = packet.Password,
+                            FBToken = "",
+                            GoogleToken = "",
+                            RegisterSource = -1,
+                            RegisterDate = dateTime,
+                            LoginDate = dateTime
+                        };
+
+                        dbConnect.GetSql().Insertable(account).ExecuteCommand();
+
+                        UserInfo info = new UserInfo
+                        {
+                            Index = account.UserID,
+                            NickName = "",
+                            Birthday = dateTime,
+                            BodyHeight = 0,
+                            BodyWeight = 0,
+                            FrontCoverUrl = "",
+                            PhotoUrl = "",
+                            Mobile = "",
+                            Country = -1
+                        };
+
+                        dbConnect.GetSql().Insertable(info).ExecuteCommand();
+
                     }
                     catch (Exception ex)
                     {
                         log.SaveLog("[Error] Controller::OnCreateNewAccount Create Fail, Error Msg:" + ex.Message);
                     }
 
-                    rData.result = 0;
+                    rData.Result = 0;
                 }
                 else
                 {
-                    rData.result = 1;
+                    rData.Result = 1;
                 }
 
             }
             else
             {
-                rData.result = 2;
+                rData.Result = 2;
             }
 
             PacketBase rPacket = new PacketBase
             {
-                cmdID = (int)S2C_CmdID.emUserRegisteredResult,
-                data = JsonSerializer.Serialize<UserRegisteredResult>(rData)
+                CmdID = (int)S2C_CmdID.emUserRegisteredResult,
+                Data = JsonSerializer.Serialize<UserRegisteredResult>(rData)
             };
 
             string sReturn = JsonSerializer.Serialize(rPacket);
@@ -191,31 +228,85 @@ namespace UserService
 
         }
 
+        /**
+         * 使用者登入
+         */
         private string OnUserLogin(UserLogin packet)
         {
             UserLoginResult rData = new UserLoginResult();
 
-            List<UserInfo> accountList = dbConnect.GetSql().Queryable<UserInfo>().Where(it => it.Email == packet.email && it.Password == packet.password).ToList();
+            List<UserAccount> accountList = dbConnect.GetSql().Queryable<UserAccount>().Where(it => it.Email == packet.Email && it.Password == packet.Password).ToList();
 
-            // TODO 需新增帳號錯誤 或 密碼錯誤
+            // 有找到帳號
             if (accountList.Count() == 1)
             {
-                rData.result = 1;
+                if (accountList[0].Password == packet.Password)
+                {
+                    rData.Result = 0;
+                }
+                else
+                {
+                    rData.Result = 2;
+                }
             }
             else
             {
-                rData.result = 0;
+                rData.Result = 1;
             }
 
             PacketBase rPacket = new PacketBase
             {
-                cmdID = (int)S2C_CmdID.emUserLoginResult,
-                data = JsonSerializer.Serialize<UserLoginResult>(rData)
+                CmdID = (int)S2C_CmdID.emUserLoginResult,
+                Data = JsonSerializer.Serialize<UserLoginResult>(rData)
             };
 
             string sReturn = JsonSerializer.Serialize(rPacket);
             return sReturn;
         }
+
+        /**
+         * 更新使用者資訊
+         */
+        private string OnUpdateUserInfo(UpdateUserInfo packet)
+        {
+            UpdateUserInfoResult rData = new UpdateUserInfoResult();
+
+            List<UserAccount> accountList = dbConnect.GetSql().Queryable<UserAccount>().Where(it => it.Email == packet.Email).ToList();
+
+            // 有找到帳號
+            if (accountList.Count() == 1)
+            {
+                UpdateUserInfo info = new UpdateUserInfo
+                {
+                    NickName = packet.NickName,
+                    Birthday = packet.Birthday,
+                    BodyHeight = packet.BodyHeight,
+                    BodyWeight = packet.BodyWeight,
+                    FrontCoverUrl = packet.FrontCoverUrl,
+                    PhotoUrl = packet.PhotoUrl,
+                    Mobile = packet.Mobile,
+                    Country = packet.Country
+                };
+
+                dbConnect.GetSql().Updateable(info).ExecuteCommand();
+
+                rData.Result = 0;
+            }
+            else
+            {
+                rData.Result = 1;
+            }
+
+            PacketBase rPacket = new PacketBase
+            {
+                CmdID = (int)S2C_CmdID.emUpdateUserInfoResult,
+                Data = JsonSerializer.Serialize<UpdateUserInfoResult>(rData)
+            };
+
+            string sReturn = JsonSerializer.Serialize(rPacket);
+            return sReturn;
+        }
+
     }
 
 }
