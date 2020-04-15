@@ -98,7 +98,7 @@ namespace Packet.ClientToServer
         public string GoogleToken { get; set; }
 
         // 註冊來源
-        public string RegisterSource { get; set; }
+        public int RegisterSource { get; set; }
     }
 
     /*
