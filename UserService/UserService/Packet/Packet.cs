@@ -1,14 +1,4 @@
-﻿namespace Packet.Base
-{
-    class PacketBase
-    {
-        public int CmdID { get; set; }
-
-        public string Data { get; set; }
-
-    }
-}
-
+﻿
 namespace Packet.ServerToClient
 {
     public enum S2C_CmdID : int

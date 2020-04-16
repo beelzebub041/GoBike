@@ -5,14 +5,15 @@ using System.Text;
 using System.Threading.Tasks;
 
 using System.Windows.Forms;
-using System.Text.Json;
+
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 using Tools.Logger;
 
 using UserService.Def;
 using UserService.Connect;
 
-using Packet.Base;
 using Packet.ClientToServer;
 using Packet.ServerToClient;
 
@@ -28,6 +29,8 @@ namespace UserService
         private DataBaseConnect dbConnect = null;
 
         private Server wsServer = null;                 // Web Socket Server
+
+        private string ControllerVersion = "Version003";
 
 
         public Controller(Form1 fm1)
@@ -50,6 +53,8 @@ namespace UserService
             try
             {
                 log = new Logger(fm1);
+
+                log.SaveLog($"Controller Version: {ControllerVersion}");
 
                 wsServer = new Server(log.SaveLog, MessageProcess);
 
@@ -84,48 +89,76 @@ namespace UserService
 
         public string MessageProcess(string msg)
         {
+            log.SaveLog($"Controller::MessageProcess Msg: {msg}");
+
             string sReturn = string.Empty;
 
             // TODO Lock ??
 
             if (msg != string.Empty)
             {
-                JsonDocument jsonDoc = JsonDocument.Parse(msg);
-
-                JsonElement jsMain = jsonDoc.RootElement;
-
-                if (jsMain.TryGetProperty("CmdID", out JsonElement jsName))
+                try
                 {
-                    int cmdID = jsName.GetInt32();
+                    JObject jsMain = JObject.Parse(msg);
 
-                    string packetData = jsMain.GetProperty("Data").GetString();
-
-                    switch (cmdID)
+                    if (jsMain.ContainsKey("CmdID"))
                     {
-                        case (int)C2S_CmdID.emUserRegistered:
-                            UserRegistered registeredMsg = JsonSerializer.Deserialize<UserRegistered>(packetData);
+                        int cmdID = (int)jsMain["CmdID"];
 
-                            sReturn = OnCreateNewAccount(registeredMsg);
+                        if (jsMain.ContainsKey("Data")) 
+                        {
+                            string packetData = jsMain["Data"].ToString();
 
-                            break;
+                            switch (cmdID)
+                            {
+                                case (int)C2S_CmdID.emUserRegistered:
 
-                        case (int)C2S_CmdID.emUserLogin:
-                            UserLogin loginMsg = JsonSerializer.Deserialize<UserLogin>(packetData);
+                                    UserRegistered registeredMsg = JsonConvert.DeserializeObject<UserRegistered>(packetData);
 
-                            sReturn = OnUserLogin(loginMsg);
+                                    sReturn = OnCreateNewAccount(registeredMsg);
 
-                            break;
+                                    break;
 
-                        case (int)C2S_CmdID.emUpdateUserInfo:
-                            UpdateUserInfo updateMsg = JsonSerializer.Deserialize<UpdateUserInfo>(packetData);
+                                case (int)C2S_CmdID.emUserLogin:
+                                    UserLogin loginMsg = JsonConvert.DeserializeObject<UserLogin>(packetData);
 
-                            sReturn = OnUpdateUserInfo(updateMsg);
+                                    sReturn = OnUserLogin(loginMsg);
 
-                            break;
+                                    break;
 
+                                case (int)C2S_CmdID.emUpdateUserInfo:
+                                    UpdateUserInfo updateMsg = JsonConvert.DeserializeObject<UpdateUserInfo>(packetData);
+
+                                    sReturn = OnUpdateUserInfo(updateMsg);
+
+                                    break;
+                                default:
+                                    log.SaveLog($"[Warning] Controller::MessageProcess Can't Find CmdID {cmdID}");
+
+                                    break;
+                            }
+
+                        }
+                        else
+                        {
+                            log.SaveLog("[Warning] Controller::MessageProcess Can't Find Member \"Data\" ");
+                        }
+
+                    }
+                    else
+                    {
+                        log.SaveLog("[Warning] Controller::MessageProcess Can't Find Member \"CmdID\" ");
                     }
 
                 }
+                catch (Exception ex)
+                {
+                    log.SaveLog("[Error] Controller::MessageProcess Process Error Msg:" + ex.Message);
+                }
+            }
+            else
+            {
+                log.SaveLog("[Warning] Controller::MessageProcess Msg Is Empty");
             }
 
             return sReturn;
@@ -155,15 +188,14 @@ namespace UserService
 
             if (packet.Password == packet.CheckPassword)
             {
-                List<UserAccount> accountList = dbConnect.GetSql().Queryable<UserAccount>().Where(it => it.Email == packet.Email).ToList();
-
-                // 未包含該Email
-                if (accountList.Count() == 0)
+                try
                 {
-                    try
+                    List<UserAccount> accountList = dbConnect.GetSql().Queryable<UserAccount>().Where(it => it.Email == packet.Email).ToList();
+                
+                    // 未包含該Email
+                    if (accountList.Count() == 0)
                     {
                         string dateTime = DateTime.Now.ToString("yyyy-MM-dd hh:mm:ss");
-
 
                         string guidAll = Guid.NewGuid().ToString();
 
@@ -174,9 +206,9 @@ namespace UserService
                             UserID = "Dblha-" + guidList[0],        // 取GUID前8碼
                             Email = packet.Email,
                             Password = packet.Password,
-                            FBToken = "",
-                            GoogleToken = "",
-                            RegisterSource = -1,
+                            FBToken = packet.FBToken,
+                            GoogleToken = packet.GoogleToken,
+                            RegisterSource = packet.RegisterSource,
                             RegisterDate = dateTime,
                             LoginDate = dateTime
                         };
@@ -198,17 +230,18 @@ namespace UserService
 
                         dbConnect.GetSql().Insertable(info).ExecuteCommand();
 
+
+                        rData.Result = 0;
                     }
-                    catch (Exception ex)
+                    else
                     {
-                        log.SaveLog("[Error] Controller::OnCreateNewAccount Create Fail, Error Msg:" + ex.Message);
+                        rData.Result = 1;
                     }
 
-                    rData.Result = 0;
                 }
-                else
+                catch (Exception ex)
                 {
-                    rData.Result = 1;
+                    log.SaveLog("[Error] Controller::OnCreateNewAccount Create Error Msg:" + ex.Message);
                 }
 
             }
@@ -217,14 +250,11 @@ namespace UserService
                 rData.Result = 2;
             }
 
-            PacketBase rPacket = new PacketBase
-            {
-                CmdID = (int)S2C_CmdID.emUserRegisteredResult,
-                Data = JsonSerializer.Serialize<UserRegisteredResult>(rData)
-            };
+            JObject jsMain = new JObject();
+            jsMain.Add("CmdID", (int)S2C_CmdID.emUserRegisteredResult);
+            jsMain.Add("Data", JsonConvert.DeserializeObject<JObject>(JsonConvert.SerializeObject(rData)));
 
-            string sReturn = JsonSerializer.Serialize(rPacket);
-            return sReturn;
+            return jsMain.ToString();
 
         }
 
@@ -254,14 +284,11 @@ namespace UserService
                 rData.Result = 1;
             }
 
-            PacketBase rPacket = new PacketBase
-            {
-                CmdID = (int)S2C_CmdID.emUserLoginResult,
-                Data = JsonSerializer.Serialize<UserLoginResult>(rData)
-            };
+            JObject jsMain = new JObject();
+            jsMain.Add("CmdID", (int)S2C_CmdID.emUserLoginResult);
+            jsMain.Add("Data", JsonConvert.DeserializeObject<JObject>(JsonConvert.SerializeObject(rData)));
 
-            string sReturn = JsonSerializer.Serialize(rPacket);
-            return sReturn;
+            return jsMain.ToString();
         }
 
         /**
@@ -297,14 +324,11 @@ namespace UserService
                 rData.Result = 1;
             }
 
-            PacketBase rPacket = new PacketBase
-            {
-                CmdID = (int)S2C_CmdID.emUpdateUserInfoResult,
-                Data = JsonSerializer.Serialize<UpdateUserInfoResult>(rData)
-            };
+            JObject jsMain = new JObject();
+            jsMain.Add("CmdID", (int)S2C_CmdID.emUpdateUserInfoResult);
+            jsMain.Add("Data", JsonConvert.DeserializeObject<JObject>(JsonConvert.SerializeObject(rData)));
 
-            string sReturn = JsonSerializer.Serialize(rPacket);
-            return sReturn;
+            return jsMain.ToString();
         }
 
     }

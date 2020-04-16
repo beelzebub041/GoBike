@@ -201,6 +201,8 @@ namespace UserService
 
             string sendMsg = msgProcess(e.Data);
 
+            log($"Send msg: {sendMsg}");
+
             Send(sendMsg);
 
         }
