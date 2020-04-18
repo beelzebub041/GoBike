@@ -11,7 +11,7 @@ using Newtonsoft.Json.Linq;
 
 using Tools.Logger;
 
-using UserService.Def;
+using DataBaseDef;
 using UserService.Connect;
 
 using Packet.ClientToServer;
@@ -217,7 +217,7 @@ namespace UserService
 
                         UserInfo info = new UserInfo
                         {
-                            Index = account.UserID,
+                            UserID = account.UserID,
                             NickName = "",
                             Birthday = dateTime,
                             BodyHeight = 0,
@@ -230,24 +230,36 @@ namespace UserService
 
                         dbConnect.GetSql().Insertable(info).ExecuteCommand();
 
+                        RideData data = new RideData
+                        {
+                            UserID = account.UserID,
+                            TotalDistance = 0,
+                            TotalAltitude = 0,
+                            TotalRideTime = 0,
+                        };
 
-                        rData.Result = 0;
+                        dbConnect.GetSql().Insertable(data).ExecuteCommand();
+
+
+                        rData.Result = 1;
                     }
                     else
                     {
-                        rData.Result = 1;
+                        rData.Result = 2;
                     }
 
                 }
                 catch (Exception ex)
                 {
+                    rData.Result = 0;
+
                     log.SaveLog("[Error] Controller::OnCreateNewAccount Create Error Msg:" + ex.Message);
                 }
 
             }
             else
             {
-                rData.Result = 2;
+                rData.Result = 3;
             }
 
             JObject jsMain = new JObject();
@@ -265,23 +277,32 @@ namespace UserService
         {
             UserLoginResult rData = new UserLoginResult();
 
-            List<UserAccount> accountList = dbConnect.GetSql().Queryable<UserAccount>().Where(it => it.Email == packet.Email && it.Password == packet.Password).ToList();
-
-            // 有找到帳號
-            if (accountList.Count() == 1)
+            try
             {
-                if (accountList[0].Password == packet.Password)
+                List<UserAccount> accountList = dbConnect.GetSql().Queryable<UserAccount>().Where(it => it.Email == packet.Email && it.Password == packet.Password).ToList();
+
+                // 有找到帳號
+                if (accountList.Count() == 1)
                 {
-                    rData.Result = 0;
+                    if (accountList[0].Password == packet.Password)
+                    {
+                        rData.Result = 1;
+                    }
+                    else
+                    {
+                        rData.Result = 3;
+                    }
                 }
                 else
                 {
                     rData.Result = 2;
                 }
             }
-            else
+            catch (Exception ex)
             {
-                rData.Result = 1;
+                log.SaveLog("[Error] Controller::OnUserLogin Catch Error, Msg:" + ex.Message);
+
+                rData.Result = 0;
             }
 
             JObject jsMain = new JObject();
