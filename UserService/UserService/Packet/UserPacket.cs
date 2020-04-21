@@ -5,12 +5,35 @@ namespace Packet.ServerToClient
     {
         emUserRegisteredResult = 1001,
         emUserLoginResult,
-        emUserLogoutResult,
         emUpdateUserInfoResult,
+        emUpdatePasswordResult,
     }
-    
-    // ======================= User ======================= //
-    
+
+    // 登入資料
+    class UserLoginData
+    {
+        public string MemberID { get; set; }
+        public string Nickname { get; set; }
+        public string Avatar { get; set; }
+        public string Birthday { get; set; }
+        public float BodyHeight { get; set; }
+        public float BodyWeight { get; set; }
+        public int Country { get; set; }
+        public string Email { get; set; }
+        public string FBToken { get; set; }
+        public string GoogleToken { get; set; }
+        public string FrontCover { get; set; }
+        public int Gender { get; set; }
+        public string LoginDate { get; set; }
+        public string Mobile { get; set; }
+        public string RegisterDate { get; set; }
+        public int RegisterSource { get; set; }
+        public double TotalAltitude { get; set; }
+        public double TotalDistance { get; set; }
+        public long TotalRideTime { get; set; }
+    }
+
+
     // 使用者註冊結果
     class UserRegisteredResult
     {
@@ -34,16 +57,11 @@ namespace Packet.ServerToClient
         * 3: 密碼錯誤
         */
         public int Result { get; set; }
-    }
 
-    // 使用者登入結果
-    class UserLogoutResult
-    {
-        /*
-        * 0: 登出失敗
-        * 1: 登出成功
-        */
-        public int Result { get; set; }
+        /**
+         * 登入資料
+         */
+        public UserLoginData LoginData { get; set; }
     }
 
     // 更新使用者資訊結果
@@ -55,6 +73,18 @@ namespace Packet.ServerToClient
         */
         public int Result { get; set; }
     }
+
+    // 更新密碼結果
+    class UpdatePasswordResult
+    {
+        /*
+        * 0: 更新失敗
+        * 1: 更新成功
+        * 1: 舊密碼錯誤
+        */
+        public int Result { get; set; }
+
+    }
 }
 
 namespace Packet.ClientToServer
@@ -63,8 +93,8 @@ namespace Packet.ClientToServer
     {
         emUserRegistered = 1001,
         emUserLogin,
-        emUserLogout,
         emUpdateUserInfo,
+        emUpdatePassword,
     }
 
     // ======================= User ======================= //
@@ -106,24 +136,11 @@ namespace Packet.ClientToServer
 
     }
 
-    /*
-    * 使用者登出
-    */
-    class UserLogout
+    /**
+     * 更新資訊
+     */
+    class UpdateInfo
     {
-        // Email
-        public string Email { get; set; }
-
-    }
-
-    /*
-    * 更新使用者資訊
-    */
-    class UpdateUserInfo
-    {
-        // Email
-        public string Email { get; set; }
-
         // 暱稱
         public string NickName { get; set; }
 
@@ -139,20 +156,49 @@ namespace Packet.ClientToServer
         // 體重
         public float BodyWeight { get; set; }
 
-        //
-        public string FrontCoverUrl { get; set; }
+        // 封面路徑
+        public string FrontCover { get; set; }
 
-        //
-        public string PhotoUrl { get; set; }
+        // 頭像路徑
+        public string Avatar { get; set; }
 
         // 手機認證
         public string Mobile { get; set; }
 
-        //
+        // 性別
         public int Gender { get; set; }
 
         // 國家
         public int Country { get; set; }
+
+    }
+
+    /*
+    * 更新使用者資訊
+    */
+    class UpdateUserInfo
+    {
+        // 使用者索引
+        public string MemberID { get; set; }
+
+        // 使用者資料
+        public UpdateInfo UpdateData { get; set; }
+
+    }
+
+    /*
+    * 更新密碼
+    */
+    class UpdatePassword
+    {
+        // 使用者索引
+        public string MemberID { get; set; }
+
+        // 密碼
+        public string Password { get; set; }
+
+        // 新密碼
+        public string NewPassword { get; set; }
 
     }
 

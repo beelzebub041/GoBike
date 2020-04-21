@@ -11,7 +11,7 @@ namespace DataBaseDef
     // 使用者帳戶
     public class UserAccount
     {
-        public string UserID { get; set; }
+        public string MemberID { get; set; }
         public string Email { get; set; }
         public string Password { get; set; }
         public string FBToken { get; set; }
@@ -25,13 +25,13 @@ namespace DataBaseDef
     // 使用者資料
     public class UserInfo
     {
-        public string UserID { get; set; }
+        public string MemberID { get; set; }
+        public string Avatar { get; set; }
         public string NickName { get; set; }
         public string Birthday { get; set; }
         public float BodyHeight { get; set; }
         public float BodyWeight { get; set; }
-        public string FrontCoverUrl { get; set; }
-        public string PhotoUrl { get; set; }
+        public string FrontCover { get; set; }
         public string Mobile { get; set; }
         public int Gender { get; set; }
         public int Country { get; set; }
@@ -41,7 +41,7 @@ namespace DataBaseDef
     // 騎乘資料
     public class RideData
     {
-        public string UserID { get; set; }
+        public string MemberID { get; set; }
         public float TotalDistance { get; set; }
         public float TotalAltitude { get; set; }
         public Int64 TotalRideTime { get; set; }
@@ -52,7 +52,7 @@ namespace DataBaseDef
     public class RideRecord
     {
         // 使用者索引
-        public string UserID { get; set; }
+        public string MemberID { get; set; }
 
         // 建立日期
         public string CreateDate { get; set; }

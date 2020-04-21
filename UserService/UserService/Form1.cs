@@ -8,7 +8,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 
-using UserService.Connect;
+using Connect;
 using Tools.Logger;
 
 namespace UserService

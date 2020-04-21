@@ -203,7 +203,14 @@ namespace UserService
 
             log($"Send msg: {sendMsg}");
 
-            Send(sendMsg);
+            try 
+            {
+                Send(sendMsg);
+            }
+            catch
+            {
+
+            }
 
         }
     }

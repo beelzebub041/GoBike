@@ -12,7 +12,7 @@ using Newtonsoft.Json.Linq;
 using Tools.Logger;
 
 using DataBaseDef;
-using UserService.Connect;
+using Connect;
 
 using Packet.ClientToServer;
 using Packet.ServerToClient;
@@ -30,7 +30,7 @@ namespace UserService
 
         private Server wsServer = null;                 // Web Socket Server
 
-        private string ControllerVersion = "Version003";
+        private string ControllerVersion = "Version007";
 
 
         public Controller(Form1 fm1)
@@ -132,6 +132,14 @@ namespace UserService
                                     sReturn = OnUpdateUserInfo(updateMsg);
 
                                     break;
+
+                                case (int)C2S_CmdID.emUpdatePassword:
+                                    UpdatePassword passwordMsg = JsonConvert.DeserializeObject<UpdatePassword>(packetData);
+
+                                    sReturn = OnUpdatePassword(passwordMsg);
+
+                                    break;
+
                                 default:
                                     log.SaveLog($"[Warning] Controller::MessageProcess Can't Find CmdID {cmdID}");
 
@@ -195,7 +203,7 @@ namespace UserService
                     // 未包含該Email
                     if (accountList.Count() == 0)
                     {
-                        string dateTime = DateTime.Now.ToString("yyyy-MM-dd hh:mm:ss");
+                        string dateTime = DateTime.UtcNow.ToString("yyyy-MM-dd hh:mm:ss");
 
                         string guidAll = Guid.NewGuid().ToString();
 
@@ -203,7 +211,7 @@ namespace UserService
 
                         UserAccount account = new UserAccount
                         {
-                            UserID = "Dblha-" + guidList[0],        // 取GUID前8碼
+                            MemberID = "Dblha-" + guidList[0],        // 取GUID前8碼
                             Email = packet.Email,
                             Password = packet.Password,
                             FBToken = packet.FBToken,
@@ -217,13 +225,13 @@ namespace UserService
 
                         UserInfo info = new UserInfo
                         {
-                            UserID = account.UserID,
+                            MemberID = account.MemberID,
                             NickName = "",
                             Birthday = dateTime,
                             BodyHeight = 0,
                             BodyWeight = 0,
-                            FrontCoverUrl = "",
-                            PhotoUrl = "",
+                            FrontCover = "",
+                            Avatar = "",
                             Mobile = "",
                             Country = -1
                         };
@@ -232,7 +240,7 @@ namespace UserService
 
                         RideData data = new RideData
                         {
-                            UserID = account.UserID,
+                            MemberID = account.MemberID,
                             TotalDistance = 0,
                             TotalAltitude = 0,
                             TotalRideTime = 0,
@@ -286,7 +294,48 @@ namespace UserService
                 {
                     if (accountList[0].Password == packet.Password)
                     {
-                        rData.Result = 1;
+                        List<UserInfo> infoList = dbConnect.GetSql().Queryable<UserInfo>().Where(it => it.MemberID == accountList[0].MemberID).ToList();
+
+                        List<RideData> rideDataList = dbConnect.GetSql().Queryable<RideData>().Where(it => it.MemberID == accountList[0].MemberID).ToList();
+
+                        if (infoList.Count() == 1 && rideDataList.Count() == 1)
+                        {
+                            rData.LoginData = new UserLoginData()
+                            {
+                                Email = accountList[0].Email,
+                                FBToken = accountList[0].FBToken,
+                                GoogleToken = accountList[0].GoogleToken,
+                                LoginDate = DateTime.Parse(accountList[0].LoginDate).ToString("yyyy-MM-dd hh:mm:ss"),
+                                RegisterDate = DateTime.Parse(accountList[0].RegisterDate).ToString("yyyy-MM-dd hh:mm:ss"),
+                                RegisterSource = accountList[0].RegisterSource,
+
+                                MemberID = infoList[0].MemberID,
+                                Nickname = infoList[0].NickName,
+                                Avatar = infoList[0].Avatar,
+                                Birthday = DateTime.Parse(infoList[0].Birthday).ToString("yyyy-MM-dd hh:mm:ss"),
+                                BodyHeight = infoList[0].BodyHeight,
+                                BodyWeight = infoList[0].BodyWeight,
+                                Country = infoList[0].Country,
+                                FrontCover = infoList[0].FrontCover,
+                                Gender = infoList[0].Gender,
+                                Mobile = infoList[0].Mobile,
+                                
+                                TotalAltitude = rideDataList[0].TotalAltitude,
+                                TotalDistance = rideDataList[0].TotalDistance,
+                                TotalRideTime = rideDataList[0].TotalRideTime
+                            };
+
+                            rData.Result = 1;
+
+                        }
+                        else
+                        {
+                            log.SaveLog("[Error] Controller::OnUserLogin Can't Find User Info or Ride Data");
+
+                            rData.Result = 0;
+                        }
+
+
                     }
                     else
                     {
@@ -319,34 +368,87 @@ namespace UserService
         {
             UpdateUserInfoResult rData = new UpdateUserInfoResult();
 
-            List<UserAccount> accountList = dbConnect.GetSql().Queryable<UserAccount>().Where(it => it.Email == packet.Email).ToList();
-
-            // 有找到帳號
-            if (accountList.Count() == 1)
+            try
             {
-                UpdateUserInfo info = new UpdateUserInfo
-                {
-                    NickName = packet.NickName,
-                    Birthday = packet.Birthday,
-                    BodyHeight = packet.BodyHeight,
-                    BodyWeight = packet.BodyWeight,
-                    FrontCoverUrl = packet.FrontCoverUrl,
-                    PhotoUrl = packet.PhotoUrl,
-                    Mobile = packet.Mobile,
-                    Country = packet.Country
-                };
+                List<UserInfo> infoList = dbConnect.GetSql().Queryable<UserInfo>().Where(it => it.MemberID == packet.MemberID).ToList();
 
-                dbConnect.GetSql().Updateable(info).ExecuteCommand();
+                // 有找到資料
+                if (infoList.Count() == 1)
+                {
+                    infoList[0].NickName = packet.UpdateData.NickName == null ? infoList[0].NickName : packet.UpdateData.NickName;
+                    infoList[0].Birthday = packet.UpdateData.Birthday == null ? DateTime.Parse(infoList[0].Birthday).ToString("yyyy-MM-dd hh:mm:ss") : packet.UpdateData.Birthday;
+                    infoList[0].BodyHeight = packet.UpdateData.BodyHeight == 0 ? infoList[0].BodyHeight : packet.UpdateData.BodyHeight;
+                    infoList[0].BodyWeight = packet.UpdateData.BodyWeight == 0 ? infoList[0].BodyWeight : packet.UpdateData.BodyWeight;
+                    infoList[0].FrontCover = packet.UpdateData.FrontCover == null ? infoList[0].FrontCover : packet.UpdateData.FrontCover;
+                    infoList[0].Avatar = packet.UpdateData.Avatar == null ? infoList[0].Avatar : packet.UpdateData.Avatar;
+                    infoList[0].Mobile = packet.UpdateData.Mobile == null ? infoList[0].Mobile : packet.UpdateData.Mobile;
+                    infoList[0].Country = packet.UpdateData.Country == 0 ? infoList[0].Country : packet.UpdateData.Country;
+
+                    dbConnect.GetSql().Updateable<UserInfo>(infoList[0]).Where(it => it.MemberID == packet.MemberID).ExecuteCommand();
+
+                    //dbConnect.GetSql().Updateable<UserAccount>().SetColumns(it => new UserAccount() { Password = packet.NewPassword }).Where(it => it.MemberID == packet.MemberID).ExecuteCommand();
+
+
+                    rData.Result = 1;
+                }
+                else
+                {
+                    rData.Result = 0;
+                }
+            }
+            catch (Exception ex)
+            {
+                log.SaveLog("[Error] Controller::OnUpdateUserInfo Catch Error, Msg:" + ex.Message);
 
                 rData.Result = 0;
-            }
-            else
-            {
-                rData.Result = 1;
             }
 
             JObject jsMain = new JObject();
             jsMain.Add("CmdID", (int)S2C_CmdID.emUpdateUserInfoResult);
+            jsMain.Add("Data", JsonConvert.DeserializeObject<JObject>(JsonConvert.SerializeObject(rData)));
+
+            return jsMain.ToString();
+        }
+
+        /**
+         * 更新密碼
+         */
+        private string OnUpdatePassword(UpdatePassword packet)
+        {
+            UpdatePasswordResult rData = new UpdatePasswordResult();
+
+            try
+            {
+                List<UserAccount> accountList = dbConnect.GetSql().Queryable<UserAccount>().Where(it => it.MemberID == packet.MemberID).ToList();
+
+                // 有找到帳號
+                if (accountList.Count() == 1)
+                {
+                    if (accountList[0].Password == packet.Password)
+                    {
+                        dbConnect.GetSql().Updateable<UserAccount>().SetColumns(it => new UserAccount() { Password = packet.NewPassword }).Where(it => it.MemberID == packet.MemberID).ExecuteCommand();
+
+                        rData.Result = 1;
+                    }
+                    else
+                    {
+                        rData.Result = 2;
+                    }
+                }
+                else
+                {
+                    rData.Result = 0;
+                }
+            }
+            catch (Exception ex)
+            {
+                log.SaveLog("[Error] Controller::OnUpdateUserInfo Catch Error, Msg:" + ex.Message);
+
+                rData.Result = 0;
+            }
+
+            JObject jsMain = new JObject();
+            jsMain.Add("CmdID", (int)S2C_CmdID.emUpdatePasswordResult);
             jsMain.Add("Data", JsonConvert.DeserializeObject<JObject>(JsonConvert.SerializeObject(rData)));
 
             return jsMain.ToString();

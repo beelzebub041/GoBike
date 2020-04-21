@@ -9,7 +9,7 @@ using SqlSugar;
 
 using Tools.Logger;
 
-namespace UserService.Connect
+namespace Connect
 {
     class DataBaseConnect
     {
