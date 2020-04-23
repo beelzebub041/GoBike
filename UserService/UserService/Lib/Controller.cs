@@ -209,6 +209,8 @@ namespace UserService
 
                         string[] guidList = guidAll.Split('-');
 
+
+                        // 建立新帳號
                         UserAccount account = new UserAccount
                         {
                             MemberID = "Dblha-" + guidList[0],        // 取GUID前8碼
@@ -223,6 +225,7 @@ namespace UserService
 
                         dbConnect.GetSql().Insertable(account).ExecuteCommand();
 
+                        // 新增使用者資訊
                         UserInfo info = new UserInfo
                         {
                             MemberID = account.MemberID,
@@ -238,6 +241,7 @@ namespace UserService
 
                         dbConnect.GetSql().Insertable(info).ExecuteCommand();
 
+                        // 新增騎乘資料
                         RideData data = new RideData
                         {
                             MemberID = account.MemberID,
@@ -247,7 +251,6 @@ namespace UserService
                         };
 
                         dbConnect.GetSql().Insertable(data).ExecuteCommand();
-
 
                         rData.Result = 1;
                     }

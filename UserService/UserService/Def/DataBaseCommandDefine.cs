@@ -4,6 +4,8 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
+
+
 using SqlSugar;
 
 namespace DataBaseDef
@@ -41,9 +43,16 @@ namespace DataBaseDef
     // 騎乘資料
     public class RideData
     {
+        // 使用者索引
         public string MemberID { get; set; }
+
+        // 總距離
         public float TotalDistance { get; set; }
+
+        // 總高度
         public float TotalAltitude { get; set; }
+
+        // 總騎乘時間
         public Int64 TotalRideTime { get; set; }
 
     }
@@ -51,6 +60,9 @@ namespace DataBaseDef
     // 騎乘紀錄
     public class RideRecord
     {
+        // 騎乘記錄索引
+        public string RideID { get; set; }
+
         // 使用者索引
         public string MemberID { get; set; }
 
@@ -86,6 +98,23 @@ namespace DataBaseDef
 
         // 分享類型
         public int SharedType { get; set; }
+
+    }
+
+    // 本周騎乘資料
+    public class WeekRideData
+    {
+        // 使用者索引
+        public string MemberID { get; set; }
+
+        // 本周開始日期
+        public string WeekFirstDay { get; set; }
+
+        // 本周結束日期
+        public string WeekLastDay { get; set; }
+
+        // 本周騎乘距離
+        public float WeekDistance { get; set; }
 
     }
 
