@@ -10,6 +10,7 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
 using Tools.Logger;
+using Tools.WeekProcess;
 
 using DataBaseDef;
 using Connect;
@@ -25,6 +26,8 @@ namespace RideService
         private Form1 fm1 = null;
 
         private Logger log = null;                      // Logger
+
+        private WeekProcess weekProcess = null;         // WeekProcess
 
         private DataBaseConnect dbConnect = null;
 
@@ -54,6 +57,8 @@ namespace RideService
             {
                 log = new Logger(fm1);
 
+                weekProcess = new WeekProcess();
+
                 log.SaveLog($"Controller Version: {ControllerVersion}");
 
                 wsServer = new Server(log.SaveLog, MessageProcess);
@@ -78,10 +83,9 @@ namespace RideService
                 }
 
             }
-            catch
+            catch (Exception ex)
             {
-
-
+                log.SaveLog($"[Error] Controller::Initialize, Catch Error, Msg:{ex.Message}");
             }
 
             return bReturn;
@@ -111,33 +115,12 @@ namespace RideService
 
                             switch (cmdID)
                             {
-                                case (int)C2S_CmdID.UpdateRideData:
-
-                                    UpdateRideData UpdateData = JsonConvert.DeserializeObject<UpdateRideData>(packetData);
-
-                                    sReturn = OnUpdateRideData(UpdateData);
-
-                                    break;
-
                                 case (int)C2S_CmdID.CreateRideRecord:
                                     CreateRideRecord CreateData = JsonConvert.DeserializeObject<CreateRideRecord>(packetData);
 
                                     sReturn = OnCreateRideRecord(CreateData);
 
                                     break;
-
-                                //case (int)C2S_CmdID.GetRideRecordIdList:
-                                //    GetRideRecordIdList dataList = JsonConvert.DeserializeObject<GetRideRecordIdList>(packetData);
-
-                                //    sReturn = OnGetRideRecordIdList(dataList);
-
-                                //    break;
-                                //case (int)C2S_CmdID.GetRideRecord:
-                                //    GetRideRecord recordData = JsonConvert.DeserializeObject<GetRideRecord>(packetData);
-
-                                //    sReturn = OnGetRideRecord(recordData);
-
-                                //    break;
 
                                 default:
                                     log.SaveLog($"[Warning] Controller::MessageProcess Can't Find CmdID {cmdID}");
@@ -187,51 +170,6 @@ namespace RideService
         }
 
         /**
-         * 更新騎乘資料
-         */
-        private string OnUpdateRideData(UpdateRideData packet)
-        {
-            UpdateRideDataResult rData = new UpdateRideDataResult();
-
-            try 
-            {
-                List<UserAccount> accountList = dbConnect.GetSql().Queryable<UserAccount>().Where(it => it.UserID == packet.UserID).ToList();
-
-                // 有找到帳號
-                if (accountList.Count() == 1)
-                {
-                    RideData info = new RideData
-                    {
-                        UserID = packet.UserID,
-                        TotalDistance = packet.TotalDistance,
-                        TotalAltitude = packet.TotalAltitude,
-                        TotalRideTime = packet.TotalRideTime,
-                    };
-
-                    dbConnect.GetSql().Updateable(info).ExecuteCommand();
-
-                    rData.Result = 1;
-                }
-                else
-                {
-                    rData.Result = 0;
-                }
-            }
-            catch (Exception ex)
-            {
-                log.SaveLog("[Error] Controller::OnUpdateRideData Catch Error, Msg:" + ex.Message);
-
-                rData.Result = 0;
-            }
-
-            JObject jsMain = new JObject();
-            jsMain.Add("CmdID", (int)S2C_CmdID.emUpdateRideDataResult);
-            jsMain.Add("Data", JsonConvert.DeserializeObject<JObject>(JsonConvert.SerializeObject(rData)));
-
-            return jsMain.ToString();
-        }
-
-        /**
          * 建立騎乘紀錄
          */
         private string OnCreateRideRecord(CreateRideRecord packet)
@@ -240,21 +178,24 @@ namespace RideService
 
             try 
             {
-                List<UserAccount> accountList = dbConnect.GetSql().Queryable<UserAccount>().Where(it => it.UserID == packet.UserID).ToList();
+                List<UserAccount> accountList = dbConnect.GetSql().Queryable<UserAccount>().Where(it => it.MemberID == packet.MemberID).ToList();
 
-                // 有找到帳號
-                if (accountList.Count() == 1)
+                List<RideData> rideDataList = dbConnect.GetSql().Queryable<RideData>().Where(it => it.MemberID == packet.MemberID).ToList();
+
+                // 有找到帳號 且 有找到 騎乘資料
+                if (accountList.Count() == 1 && rideDataList.Count() == 1)
                 {
-                    string dateTime = DateTime.Now.ToString("yyyyMMdd-hhmmss");
+                    string dateTime = DateTime.UtcNow.ToString("MMdd-hhmmss");
 
                     string guidAll = Guid.NewGuid().ToString();
 
                     string[] guidList = guidAll.Split('-');
 
+                    // ======================= 新增騎乘紀錄 =======================
                     RideRecord record = new RideRecord
                     {
-                        RideID = "Dblha-" + guidList[0] + "-" + dateTime,
-                        UserID = packet.UserID,
+                        RideID = "DbRr-" + guidList[0] + "-" + dateTime,
+                        MemberID = packet.MemberID,
                         CreateDate = packet.CreateDate,
                         Title = packet.Title,
                         Photo = packet.Photo,
@@ -270,7 +211,46 @@ namespace RideService
 
                     dbConnect.GetSql().Insertable(record).ExecuteCommand();
 
+                    // ======================= 更新騎乘資料 =======================
+                    rideDataList[0].TotalDistance += packet.Distance;
+                    rideDataList[0].TotalAltitude += packet.Altitude;
+                    rideDataList[0].TotalRideTime += packet.Time;
+
+                    dbConnect.GetSql().Updateable<RideData>(rideDataList[0]).Where(it => it.MemberID == packet.MemberID).ExecuteCommand();
+
+                    // ======================= 更新周騎乘資料 =======================
+                    string firsDay = weekProcess.GetWeekFirstDay(DateTime.UtcNow);
+                    string lastDay = weekProcess.GetWeekLastDay(DateTime.UtcNow);
+
+                    List<WeekRideData> wRideDataList = dbConnect.GetSql().Queryable<WeekRideData>()
+                        .Where(it => it.MemberID == packet.MemberID && it.WeekFirstDay == firsDay && it.WeekLastDay == lastDay).ToList();
+
+                    // 有找到資料
+                    if (wRideDataList.Count() == 1)
+                    {
+                        wRideDataList[0].WeekDistance += packet.Distance;
+
+                        dbConnect.GetSql().Updateable<WeekRideData>(wRideDataList[0])
+                            .Where(it => it.MemberID == packet.MemberID && it.WeekFirstDay == firsDay && it.WeekLastDay == lastDay).ExecuteCommand();
+                    }
+                    else
+                    {
+                        WeekRideData updateWeek = new WeekRideData
+                        {
+                            MemberID = packet.MemberID,
+                            WeekFirstDay = firsDay,
+                            WeekLastDay = lastDay,
+                            WeekDistance = packet.Distance
+                        };
+
+                        dbConnect.GetSql().Insertable(updateWeek).ExecuteCommand();
+
+                    }
+
                     rData.Result = 1;
+                    rData.TotalDistance = rideDataList[0].TotalDistance;
+                    rData.TotalAltitude = rideDataList[0].TotalAltitude;
+                    rData.TotalRideTime = rideDataList[0].TotalRideTime;
 
                 }
                 else
@@ -291,36 +271,6 @@ namespace RideService
 
             return jsMain.ToString();
         }
-
-        ///**
-        // * 取得騎乘紀錄ID列表
-        // */
-        //private string OnGetRideRecordIdList(GetRideRecordIdList packet)
-        //{
-        //    RespondRideRecordIdList rData = new RespondRideRecordIdList();
-
-        //    JObject jsMain = new JObject();
-        //    jsMain.Add("CmdID", (int)S2C_CmdID.emRespondRideRecordIdList);
-        //    jsMain.Add("Data", JsonConvert.DeserializeObject<JObject>(JsonConvert.SerializeObject(rData)));
-
-        //    return jsMain.ToString();
-        //}
-
-        ///**
-        // * 取得騎乘紀錄ID列表
-        // */
-        //private string OnGetRideRecord(GetRideRecord packet)
-        //{
-        //    RespondRideRecord rData = new RespondRideRecord();
-
-        //    JObject jsMain = new JObject();
-        //    jsMain.Add("CmdID", (int)S2C_CmdID.emRespondRideRecord);
-        //    jsMain.Add("Data", JsonConvert.DeserializeObject<JObject>(JsonConvert.SerializeObject(rData)));
-
-        //    return jsMain.ToString();
-        //}
-
-
 
     }
 
