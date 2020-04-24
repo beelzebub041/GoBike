@@ -78,9 +78,9 @@ namespace UserService
                 }
 
             }
-            catch
+            catch (Exception ex)
             {
-
+                log.SaveLog($"[Error] Controller::Initialize, Catch Error, Msg:{ex.Message}");
 
             }
 
