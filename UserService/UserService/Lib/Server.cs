@@ -150,6 +150,12 @@ namespace UserService
 
         }
 
+        public void SaveLogAA(string msg)
+        {
+            this.log(msg);
+
+        }
+
         public string MessageProcess(string msg)
         {
             return this.msg(msg);

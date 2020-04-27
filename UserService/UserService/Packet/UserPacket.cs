@@ -1,5 +1,5 @@
 ﻿
-namespace Packet.ServerToClient
+namespace UserPacket.ServerToClient
 {
     public enum S2C_CmdID : int
     {
@@ -8,31 +8,6 @@ namespace Packet.ServerToClient
         emUpdateUserInfoResult,
         emUpdatePasswordResult,
     }
-
-    // 登入資料
-    class UserLoginData
-    {
-        public string MemberID { get; set; }
-        public string Nickname { get; set; }
-        public string Avatar { get; set; }
-        public string Birthday { get; set; }
-        public float BodyHeight { get; set; }
-        public float BodyWeight { get; set; }
-        public int Country { get; set; }
-        public string Email { get; set; }
-        public string FBToken { get; set; }
-        public string GoogleToken { get; set; }
-        public string FrontCover { get; set; }
-        public int Gender { get; set; }
-        public string LoginDate { get; set; }
-        public string Mobile { get; set; }
-        public string RegisterDate { get; set; }
-        public int RegisterSource { get; set; }
-        public double TotalAltitude { get; set; }
-        public double TotalDistance { get; set; }
-        public long TotalRideTime { get; set; }
-    }
-
 
     // 使用者註冊結果
     class UserRegisteredResult
@@ -59,9 +34,9 @@ namespace Packet.ServerToClient
         public int Result { get; set; }
 
         /**
-         * 登入資料
+         * 會員ID
          */
-        public UserLoginData LoginData { get; set; }
+        public string MemberID { get; set; }
     }
 
     // 更新使用者資訊結果
@@ -87,7 +62,7 @@ namespace Packet.ServerToClient
     }
 }
 
-namespace Packet.ClientToServer
+namespace UserPacket.ClientToServer
 {
     public enum C2S_CmdID : int
     {
@@ -178,7 +153,7 @@ namespace Packet.ClientToServer
     */
     class UpdateUserInfo
     {
-        // 使用者索引
+        // 會員ID
         public string MemberID { get; set; }
 
         // 使用者資料

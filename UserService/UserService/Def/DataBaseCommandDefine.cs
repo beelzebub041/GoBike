@@ -5,9 +5,6 @@ using System.Text;
 using System.Threading.Tasks;
 
 
-
-using SqlSugar;
-
 namespace DataBaseDef
 {
     // 使用者帳戶
@@ -20,7 +17,6 @@ namespace DataBaseDef
         public string GoogleToken { get; set; }
         public int RegisterSource { get; set; }
         public string RegisterDate { get; set; }
-        public string LoginDate { get; set; }
 
     }
 

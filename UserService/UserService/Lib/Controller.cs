@@ -14,8 +14,8 @@ using Tools.Logger;
 using DataBaseDef;
 using Connect;
 
-using Packet.ClientToServer;
-using Packet.ServerToClient;
+using UserPacket.ClientToServer;
+using UserPacket.ServerToClient;
 
 
 namespace UserService
@@ -30,7 +30,7 @@ namespace UserService
 
         private Server wsServer = null;                 // Web Socket Server
 
-        private string ControllerVersion = "Version007";
+        private string ControllerVersion = "Version009";
 
 
         public Controller(Form1 fm1)
@@ -220,7 +220,6 @@ namespace UserService
                             GoogleToken = packet.GoogleToken,
                             RegisterSource = packet.RegisterSource,
                             RegisterDate = dateTime,
-                            LoginDate = dateTime
                         };
 
                         dbConnect.GetSql().Insertable(account).ExecuteCommand();
@@ -299,37 +298,10 @@ namespace UserService
                     {
                         List<UserInfo> infoList = dbConnect.GetSql().Queryable<UserInfo>().Where(it => it.MemberID == accountList[0].MemberID).ToList();
 
-                        List<RideData> rideDataList = dbConnect.GetSql().Queryable<RideData>().Where(it => it.MemberID == accountList[0].MemberID).ToList();
-
-                        if (infoList.Count() == 1 && rideDataList.Count() == 1)
+                        if (infoList.Count() == 1)
                         {
-                            rData.LoginData = new UserLoginData()
-                            {
-                                Email = accountList[0].Email,
-                                FBToken = accountList[0].FBToken,
-                                GoogleToken = accountList[0].GoogleToken,
-                                LoginDate = DateTime.Parse(accountList[0].LoginDate).ToString("yyyy-MM-dd hh:mm:ss"),
-                                RegisterDate = DateTime.Parse(accountList[0].RegisterDate).ToString("yyyy-MM-dd hh:mm:ss"),
-                                RegisterSource = accountList[0].RegisterSource,
-
-                                MemberID = infoList[0].MemberID,
-                                Nickname = infoList[0].NickName,
-                                Avatar = infoList[0].Avatar,
-                                Birthday = DateTime.Parse(infoList[0].Birthday).ToString("yyyy-MM-dd hh:mm:ss"),
-                                BodyHeight = infoList[0].BodyHeight,
-                                BodyWeight = infoList[0].BodyWeight,
-                                Country = infoList[0].Country,
-                                FrontCover = infoList[0].FrontCover,
-                                Gender = infoList[0].Gender,
-                                Mobile = infoList[0].Mobile,
-                                
-                                TotalAltitude = rideDataList[0].TotalAltitude,
-                                TotalDistance = rideDataList[0].TotalDistance,
-                                TotalRideTime = rideDataList[0].TotalRideTime
-                            };
-
                             rData.Result = 1;
-
+                            rData.MemberID = accountList[0].MemberID;
                         }
                         else
                         {
@@ -385,12 +357,10 @@ namespace UserService
                     infoList[0].FrontCover = packet.UpdateData.FrontCover == null ? infoList[0].FrontCover : packet.UpdateData.FrontCover;
                     infoList[0].Avatar = packet.UpdateData.Avatar == null ? infoList[0].Avatar : packet.UpdateData.Avatar;
                     infoList[0].Mobile = packet.UpdateData.Mobile == null ? infoList[0].Mobile : packet.UpdateData.Mobile;
+                    infoList[0].Gender = packet.UpdateData.Gender == 0 ? infoList[0].Gender : packet.UpdateData.Gender;
                     infoList[0].Country = packet.UpdateData.Country == 0 ? infoList[0].Country : packet.UpdateData.Country;
 
                     dbConnect.GetSql().Updateable<UserInfo>(infoList[0]).Where(it => it.MemberID == packet.MemberID).ExecuteCommand();
-
-                    //dbConnect.GetSql().Updateable<UserAccount>().SetColumns(it => new UserAccount() { Password = packet.NewPassword }).Where(it => it.MemberID == packet.MemberID).ExecuteCommand();
-
 
                     rData.Result = 1;
                 }
@@ -427,16 +397,9 @@ namespace UserService
                 // 有找到帳號
                 if (accountList.Count() == 1)
                 {
-                    if (accountList[0].Password == packet.Password)
-                    {
-                        dbConnect.GetSql().Updateable<UserAccount>().SetColumns(it => new UserAccount() { Password = packet.NewPassword }).Where(it => it.MemberID == packet.MemberID).ExecuteCommand();
+                    dbConnect.GetSql().Updateable<UserAccount>().SetColumns(it => new UserAccount() { Password = packet.NewPassword }).Where(it => it.MemberID == packet.MemberID).ExecuteCommand();
 
-                        rData.Result = 1;
-                    }
-                    else
-                    {
-                        rData.Result = 2;
-                    }
+                    rData.Result = 1;
                 }
                 else
                 {
