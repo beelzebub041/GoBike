@@ -28,9 +28,9 @@ namespace AccountService.Communication
 
         private AccountService accountService = null;
 
-        public ClientConnect(string sIp, int iPort, AccountService service)
+        public ClientConnect(string sIp, int iPort, AccountService service, Logger log)
         {
-            log = new Logger();
+            this.log = log;
 
             accountService = service;
 

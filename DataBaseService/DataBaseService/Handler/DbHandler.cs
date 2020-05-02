@@ -89,17 +89,34 @@ namespace DataBaseService.Handler
         }
 
         /**
-         * SQL 命令處理
+         * SQL 操作
          * 
          */
-        public void SqlCommandProcess(string sqlCmd)
+        public void SqlCommand_Process(string sqlCmd)
         {
             //lock (this)
             {
                 MySqlCommand cmd = new MySqlCommand(sqlCmd, sql);
-                int n = cmd.ExecuteNonQuery();
+
+                cmd.ExecuteNonQuery();
             }
 
+        }
+
+        /**
+         * SQL 查詢
+         */
+        public int SqlCommand_Search(string sqlCmd)
+        {
+            //lock (this)
+            {
+                MySqlCommand cmd = new MySqlCommand(sqlCmd, sql);
+
+
+                int n = Convert.ToInt32(cmd.ExecuteScalar());
+
+                return n;
+            }
         }
 
     }

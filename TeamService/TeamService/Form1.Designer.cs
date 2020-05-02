@@ -1,4 +1,4 @@
-﻿namespace AccountService.Main
+﻿namespace TeamService
 {
     partial class Form1
     {
@@ -51,7 +51,7 @@
             this.ClientSize = new System.Drawing.Size(482, 207);
             this.Controls.Add(this.ConsoleTextBox);
             this.Name = "Form1";
-            this.Text = "Account Service";
+            this.Text = "Team Service";
             this.ResumeLayout(false);
             this.PerformLayout();
 

@@ -8,15 +8,13 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 
+using Connect;
 using Tools.Logger;
 
-namespace AccountService.Main
+namespace TeamService
 {
     public partial class Form1 : Form
     {
-        private AccountService accountService = null;
-
-        private Logger log = null;
 
         // 定義Dalegate(委派)方法 (參數部分需與帶入的方法所用之參數相同)
         public delegate void TextBoxDalegate(string s);
@@ -28,32 +26,20 @@ namespace AccountService.Main
             // 添加Close事件
             this.FormClosing += new System.Windows.Forms.FormClosingEventHandler(this.Form1_FormClosing);
 
-            log = new Logger(this);
-
-            accountService = new AccountService(log);
-
-            if (accountService.Initialize())
-            {
-                log.saveLog("[Info][Error] Form1: Login Server Initialize Success");
-            }
-            else 
-            {
-                log.saveLog("[Info][Error] Form1: Login Server Initialize Fail");
-            }
+            Initialize();
         }
 
         ~Form1()
         {
-           if (accountService != null)
-           {
-                accountService.StopProcess();
-           }
 
-            if (log != null)
-            {
-                accountService.StopProcess();
-            }
+        }
 
+        void Initialize()
+        {
+            Controller ctrl = new Controller(this);
+
+            ctrl.Initialize();
+            
         }
 
         public void updateTextBox(string msg)
@@ -102,7 +88,7 @@ namespace AccountService.Main
                 }
                 else
                 {
-                    accountService.StopProcess();
+                    //accountService.StopProcess();
                 }
             }
         }

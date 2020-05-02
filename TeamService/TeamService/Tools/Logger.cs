@@ -7,14 +7,13 @@ using System.Threading.Tasks;
 using System.IO;
 using System.Windows.Forms;
 
-using AccountService.Main;
+using TeamService;
 
 namespace Tools.Logger
 {
     class Logger
     {
-
-        private Form1 fm;
+        private Form1 fm = null;
 
         public Logger(Form1 fm)
         {
@@ -43,11 +42,11 @@ namespace Tools.Logger
 
         }
 
-        public void saveLog(string msg)
+        public void SaveLog(string msg)
         {
             try
             {
-                //fm.Invoke(fm.tbd, msg);
+                Console.WriteLine(msg);
 
                 fm.updateTextBox(msg);
 

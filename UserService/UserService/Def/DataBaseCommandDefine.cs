@@ -114,4 +114,51 @@ namespace DataBaseDef
 
     }
 
+    // 車隊資料
+    public class TeamData
+    {
+        // 車隊ID
+        public string TeamID { get; set; }
+
+        // 建立日期
+        public string CreateDate { get; set; }
+
+        // 車隊長的MemberID
+        public string Leader { get; set; }
+
+        // 副隊長的MemberID列表
+        public string TeamViceLeaderIDs { get; set; }
+
+        // 車隊成員的MemberID列表
+        public string TeamMemberIDs { get; set; }
+
+        // 車隊名稱
+        public string TeamName { get; set; }
+
+        // 車隊簡介
+        public string TeamInfo { get; set; }
+
+        // 車隊頭像
+        public string Avatar { get; set; }
+
+        // 車隊封面
+        public string FrontCover { get; set; }
+
+        // 車隊所在地
+        public int CountyID { get; set; }
+
+        // 是否開放搜尋
+        public int SearchStatus { get; set; }
+
+        // 加入車隊是否需要審核
+        public int ExamineStatus { get; set; }
+
+        // 申請加入的會員ID列表
+        public string ApplyJoinList { get; set; }
+
+        // 邀請加入的會員ID列表
+        public string InviteJoinList { get; set; }
+
+    }
+
 }

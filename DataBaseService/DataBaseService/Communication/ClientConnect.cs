@@ -192,9 +192,16 @@ namespace DataBaseService.Communication
                     switch (packetName)
                     {
                         case "C2S_UserRegistered":
-                            C2S_UserRegistered msgObject = JsonSerializer.Deserialize<C2S_UserRegistered>(packetData);
+                            C2S_UserRegistered registeredMsg = JsonSerializer.Deserialize<C2S_UserRegistered>(packetData);
 
-                            AddNewAccount(msgObject, iClientIdx);
+                            AddNewAccount(registeredMsg, iClientIdx);
+
+                            break;
+
+                        case "C2S_UserLogin":
+                            C2S_UserLogin loginMsg = JsonSerializer.Deserialize<C2S_UserLogin>(packetData);
+
+                            UserLogin(loginMsg, iClientIdx);
 
                             break;
                     }
@@ -210,17 +217,17 @@ namespace DataBaseService.Communication
 
         }
 
-        private void AddNewAccount(C2S_UserRegistered msgObject, int iClientIdx)
+        private void AddNewAccount(C2S_UserRegistered registeredMsg, int iClientIdx)
         {
             S2C_UserRegisteredResult rData = new S2C_UserRegisteredResult();
 
-            if (msgObject.Password == msgObject.CheckPassword)
+            if (registeredMsg.Password == registeredMsg.CheckPassword)
             {
                 DateTime dt = DateTime.Now;
 
-                string sqlCmd = "INSERT INTO userinfo.useraccount (ID, Account, Password, CREATE_DATE) VALUES(0, '" + msgObject.Account + "', '" + msgObject.Password + "', '" + dt.ToString("yyyy-MM-dd hh:mm:ss") + "')";
+                string sqlCmd = "INSERT INTO userinfo.useraccount (ID, Account, Password, CREATE_DATE) VALUES(0, '" + registeredMsg.Account + "', '" + registeredMsg.Password + "', '" + dt.ToString("yyyy-MM-dd hh:mm:ss") + "')";
 
-                dbHander.SqlCommandProcess(sqlCmd);
+                dbHander.SqlCommand_Process(sqlCmd);
 
                 rData.Result = 0;
             }
@@ -233,6 +240,26 @@ namespace DataBaseService.Communication
 
             SendMsg(packet, iClientIdx);
 
+        }
+
+        private void UserLogin(C2S_UserLogin loginMsg, int iClientIdx)
+        {
+            S2C_UserLoginResult rData = new S2C_UserLoginResult();
+
+            string sqlCmd = "select count(*) FROM userinfo.useraccount where Account = '" + loginMsg.Account + "' and Password = '" + loginMsg.Password + "'";
+
+            if (dbHander.SqlCommand_Search(sqlCmd) == 1)
+            {
+                rData.Result = 1;
+            }
+            else
+            {
+                rData.Result = 0;
+            }
+
+            string packet = JsonSerializer.Serialize<S2C_UserLoginResult>(rData);
+
+            SendMsg(packet, iClientIdx);
         }
     }
 }

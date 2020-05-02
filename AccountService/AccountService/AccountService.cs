@@ -17,7 +17,7 @@ namespace AccountService
         [DllImport("kernel32")]
         private static extern int GetPrivateProfileString(string section, string key, string def, StringBuilder retVal, int size, string filePath);
 
-        private Logger log = null;                          // Logger Class
+        public Logger log = null;                          // Logger Class
 
         private ClientConnect sc = null;                    // SocketConnect Class
 
@@ -31,14 +31,11 @@ namespace AccountService
 
         private int dbscPort = 0;                           // DataBaseServiceConnect Port
 
-        private List<string> C2S_PacketList;                // Client Packet List
 
-
-
-        // LoginService 建構式
-        public AccountService()
+        // 建構式
+        public AccountService(Logger log)
         {
-            log = new Logger();
+            this.log = log;
 
         }
 
@@ -46,11 +43,6 @@ namespace AccountService
         ~AccountService()
         {
             StopProcess();
-
-            if (log != null)
-            {
-                // TODO 刪除物件
-            }
 
             if (sc != null)
             {
@@ -77,7 +69,7 @@ namespace AccountService
                     log.saveLog("[Info] AccountService::Initialize, Loading Config Success");
 
                     // 建立Server Socket物件
-                    sc = new ClientConnect(localIp, localPort, this);
+                    sc = new ClientConnect(localIp, localPort, this, log);
 
                     sc.Start();
 
