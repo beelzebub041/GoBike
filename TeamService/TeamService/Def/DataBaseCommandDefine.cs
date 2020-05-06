@@ -10,12 +10,25 @@ namespace DataBaseDef
     // 使用者帳戶
     public class UserAccount
     {
+        // 會員ID
         public string MemberID { get; set; }
+
+        // Email
         public string Email { get; set; }
+
+        // 密碼
         public string Password { get; set; }
+
+        // FB Token
         public string FBToken { get; set; }
+
+        // Google Token
         public string GoogleToken { get; set; }
+
+        // 註冊來源
         public int RegisterSource { get; set; }
+
+        // 註冊日期
         public string RegisterDate { get; set; }
 
     }
@@ -23,16 +36,47 @@ namespace DataBaseDef
     // 使用者資料
     public class UserInfo
     {
+        // 會員ID
         public string MemberID { get; set; }
-        public string Avatar { get; set; }
+
+        // 暱稱
         public string NickName { get; set; }
+
+        // 生日
         public string Birthday { get; set; }
+
+        // 身高
         public float BodyHeight { get; set; }
+
+        // 體重
         public float BodyWeight { get; set; }
+
+        // 封面
         public string FrontCover { get; set; }
+
+        // 玩家頭像
+        public string Avatar { get; set; }
+
+        //首頁圖片
+        public string Photo { get; set; }
+
+        // 手機認證
         public string Mobile { get; set; }
+
+        // 性別
         public int Gender { get; set; }
-        public int Country { get; set; }
+
+        // 居住地
+        public int County { get; set; }
+
+        // 車隊列表 (紀錄車隊ID)
+        public string TeamList { get; set; }
+
+        // 好友列表 (紀錄會員ID)
+        public string FriendList { get; set; }
+
+        // 黑名單列表 (紀錄會員ID)
+        public string BlackList { get; set; }
 
     }
 

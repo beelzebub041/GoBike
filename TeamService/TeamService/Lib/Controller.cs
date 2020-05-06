@@ -30,7 +30,7 @@ namespace TeamService
 
         private Server wsServer = null;                 // Web Socket Server
 
-        private string ControllerVersion = "Version001";
+        private string ControllerVersion = "Version002";
 
 
         public Controller(Form1 fm1)
