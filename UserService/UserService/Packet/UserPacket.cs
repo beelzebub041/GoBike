@@ -7,6 +7,9 @@ namespace UserPacket.ServerToClient
         emUserLoginResult,
         emUpdateUserInfoResult,
         emUpdatePasswordResult,
+        emUpdateTeamListResult,
+        emUpdateFriendListResult,
+        emUpdateBlackListResult
     }
 
     // 使用者註冊結果
@@ -60,6 +63,65 @@ namespace UserPacket.ServerToClient
         public int Result { get; set; }
 
     }
+
+    // 更新車隊列表結果
+    class UpdateTeamListResult
+    {
+        /**
+          * 更新動作
+          * -1: 無動作
+          * 0: 新增
+          * 1: 刪除
+          */
+        public int Action { get; set; }
+
+        /*
+        * 0: 失敗
+        * 1: 成功
+        */
+        public int Result { get; set; }
+
+    }
+
+    // 更新好友列表結果
+    class UpdateFriendListResult
+    {
+        /**
+          * 更新動作
+          * -1: 無動作
+          * 0: 新增
+          * 1: 刪除
+          */
+        public int Action { get; set; }
+
+        /*
+        * 0: 失敗
+        * 1: 成功
+        */
+        public int Result { get; set; }
+
+    }
+
+    // 更新黑名單列表結果
+    class UpdateBlackListResult
+    {
+        /**
+          * 更新動作
+          * -1: 無動作
+          * 0: 新增
+          * 1: 刪除
+          */
+        public int Action { get; set; }
+
+        /*
+        * 0: 失敗
+        * 1: 成功
+        */
+        public int Result { get; set; }
+
+    }
+
+
 }
 
 namespace UserPacket.ClientToServer
@@ -70,6 +132,9 @@ namespace UserPacket.ClientToServer
         emUserLogin,
         emUpdateUserInfo,
         emUpdatePassword,
+        emUpdateTeamList,
+        emUpdateFriendList,
+        emUpdateBlackList,
     }
 
     // ======================= User ======================= //
@@ -119,9 +184,6 @@ namespace UserPacket.ClientToServer
         // 暱稱
         public string NickName { get; set; }
 
-        // 登入資料
-        public string LoginData { get; set; }
-
         // 生日
         public string Birthday { get; set; }
 
@@ -136,6 +198,9 @@ namespace UserPacket.ClientToServer
 
         // 頭像路徑
         public string Avatar { get; set; }
+
+        // 首頁圖片路徑
+        public string Photo { get; set; }
 
         // 手機認證
         public string Mobile { get; set; }
@@ -177,5 +242,66 @@ namespace UserPacket.ClientToServer
 
     }
 
+    /*
+    * 更新車隊列表
+    */
+    class UpdateTeamList
+    {
+        // 會員ID
+        public string MemberID { get; set; }
+
+        /**
+        * 更新動作
+        * -1: 刪除
+        * 0: 無動作
+        * 1: 新增
+        */
+        public int Action { get; set; }
+
+        // 車隊ID
+        public string TeamID { get; set; }
+    }
+
+    /*
+    * 更新好友列表
+    */
+    class UpdateFriendList
+    {
+        // 會員ID
+        public string MemberID { get; set; }
+
+        /**
+        * 更新動作
+        * -1: 刪除
+        * 0: 無動作
+        * 1: 新增
+        */
+        public int Action { get; set; }
+
+        // 好友的會員ID
+        public string FriendID { get; set; }
+    }
+
+    /*
+    * 更新黑名單列表
+    */
+    class UpdateBlackList
+    {
+        // 會員ID
+        public string MemberID { get; set; }
+
+        /**
+        * 更新動作
+        * -1: 刪除
+        * 0: 無動作
+        * 1: 新增
+        */
+        public int Action { get; set; }
+
+        // 黑名單的會員ID
+        public string BlackID { get; set; }
+    }
+
 
 }
+

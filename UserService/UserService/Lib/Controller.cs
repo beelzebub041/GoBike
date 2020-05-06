@@ -30,7 +30,7 @@ namespace UserService
 
         private Server wsServer = null;                 // Web Socket Server
 
-        private string ControllerVersion = "Version009";
+        private string ControllerVersion = "Version010";
 
 
         public Controller(Form1 fm1)
@@ -140,6 +140,27 @@ namespace UserService
 
                                     break;
 
+                                case (int)C2S_CmdID.emUpdateTeamList:
+                                    UpdateTeamList teamMsg = JsonConvert.DeserializeObject<UpdateTeamList>(packetData);
+
+                                    sReturn = OnUpdateTeamList(teamMsg);
+
+                                    break;
+
+                                case (int)C2S_CmdID.emUpdateFriendList:
+                                    UpdateFriendList friendMsg = JsonConvert.DeserializeObject<UpdateFriendList>(packetData);
+
+                                    sReturn = OnUpdateFriendList(friendMsg);
+
+                                    break;
+
+                                case (int)C2S_CmdID.emUpdateBlackList:
+                                    UpdateBlackList blackMsg = JsonConvert.DeserializeObject<UpdateBlackList>(packetData);
+
+                                    sReturn = OnUpdateBlackList(blackMsg);
+
+                                    break;
+
                                 default:
                                     log.SaveLog($"[Warning] Controller::MessageProcess Can't Find CmdID {cmdID}");
 
@@ -234,8 +255,11 @@ namespace UserService
                             BodyWeight = 0,
                             FrontCover = "",
                             Avatar = "",
+                            Photo = "",
                             Mobile = "",
-                            Country = -1
+                            County = -1,
+                            TeamList = "",
+                            FriendList = ""
                         };
 
                         dbConnect.GetSql().Insertable(info).ExecuteCommand();
@@ -356,9 +380,10 @@ namespace UserService
                     infoList[0].BodyWeight = packet.UpdateData.BodyWeight == 0 ? infoList[0].BodyWeight : packet.UpdateData.BodyWeight;
                     infoList[0].FrontCover = packet.UpdateData.FrontCover == null ? infoList[0].FrontCover : packet.UpdateData.FrontCover;
                     infoList[0].Avatar = packet.UpdateData.Avatar == null ? infoList[0].Avatar : packet.UpdateData.Avatar;
+                    infoList[0].Photo = packet.UpdateData.Photo == null ? infoList[0].Photo : packet.UpdateData.Photo;
                     infoList[0].Mobile = packet.UpdateData.Mobile == null ? infoList[0].Mobile : packet.UpdateData.Mobile;
                     infoList[0].Gender = packet.UpdateData.Gender == 0 ? infoList[0].Gender : packet.UpdateData.Gender;
-                    infoList[0].Country = packet.UpdateData.Country == 0 ? infoList[0].Country : packet.UpdateData.Country;
+                    infoList[0].County = packet.UpdateData.Country == 0 ? infoList[0].County : packet.UpdateData.Country;
 
                     dbConnect.GetSql().Updateable<UserInfo>(infoList[0]).Where(it => it.MemberID == packet.MemberID).ExecuteCommand();
 
@@ -415,6 +440,294 @@ namespace UserService
 
             JObject jsMain = new JObject();
             jsMain.Add("CmdID", (int)S2C_CmdID.emUpdatePasswordResult);
+            jsMain.Add("Data", JsonConvert.DeserializeObject<JObject>(JsonConvert.SerializeObject(rData)));
+
+            return jsMain.ToString();
+        }
+
+        /**
+         * 更新車隊列表
+         */
+        private string OnUpdateTeamList(UpdateTeamList packet)
+        {
+            UpdateTeamListResult rData = new UpdateTeamListResult();
+            rData.Action = packet.Action;
+
+            try
+            {
+                List<UserInfo> userList = dbConnect.GetSql().Queryable<UserInfo>().Where(it => it.MemberID == packet.MemberID).ToList();
+
+                // 有找到會員
+                if (userList.Count() == 1)
+                {
+                    JObject jsData = JObject.Parse(userList[0].TeamList);
+
+                    if (jsData.ContainsKey("TeamList"))
+                    {
+                        JArray jsArray = jsData["TeamList"] as JArray;
+
+                        List<string> idList = jsArray.ToObject<List<string>>();
+
+                        // 新增
+                        if (packet.Action == 1)
+                        {
+                            if (!idList.Contains(packet.TeamID))
+                            {
+                                idList.Add(packet.TeamID);
+
+                                rData.Result = 1;
+
+                            }
+                            else
+                            {
+                                rData.Result = 0;
+                            }
+
+                        }
+                        // 刪除
+                        else if (packet.Action == -1)
+                        {
+                            if (idList.Contains(packet.TeamID))
+                            {
+                                idList.Remove(packet.TeamID);
+
+                                rData.Result = 1;
+                            }
+                            else
+                            {
+                                rData.Result = 0;
+                            }
+                        }
+
+                        if (rData.Result == 1)
+                        {
+                            JObject jsNew = new JObject();
+                            jsNew.Add("TeamList", JArray.FromObject(idList));
+
+
+                            if (dbConnect.GetSql().Updateable<UserInfo>().SetColumns(it => new UserInfo() { TeamList = jsNew.ToString() }).Where(it => it.MemberID == packet.MemberID).ExecuteCommand() > 0)
+                            {
+                                rData.Result = 1;
+                            }
+                            else
+                            {
+                                rData.Result = 0;
+                            }
+                        }
+
+                    }
+                    else
+                    {
+                        rData.Result = 0;
+                    }
+
+                }
+                else
+                {
+                    rData.Result = 0;
+                }
+            }
+            catch (Exception ex)
+            {
+                log.SaveLog("[Error] Controller::OnUpdateTeamList Catch Error, Msg:" + ex.Message);
+
+                rData.Result = 0;
+            }
+
+            JObject jsMain = new JObject();
+            jsMain.Add("CmdID", (int)S2C_CmdID.emUpdateTeamListResult);
+            jsMain.Add("Data", JsonConvert.DeserializeObject<JObject>(JsonConvert.SerializeObject(rData)));
+
+            return jsMain.ToString();
+        }
+
+        /**
+         * 更新好友列表
+         */
+        private string OnUpdateFriendList(UpdateFriendList packet)
+        {
+            UpdateFriendListResult rData = new UpdateFriendListResult();
+            rData.Action = packet.Action;
+
+            try
+            {
+                List<UserInfo> userList = dbConnect.GetSql().Queryable<UserInfo>().Where(it => it.MemberID == packet.MemberID).ToList();
+
+                // 有找到會員
+                if (userList.Count() == 1)
+                {
+                    JObject jsData = JObject.Parse(userList[0].TeamList);
+
+                    if (jsData.ContainsKey("FriendList"))
+                    {
+                        JArray jsArray = jsData["FriendList"] as JArray;
+
+                        List<string> idList = jsArray.ToObject<List<string>>();
+
+                        // 新增
+                        if (packet.Action == 1)
+                        {
+                            if (!idList.Contains(packet.FriendID))
+                            {
+                                idList.Add(packet.FriendID);
+
+                                rData.Result = 1;
+
+                            }
+                            else
+                            {
+                                rData.Result = 0;
+                            }
+
+                        }
+                        // 刪除
+                        else if (packet.Action == -1)
+                        {
+                            if (idList.Contains(packet.FriendID))
+                            {
+                                idList.Remove(packet.FriendID);
+
+                                rData.Result = 1;
+                            }
+                            else
+                            {
+                                rData.Result = 0;
+                            }
+                        }
+
+                        if (rData.Result == 1)
+                        {
+                            JObject jsNew = new JObject();
+                            jsNew.Add("FriendList", JArray.FromObject(idList));
+
+
+                            if (dbConnect.GetSql().Updateable<UserInfo>().SetColumns(it => new UserInfo() { FriendList = jsNew.ToString() }).Where(it => it.MemberID == packet.MemberID).ExecuteCommand() > 0)
+                            {
+                                rData.Result = 1;
+                            }
+                            else
+                            {
+                                rData.Result = 0;
+                            }
+                        }
+
+                    }
+                    else
+                    {
+                        rData.Result = 0;
+                    }
+
+                }
+                else
+                {
+                    rData.Result = 0;
+                }
+            }
+            catch (Exception ex)
+            {
+                log.SaveLog("[Error] Controller::OnUpdateFriendList Catch Error, Msg:" + ex.Message);
+
+                rData.Result = 0;
+            }
+
+            JObject jsMain = new JObject();
+            jsMain.Add("CmdID", (int)S2C_CmdID.emUpdateFriendListResult);
+            jsMain.Add("Data", JsonConvert.DeserializeObject<JObject>(JsonConvert.SerializeObject(rData)));
+
+            return jsMain.ToString();
+        }
+
+        /**
+         * 更新黑名單列表
+         */
+        private string OnUpdateBlackList(UpdateBlackList packet)
+        {
+            UpdateBlackListResult rData = new UpdateBlackListResult();
+            rData.Action = packet.Action;
+
+            try
+            {
+                List<UserInfo> userList = dbConnect.GetSql().Queryable<UserInfo>().Where(it => it.MemberID == packet.MemberID).ToList();
+
+                // 有找到會員
+                if (userList.Count() == 1)
+                {
+                    JObject jsData = JObject.Parse(userList[0].TeamList);
+
+                    if (jsData.ContainsKey("BlackList"))
+                    {
+                        JArray jsArray = jsData["BlackList"] as JArray;
+
+                        List<string> idList = jsArray.ToObject<List<string>>();
+
+                        // 新增
+                        if (packet.Action == 1)
+                        {
+                            if (!idList.Contains(packet.BlackID))
+                            {
+                                idList.Add(packet.BlackID);
+
+                                rData.Result = 1;
+
+                            }
+                            else
+                            {
+                                rData.Result = 0;
+                            }
+
+                        }
+                        // 刪除
+                        else if (packet.Action == -1)
+                        {
+                            if (idList.Contains(packet.BlackID))
+                            {
+                                idList.Remove(packet.BlackID);
+
+                                rData.Result = 1;
+                            }
+                            else
+                            {
+                                rData.Result = 0;
+                            }
+                        }
+
+                        if (rData.Result == 1)
+                        {
+                            JObject jsNew = new JObject();
+                            jsNew.Add("BlackList", JArray.FromObject(idList));
+
+
+                            if (dbConnect.GetSql().Updateable<UserInfo>().SetColumns(it => new UserInfo() { FriendList = jsNew.ToString() }).Where(it => it.MemberID == packet.MemberID).ExecuteCommand() > 0)
+                            {
+                                rData.Result = 1;
+                            }
+                            else
+                            {
+                                rData.Result = 0;
+                            }
+                        }
+
+                    }
+                    else
+                    {
+                        rData.Result = 0;
+                    }
+
+                }
+                else
+                {
+                    rData.Result = 0;
+                }
+            }
+            catch (Exception ex)
+            {
+                log.SaveLog("[Error] Controller::OnUpdateBlackList Catch Error, Msg:" + ex.Message);
+
+                rData.Result = 0;
+            }
+
+            JObject jsMain = new JObject();
+            jsMain.Add("CmdID", (int)S2C_CmdID.emUpdateBlackListResult);
             jsMain.Add("Data", JsonConvert.DeserializeObject<JObject>(JsonConvert.SerializeObject(rData)));
 
             return jsMain.ToString();
