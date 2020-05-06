@@ -33,7 +33,7 @@ namespace RideService
 
         private Server wsServer = null;                 // Web Socket Server
 
-        private string ControllerVersion = "Version001";
+        private string ControllerVersion = "Version003";
 
 
         public Controller(Form1 fm1)
