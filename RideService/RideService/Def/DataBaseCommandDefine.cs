@@ -128,7 +128,7 @@ namespace DataBaseDef
         public int Level { get; set; }
 
         // 鄉鎮地區
-        public int CountyID { get; set; }
+        public int County { get; set; }
 
         // 騎乘路線
         public string Route { get; set; }
@@ -189,7 +189,7 @@ namespace DataBaseDef
         public string FrontCover { get; set; }
 
         // 車隊所在地
-        public int CountyID { get; set; }
+        public int County { get; set; }
 
         // 是否開放搜尋
         public int SearchStatus { get; set; }

@@ -203,7 +203,7 @@ namespace RideService
                         Distance = packet.Distance,
                         Altitude = packet.Altitude,
                         Level = packet.Level,
-                        CountyID = packet.CountyID,
+                        County = packet.County,
                         Route = packet.Route,
                         ShareContent = packet.ShareContent,
                         SharedType = packet.SharedType

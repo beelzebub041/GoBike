@@ -66,7 +66,7 @@ namespace Packet.ClientToServer
         public int Level { get; set; }
 
         // 鄉鎮地區
-        public int CountyID { get; set; }
+        public int County { get; set; }
 
         // 騎乘路線
         public string Route { get; set; }
