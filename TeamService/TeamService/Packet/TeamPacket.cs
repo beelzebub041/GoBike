@@ -161,7 +161,7 @@ namespace TeamPacket.ClientToServer
         public string FrontCover { get; set; }
 
         // 車隊所在地
-        public int CountyID { get; set; }
+        public int County { get; set; }
 
         // 是否開放搜尋
         public int SearchStatus { get; set; }
@@ -192,7 +192,7 @@ namespace TeamPacket.ClientToServer
         public string FrontCover { get; set; }
 
         // 車隊所在地
-        public int CountyID { get; set; }
+        public int County { get; set; }
 
         // 是否開放搜尋
         public int SearchStatus { get; set; }

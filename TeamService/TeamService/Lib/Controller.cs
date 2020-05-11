@@ -241,7 +241,7 @@ namespace TeamService
                         TeamInfo = packet.TeamInfo,
                         Avatar = packet.Avatar,
                         FrontCover = packet.FrontCover,
-                        CountyID = packet.CountyID,
+                        County = packet.County,
                         SearchStatus = packet.SearchStatus,
                         ExamineStatus = packet.ExamineStatus,
                         ApplyJoinList = "{\"Apply\":[]}",
@@ -303,7 +303,7 @@ namespace TeamService
                     TeamList[0].TeamInfo = packet.TeamInfo == null ? TeamList[0].TeamInfo : packet.TeamInfo;
                     TeamList[0].Avatar = packet.Avatar == null ? TeamList[0].Avatar : packet.Avatar;
                     TeamList[0].FrontCover = packet.FrontCover == null ? TeamList[0].FrontCover : packet.FrontCover;
-                    TeamList[0].CountyID = packet.CountyID == 0 ? TeamList[0].CountyID : packet.CountyID;
+                    TeamList[0].County = packet.County == 0 ? TeamList[0].County : packet.County;
                     TeamList[0].SearchStatus = packet.SearchStatus == 0 ? TeamList[0].SearchStatus : packet.SearchStatus;
                     TeamList[0].ExamineStatus = packet.ExamineStatus == 0 ? TeamList[0].ExamineStatus : packet.ExamineStatus;
 
