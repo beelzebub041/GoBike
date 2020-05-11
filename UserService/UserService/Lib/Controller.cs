@@ -30,7 +30,7 @@ namespace UserService
 
         private Server wsServer = null;                 // Web Socket Server
 
-        private string ControllerVersion = "Version010";
+        private string ControllerVersion = "Version015";
 
 
         public Controller(Form1 fm1)
@@ -230,7 +230,6 @@ namespace UserService
 
                         string[] guidList = guidAll.Split('-');
 
-
                         // 建立新帳號
                         UserAccount account = new UserAccount
                         {
@@ -242,8 +241,6 @@ namespace UserService
                             RegisterSource = packet.RegisterSource,
                             RegisterDate = dateTime,
                         };
-
-                        dbConnect.GetSql().Insertable(account).ExecuteCommand();
 
                         // 新增使用者資訊
                         UserInfo info = new UserInfo
@@ -258,11 +255,10 @@ namespace UserService
                             Photo = "",
                             Mobile = "",
                             County = -1,
-                            TeamList = "",
-                            FriendList = ""
+                            TeamList = "{\"TeamList\":[]}",
+                            FriendList = "{\"FriendList\":[]}",
+                            BlackList = "{\"BlackList\":[]}"
                         };
-
-                        dbConnect.GetSql().Insertable(info).ExecuteCommand();
 
                         // 新增騎乘資料
                         RideData data = new RideData
@@ -273,13 +269,29 @@ namespace UserService
                             TotalRideTime = 0,
                         };
 
-                        dbConnect.GetSql().Insertable(data).ExecuteCommand();
+                        // 資料有寫入資料庫
+                        if (dbConnect.GetSql().Insertable(account).ExecuteCommand() > 0 &&
+                            dbConnect.GetSql().Insertable(info).ExecuteCommand() > 0 &&
+                            dbConnect.GetSql().Insertable(data).ExecuteCommand() > 0)
+                        {
+                            rData.Result = 1;
 
-                        rData.Result = 1;
+                            log.SaveLog("[Info] Controller::OnCreateNewAccount Create New Account Success");
+                        }
+                        else
+                        {
+                            rData.Result = 0;
+
+                            log.SaveLog("[Warning] Controller::OnCreateNewAccount Email Repeat:");
+                        }
+
                     }
                     else
                     {
                         rData.Result = 2;
+
+                        log.SaveLog("[Info] Controller::OnCreateNewAccount Email Repeat:");
+
                     }
 
                 }
@@ -294,6 +306,9 @@ namespace UserService
             else
             {
                 rData.Result = 3;
+
+                log.SaveLog("[Info] Controller::OnCreateNewAccount Check Password Error:");
+
             }
 
             JObject jsMain = new JObject();
@@ -322,6 +337,7 @@ namespace UserService
                     {
                         List<UserInfo> infoList = dbConnect.GetSql().Queryable<UserInfo>().Where(it => it.MemberID == accountList[0].MemberID).ToList();
 
+                        // 有找到會員
                         if (infoList.Count() == 1)
                         {
                             rData.Result = 1;
@@ -329,16 +345,16 @@ namespace UserService
                         }
                         else
                         {
-                            log.SaveLog("[Error] Controller::OnUserLogin Can't Find User Info or Ride Data");
+                            log.SaveLog("[Warning] Controller::OnUserLogin Can't Find User Info");
 
                             rData.Result = 0;
                         }
-
-
                     }
                     else
                     {
                         rData.Result = 3;
+
+                        log.SaveLog("[Info] Controller::OnUserLogin Can't Password Error");
                     }
                 }
                 else
@@ -348,7 +364,7 @@ namespace UserService
             }
             catch (Exception ex)
             {
-                log.SaveLog("[Error] Controller::OnUserLogin Catch Error, Msg:" + ex.Message);
+                log.SaveLog($"[Error] Controller::OnUserLogin Catch Error, Msg:{ex.Message}");
 
                 rData.Result = 0;
             }
@@ -385,18 +401,32 @@ namespace UserService
                     infoList[0].Gender = packet.UpdateData.Gender == 0 ? infoList[0].Gender : packet.UpdateData.Gender;
                     infoList[0].County = packet.UpdateData.Country == 0 ? infoList[0].County : packet.UpdateData.Country;
 
-                    dbConnect.GetSql().Updateable<UserInfo>(infoList[0]).Where(it => it.MemberID == packet.MemberID).ExecuteCommand();
+                    if (dbConnect.GetSql().Updateable<UserInfo>(infoList[0]).Where(it => it.MemberID == packet.MemberID).ExecuteCommand() > 0)
+                    {
+                        rData.Result = 1;
+                        
+                        log.SaveLog($"[Info] Controller::OnUpdateUserInfo Update User: {packet.MemberID} Info Success");
 
-                    rData.Result = 1;
+                    }
+                    else
+                    {
+                        rData.Result = 0;
+
+                        log.SaveLog($"[Info] Controller::OnUpdateUserInfo Update User: {packet.MemberID} Info Fail");
+
+                    }
                 }
                 else
                 {
                     rData.Result = 0;
+
+                    log.SaveLog($"[Info] Controller::OnUpdateUserInfo Can Not Find User: {packet.MemberID}");
+
                 }
             }
             catch (Exception ex)
             {
-                log.SaveLog("[Error] Controller::OnUpdateUserInfo Catch Error, Msg:" + ex.Message);
+                log.SaveLog($"[Error] Controller::OnUpdateUserInfo Catch Error, Msg: {ex.Message}");
 
                 rData.Result = 0;
             }
@@ -422,18 +452,30 @@ namespace UserService
                 // 有找到帳號
                 if (accountList.Count() == 1)
                 {
-                    dbConnect.GetSql().Updateable<UserAccount>().SetColumns(it => new UserAccount() { Password = packet.NewPassword }).Where(it => it.MemberID == packet.MemberID).ExecuteCommand();
+                    if (dbConnect.GetSql().Updateable<UserAccount>().SetColumns(it => new UserAccount() { Password = packet.NewPassword }).Where(it => it.MemberID == packet.MemberID).ExecuteCommand() > 0)
+                    { 
+                        rData.Result = 1;
 
-                    rData.Result = 1;
+                        log.SaveLog($"[Warning] Controller::OnUpdateUserInfo Member:{packet.MemberID} Update Password Success ");
+                    }
+                    else
+                    {
+                        rData.Result = 0;
+
+                        log.SaveLog($"[Warning] Controller::OnUpdateUserInfo Member:{packet.MemberID} Can Not Change Password");
+
+                    }
                 }
                 else
                 {
                     rData.Result = 0;
+
+                    log.SaveLog($"[Warning] Controller::OnUpdateUserInfo Can Not Find Account:{packet.MemberID}");
                 }
             }
             catch (Exception ex)
             {
-                log.SaveLog("[Error] Controller::OnUpdateUserInfo Catch Error, Msg:" + ex.Message);
+                log.SaveLog($"[Error] Controller::OnUpdateUserInfo Catch Error, Msg:{ex.Message}");
 
                 rData.Result = 0;
             }
@@ -504,14 +546,19 @@ namespace UserService
                             JObject jsNew = new JObject();
                             jsNew.Add("TeamList", JArray.FromObject(idList));
 
-
                             if (dbConnect.GetSql().Updateable<UserInfo>().SetColumns(it => new UserInfo() { TeamList = jsNew.ToString() }).Where(it => it.MemberID == packet.MemberID).ExecuteCommand() > 0)
                             {
                                 rData.Result = 1;
+
+                                log.SaveLog($"[Error] Controller::OnUpdateTeamList Member: {packet.MemberID} Update TeamList Success");
+
                             }
                             else
                             {
                                 rData.Result = 0;
+
+                                log.SaveLog($"[Error] Controller::OnUpdateTeamList Member: {packet.MemberID} Update TeamList Fail");
+
                             }
                         }
 
@@ -519,17 +566,22 @@ namespace UserService
                     else
                     {
                         rData.Result = 0;
+
+                        log.SaveLog($"[Error] Controller::OnUpdateTeamList Can Not Find Json \"TeamList\" Member");
                     }
 
                 }
                 else
                 {
                     rData.Result = 0;
+
+                    log.SaveLog($"[Error] Controller::OnUpdateTeamList Can Not Find Member:{packet.MemberID}");
+
                 }
             }
             catch (Exception ex)
             {
-                log.SaveLog("[Error] Controller::OnUpdateTeamList Catch Error, Msg:" + ex.Message);
+                log.SaveLog($"[Error] Controller::OnUpdateTeamList Catch Error, Msg:{ex.Message}");
 
                 rData.Result = 0;
             }
@@ -556,7 +608,7 @@ namespace UserService
                 // 有找到會員
                 if (userList.Count() == 1)
                 {
-                    JObject jsData = JObject.Parse(userList[0].TeamList);
+                    JObject jsData = JObject.Parse(userList[0].FriendList);
 
                     if (jsData.ContainsKey("FriendList"))
                     {
@@ -600,14 +652,18 @@ namespace UserService
                             JObject jsNew = new JObject();
                             jsNew.Add("FriendList", JArray.FromObject(idList));
 
-
                             if (dbConnect.GetSql().Updateable<UserInfo>().SetColumns(it => new UserInfo() { FriendList = jsNew.ToString() }).Where(it => it.MemberID == packet.MemberID).ExecuteCommand() > 0)
                             {
                                 rData.Result = 1;
+
+                                log.SaveLog($"[Error] Controller::OnUpdateFriendList Member: {packet.MemberID} Update FriendList Success");
+
                             }
                             else
                             {
                                 rData.Result = 0;
+
+                                log.SaveLog($"[Error] Controller::OnUpdateFriendList Member: {packet.MemberID} Update FriendList Fail");
                             }
                         }
 
@@ -615,17 +671,22 @@ namespace UserService
                     else
                     {
                         rData.Result = 0;
+
+                        log.SaveLog($"[Error] Controller::OnUpdateFriendList Can Not Find Json \"FriendList\" Member");
+
                     }
 
                 }
                 else
                 {
                     rData.Result = 0;
+
+                    log.SaveLog($"[Error] Controller::OnUpdateFriendList Can Not Find Member:{packet.MemberID}");
                 }
             }
             catch (Exception ex)
             {
-                log.SaveLog("[Error] Controller::OnUpdateFriendList Catch Error, Msg:" + ex.Message);
+                log.SaveLog($"[Error] Controller::OnUpdateFriendList Catch Error, Msg:{ex.Message}");
 
                 rData.Result = 0;
             }
@@ -652,7 +713,7 @@ namespace UserService
                 // 有找到會員
                 if (userList.Count() == 1)
                 {
-                    JObject jsData = JObject.Parse(userList[0].TeamList);
+                    JObject jsData = JObject.Parse(userList[0].BlackList);
 
                     if (jsData.ContainsKey("BlackList"))
                     {
@@ -668,6 +729,35 @@ namespace UserService
                                 idList.Add(packet.BlackID);
 
                                 rData.Result = 1;
+
+                                // 檢查是否有在好友名單中
+                                JObject jsFriendData = JObject.Parse(userList[0].FriendList);
+
+                                if (jsFriendData.ContainsKey("FriendList"))
+                                {
+                                    JArray jsFriendArray = jsFriendData["FriendList"] as JArray;
+
+                                    List<string> friendList = jsFriendArray.ToObject<List<string>>();
+
+                                    if (friendList.Contains(packet.BlackID))
+                                    {
+                                        friendList.Remove(packet.BlackID);
+
+                                        JObject jsFriendNew = new JObject();
+                                        jsFriendNew.Add("FriendList", JArray.FromObject(friendList));
+
+
+                                        if (dbConnect.GetSql().Updateable<UserInfo>().SetColumns(it => new UserInfo() { FriendList = jsFriendNew.ToString() }).Where(it => it.MemberID == packet.MemberID).ExecuteCommand() > 0)
+                                        {
+                                            log.SaveLog($"[Info] Controller::OnUpdateBlackList Remove MemberID:{packet.MemberID} From Friend List");
+                                        }
+                                        else
+                                        {
+                                            log.SaveLog($"[Warning] Controller::OnUpdateBlackList Can Not Remove MemberID:{packet.MemberID} From Friend List");
+                                        }
+
+                                    }
+                                }
 
                             }
                             else
@@ -696,14 +786,18 @@ namespace UserService
                             JObject jsNew = new JObject();
                             jsNew.Add("BlackList", JArray.FromObject(idList));
 
-
-                            if (dbConnect.GetSql().Updateable<UserInfo>().SetColumns(it => new UserInfo() { FriendList = jsNew.ToString() }).Where(it => it.MemberID == packet.MemberID).ExecuteCommand() > 0)
+                            if (dbConnect.GetSql().Updateable<UserInfo>().SetColumns(it => new UserInfo() { BlackList = jsNew.ToString() }).Where(it => it.MemberID == packet.MemberID).ExecuteCommand() > 0)
                             {
                                 rData.Result = 1;
+
+                                log.SaveLog($"[Error] Controller::OnUpdateBlackList Member: {packet.MemberID} Update BlackList Success");
                             }
                             else
                             {
                                 rData.Result = 0;
+
+                                log.SaveLog($"[Error] Controller::OnUpdateBlackList Member: {packet.MemberID} Update BlackList Success");
+
                             }
                         }
 
@@ -717,11 +811,14 @@ namespace UserService
                 else
                 {
                     rData.Result = 0;
+
+                    log.SaveLog($"[Error] Controller::OnUpdateBlackList Can Not Find Member:{packet.MemberID}");
+
                 }
             }
             catch (Exception ex)
             {
-                log.SaveLog("[Error] Controller::OnUpdateBlackList Catch Error, Msg:" + ex.Message);
+                log.SaveLog($"[Error] Controller::OnUpdateBlackList Catch Error, Msg:{ex.Message}");
 
                 rData.Result = 0;
             }

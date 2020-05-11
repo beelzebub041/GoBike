@@ -11,24 +11,24 @@ namespace DataBaseDef
     public class UserAccount
     {
         // 會員ID
-		public string MemberID { get; set; }
-		
-		// Email
+        public string MemberID { get; set; }
+
+        // Email
         public string Email { get; set; }
-		
-		// 密碼
+
+        // 密碼
         public string Password { get; set; }
-		
-		// FB Token
+
+        // FB Token
         public string FBToken { get; set; }
-		
-		// Google Token
+
+        // Google Token
         public string GoogleToken { get; set; }
-		
-		// 註冊來源
+
+        // 註冊來源
         public int RegisterSource { get; set; }
-		
-		// 註冊日期
+
+        // 註冊日期
         public string RegisterDate { get; set; }
 
     }
@@ -37,21 +37,21 @@ namespace DataBaseDef
     public class UserInfo
     {
         // 會員ID
-		public string MemberID { get; set; }
-		
-		// 暱稱
+        public string MemberID { get; set; }
+
+        // 暱稱
         public string NickName { get; set; }
-		
-		// 生日
+
+        // 生日
         public string Birthday { get; set; }
-		
-		// 身高
+
+        // 身高
         public float BodyHeight { get; set; }
-		
-		// 體重
+
+        // 體重
         public float BodyWeight { get; set; }
-		
-		// 封面
+
+        // 封面
         public string FrontCover { get; set; }
 
         // 玩家頭像
@@ -62,18 +62,18 @@ namespace DataBaseDef
 
         // 手機認證
         public string Mobile { get; set; }
-		
-		// 性別
+
+        // 性別
         public int Gender { get; set; }
-		
-		// 居住地
+
+        // 居住地
         public int County { get; set; }
-		
-		// 車隊列表 (紀錄車隊ID)
-		public string TeamList { get; set; }
-		
-		// 好友列表 (紀錄會員ID)
-		public string FriendList { get; set; }
+
+        // 車隊列表 (紀錄車隊ID)
+        public string TeamList { get; set; }
+
+        // 好友列表 (紀錄會員ID)
+        public string FriendList { get; set; }
 
         // 黑名單列表 (紀錄會員ID)
         public string BlackList { get; set; }
@@ -128,7 +128,7 @@ namespace DataBaseDef
         public int Level { get; set; }
 
         // 鄉鎮地區
-        public int CountyID { get; set; }
+        public int County { get; set; }
 
         // 騎乘路線
         public string Route { get; set; }
@@ -189,7 +189,7 @@ namespace DataBaseDef
         public string FrontCover { get; set; }
 
         // 車隊所在地
-        public int CountyID { get; set; }
+        public int County { get; set; }
 
         // 是否開放搜尋
         public int SearchStatus { get; set; }
