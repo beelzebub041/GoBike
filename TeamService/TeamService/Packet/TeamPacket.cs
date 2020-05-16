@@ -10,6 +10,8 @@ namespace TeamPacket.ServerToClient
         emUpdateTeamMemberListResult,
         emUpdateApplyJoinListResult,
         emUpdateInviteJoinListResult,
+        emUpdateBulletinResult,
+        emUpdateActivityResult,
     }
 
     // 建立新車隊
@@ -18,6 +20,7 @@ namespace TeamPacket.ServerToClient
         /*
         * 0: 建立失敗
         * 1: 建立成功
+        * 2: 重複擔任隊長
         */
         public int Result { get; set; }
 
@@ -42,6 +45,7 @@ namespace TeamPacket.ServerToClient
         /*
         * 0: 改變失敗
         * 1: 改變成功
+        * 2: 重複擔任
         */
         public int Result { get; set; }
     }
@@ -122,6 +126,54 @@ namespace TeamPacket.ServerToClient
 
     }
 
+    // 更新公告結果
+    class UpdateBulletinResult
+    {
+        /**
+          * 更新動作
+          * -1: 無動作
+          * 0: 新增
+          * 1: 刪除
+          * 2: 修改
+          */
+        public int Action { get; set; }
+
+        /*
+        * 0: 更新失敗
+        * 1: 更新成功
+        * 2: 修改權限不足
+        */
+        public int Result { get; set; }
+
+        // 公告ID
+        public string BulletinID { get; set; }
+
+    }
+
+    // 更新活動結果
+    class UpdateActivityResult
+    {
+        /**
+          * 更新動作
+          * -1: 無動作
+          * 0: 新增
+          * 1: 刪除
+          * 2: 修改
+          */
+        public int Action { get; set; }
+
+        /*
+        * 0: 更新失敗
+        * 1: 更新成功
+        * 2: 修改權限不足
+        */
+        public int Result { get; set; }
+
+        // 活動ID
+        public string ActID { get; set; }
+
+    }
+
 }
 
 namespace TeamPacket.ClientToServer
@@ -135,6 +187,8 @@ namespace TeamPacket.ClientToServer
         emUpdateTeamMemberList,
         emUpdateApplyJoinList,
         emUpdateInviteJoinList,
+        emUpdateBulletin,
+        emUpdateActivity,
 
     }
 
@@ -295,6 +349,92 @@ namespace TeamPacket.ClientToServer
 
         // 隊員的MemberID
         public string MemberID { get; set; }
+    }
+
+    /*
+    * 更新公告
+    */
+    class UpdateBulletin
+    {
+        /**
+        * 更新動作
+        * -1: 刪除
+        * 0: 無動作
+        * 1: 新增
+        * 2: 修改
+        */
+        public int Action { get; set; }
+
+        // 公告ID, 修改與刪除需帶入, 新增帶空值
+        public string BulletinID { get; set; }
+
+        // 車隊ID
+        public string TeamID { get; set; }
+
+        // 發出公告的會員的會員ID
+        public string MemberID { get; set; }
+
+        // 建立日期
+        public string CreateDate { get; set; }
+
+        // 公告內容
+        public string Content { get; set; }
+
+        // 公告天數
+        public int Day { get; set; }
+
+    }
+
+    /*
+    * 更新活動
+    */
+    class UpdateActivity
+    {
+        /**
+        * 更新動作
+        * -1: 刪除
+        * 0: 無動作
+        * 1: 新增
+        * 2: 修改
+        */
+        public int Action { get; set; }
+
+        // 活動ID, 修改與刪除需帶入, 新增帶空值
+        public string ActID { get; set; }
+
+        // 建立日期
+        public string CreateDate { get; set; }
+
+        // 車隊ID
+        public string TeamID { get; set; }
+
+        // 發出活動的會員的會員ID
+        public string MemberID { get; set; }
+
+        // 加入活動的隊員的會員ID列表
+        public string MemberList { get; set; }
+
+        // 活動日期
+        public string ActDate { get; set; }
+
+        // 活動標題
+        public string Title { get; set; }
+
+        // 集合時間
+        public string MeetTime { get; set; }
+
+        // 總距離
+        public int TotalDistance { get; set; }
+
+        // 最高海拔
+        public int MaxAltitude { get; set; }
+
+        // 路線
+        public string Route { get; set; }
+
+        // 路線描述
+        public string Description { get; set; }
+
     }
 
 

@@ -205,4 +205,70 @@ namespace DataBaseDef
 
     }
 
+    // 車隊公告
+    public class TeamBulletin
+    {
+        // 公告ID
+        public string BulletinID { get; set; }
+
+        // 車隊ID
+        public string TeamID { get; set; }
+
+        // 發出公告的會員的會員ID
+        public string MemberID { get; set; }
+
+        // 建立日期
+        public string CreateDate { get; set; }
+
+        // 公告內容
+        public string Content { get; set; }
+
+        // 公告天數
+        public int Day { get; set; }
+
+    }
+
+
+    // 車隊活動
+    public class TeamActivity
+    {
+        // 活動ID
+        public string ActID { get; set; }
+
+        // 建立日期
+        public string CreateDate { get; set; }
+
+        // 車隊ID
+        public string TeamID { get; set; }
+
+        // 發出活動的會員的會員ID
+        public string MemberID { get; set; }
+
+        // 加入活動的隊員的會員ID列表
+        public string MemberList { get; set; }
+
+        // 活動日期
+        public string ActDate { get; set; }
+
+        // 活動標題
+        public string Title { get; set; }
+
+        // 集合時間
+        public string MeetTime { get; set; }
+
+        // 總距離
+        public int TotalDistance { get; set; }
+
+        // 最高海拔
+        public int MaxAltitude { get; set; }
+
+        // 路線
+        public string Route { get; set; }
+
+        // 路線描述
+        public string Description { get; set; }
+
+    }
+
+
 }
