@@ -30,7 +30,7 @@ namespace UserService
 
         private Server wsServer = null;                 // Web Socket Server
 
-        private string ControllerVersion = "Version015";
+        private string ControllerVersion = "User017";
 
 
         public Controller(Form1 fm1)
@@ -255,9 +255,9 @@ namespace UserService
                             Photo = "",
                             Mobile = "",
                             County = -1,
-                            TeamList = "{\"TeamList\":[]}",
-                            FriendList = "{\"FriendList\":[]}",
-                            BlackList = "{\"BlackList\":[]}"
+                            TeamList = "[]",
+                            FriendList = "[]",
+                            BlackList = "[]"
                         };
 
                         // 新增騎乘資料
@@ -502,72 +502,59 @@ namespace UserService
                 // 有找到會員
                 if (userList.Count() == 1)
                 {
-                    JObject jsData = JObject.Parse(userList[0].TeamList);
+                    JArray jsData = JArray.Parse(userList[0].TeamList);
 
-                    if (jsData.ContainsKey("TeamList"))
+                    List<string> idList = jsData.ToObject<List<string>>();
+
+                    // 新增
+                    if (packet.Action == 1)
                     {
-                        JArray jsArray = jsData["TeamList"] as JArray;
-
-                        List<string> idList = jsArray.ToObject<List<string>>();
-
-                        // 新增
-                        if (packet.Action == 1)
+                        if (!idList.Contains(packet.TeamID))
                         {
-                            if (!idList.Contains(packet.TeamID))
-                            {
-                                idList.Add(packet.TeamID);
+                            idList.Add(packet.TeamID);
 
-                                rData.Result = 1;
-
-                            }
-                            else
-                            {
-                                rData.Result = 0;
-                            }
+                            rData.Result = 1;
 
                         }
-                        // 刪除
-                        else if (packet.Action == -1)
+                        else
                         {
-                            if (idList.Contains(packet.TeamID))
-                            {
-                                idList.Remove(packet.TeamID);
-
-                                rData.Result = 1;
-                            }
-                            else
-                            {
-                                rData.Result = 0;
-                            }
-                        }
-
-                        if (rData.Result == 1)
-                        {
-                            JObject jsNew = new JObject();
-                            jsNew.Add("TeamList", JArray.FromObject(idList));
-
-                            if (dbConnect.GetSql().Updateable<UserInfo>().SetColumns(it => new UserInfo() { TeamList = jsNew.ToString() }).Where(it => it.MemberID == packet.MemberID).ExecuteCommand() > 0)
-                            {
-                                rData.Result = 1;
-
-                                log.SaveLog($"[Error] Controller::OnUpdateTeamList Member: {packet.MemberID} Update TeamList Success");
-
-                            }
-                            else
-                            {
-                                rData.Result = 0;
-
-                                log.SaveLog($"[Error] Controller::OnUpdateTeamList Member: {packet.MemberID} Update TeamList Fail");
-
-                            }
+                            rData.Result = 0;
                         }
 
                     }
-                    else
+                    // 刪除
+                    else if (packet.Action == -1)
                     {
-                        rData.Result = 0;
+                        if (idList.Contains(packet.TeamID))
+                        {
+                            idList.Remove(packet.TeamID);
 
-                        log.SaveLog($"[Error] Controller::OnUpdateTeamList Can Not Find Json \"TeamList\" Member");
+                            rData.Result = 1;
+                        }
+                        else
+                        {
+                            rData.Result = 0;
+                        }
+                    }
+
+                    if (rData.Result == 1)
+                    {
+                        JArray jsNew = JArray.FromObject(idList);
+
+                        if (dbConnect.GetSql().Updateable<UserInfo>().SetColumns(it => new UserInfo() { TeamList = jsNew.ToString() }).Where(it => it.MemberID == packet.MemberID).ExecuteCommand() > 0)
+                        {
+                            rData.Result = 1;
+
+                            log.SaveLog($"[Error] Controller::OnUpdateTeamList Member: {packet.MemberID} Update TeamList Success");
+
+                        }
+                        else
+                        {
+                            rData.Result = 0;
+
+                            log.SaveLog($"[Error] Controller::OnUpdateTeamList Member: {packet.MemberID} Update TeamList Fail");
+
+                        }
                     }
 
                 }
@@ -608,72 +595,58 @@ namespace UserService
                 // 有找到會員
                 if (userList.Count() == 1)
                 {
-                    JObject jsData = JObject.Parse(userList[0].FriendList);
+                    JArray jaData = JArray.Parse(userList[0].FriendList);
 
-                    if (jsData.ContainsKey("FriendList"))
+                    List<string> idList = jaData.ToObject<List<string>>();
+
+                    // 新增
+                    if (packet.Action == 1)
                     {
-                        JArray jsArray = jsData["FriendList"] as JArray;
-
-                        List<string> idList = jsArray.ToObject<List<string>>();
-
-                        // 新增
-                        if (packet.Action == 1)
+                        if (!idList.Contains(packet.FriendID))
                         {
-                            if (!idList.Contains(packet.FriendID))
-                            {
-                                idList.Add(packet.FriendID);
+                            idList.Add(packet.FriendID);
 
-                                rData.Result = 1;
-
-                            }
-                            else
-                            {
-                                rData.Result = 0;
-                            }
+                            rData.Result = 1;
 
                         }
-                        // 刪除
-                        else if (packet.Action == -1)
+                        else
                         {
-                            if (idList.Contains(packet.FriendID))
-                            {
-                                idList.Remove(packet.FriendID);
-
-                                rData.Result = 1;
-                            }
-                            else
-                            {
-                                rData.Result = 0;
-                            }
-                        }
-
-                        if (rData.Result == 1)
-                        {
-                            JObject jsNew = new JObject();
-                            jsNew.Add("FriendList", JArray.FromObject(idList));
-
-                            if (dbConnect.GetSql().Updateable<UserInfo>().SetColumns(it => new UserInfo() { FriendList = jsNew.ToString() }).Where(it => it.MemberID == packet.MemberID).ExecuteCommand() > 0)
-                            {
-                                rData.Result = 1;
-
-                                log.SaveLog($"[Error] Controller::OnUpdateFriendList Member: {packet.MemberID} Update FriendList Success");
-
-                            }
-                            else
-                            {
-                                rData.Result = 0;
-
-                                log.SaveLog($"[Error] Controller::OnUpdateFriendList Member: {packet.MemberID} Update FriendList Fail");
-                            }
+                            rData.Result = 0;
                         }
 
                     }
-                    else
+                    // 刪除
+                    else if (packet.Action == -1)
                     {
-                        rData.Result = 0;
+                        if (idList.Contains(packet.FriendID))
+                        {
+                            idList.Remove(packet.FriendID);
 
-                        log.SaveLog($"[Error] Controller::OnUpdateFriendList Can Not Find Json \"FriendList\" Member");
+                            rData.Result = 1;
+                        }
+                        else
+                        {
+                            rData.Result = 0;
+                        }
+                    }
 
+                    if (rData.Result == 1)
+                    {
+                        JArray jsNew = JArray.FromObject(idList);
+
+                        if (dbConnect.GetSql().Updateable<UserInfo>().SetColumns(it => new UserInfo() { FriendList = jsNew.ToString() }).Where(it => it.MemberID == packet.MemberID).ExecuteCommand() > 0)
+                        {
+                            rData.Result = 1;
+
+                            log.SaveLog($"[Error] Controller::OnUpdateFriendList Member: {packet.MemberID} Update FriendList Success");
+
+                        }
+                        else
+                        {
+                            rData.Result = 0;
+
+                            log.SaveLog($"[Error] Controller::OnUpdateFriendList Member: {packet.MemberID} Update FriendList Fail");
+                        }
                     }
 
                 }
@@ -713,108 +686,88 @@ namespace UserService
                 // 有找到會員
                 if (userList.Count() == 1)
                 {
-                    JObject jsData = JObject.Parse(userList[0].BlackList);
+                    JArray jsData = JArray.Parse(userList[0].BlackList);
 
-                    if (jsData.ContainsKey("BlackList"))
+                    List<string> idList = jsData.ToObject<List<string>>();
+
+                    // 新增
+                    if (packet.Action == 1)
                     {
-                        JArray jsArray = jsData["BlackList"] as JArray;
-
-                        List<string> idList = jsArray.ToObject<List<string>>();
-
-                        // 新增
-                        if (packet.Action == 1)
+                        if (!idList.Contains(packet.BlackID))
                         {
-                            if (!idList.Contains(packet.BlackID))
+                            idList.Add(packet.BlackID);
+
+                            rData.Result = 1;
+
+                            // 檢查是否有在好友名單中
+                            JArray jsFriendData = JArray.Parse(userList[0].FriendList);
+
+                            List<string> friendList = jsFriendData.ToObject<List<string>>();
+
+                            if (friendList.Contains(packet.BlackID))
                             {
-                                idList.Add(packet.BlackID);
+                                friendList.Remove(packet.BlackID);
 
-                                rData.Result = 1;
+                                JArray jsFriendNew = JArray.FromObject(friendList);
 
-                                // 檢查是否有在好友名單中
-                                JObject jsFriendData = JObject.Parse(userList[0].FriendList);
-
-                                if (jsFriendData.ContainsKey("FriendList"))
+                                if (dbConnect.GetSql().Updateable<UserInfo>().SetColumns(it => new UserInfo() { FriendList = jsFriendNew.ToString() }).Where(it => it.MemberID == packet.MemberID).ExecuteCommand() > 0)
                                 {
-                                    JArray jsFriendArray = jsFriendData["FriendList"] as JArray;
-
-                                    List<string> friendList = jsFriendArray.ToObject<List<string>>();
-
-                                    if (friendList.Contains(packet.BlackID))
-                                    {
-                                        friendList.Remove(packet.BlackID);
-
-                                        JObject jsFriendNew = new JObject();
-                                        jsFriendNew.Add("FriendList", JArray.FromObject(friendList));
-
-
-                                        if (dbConnect.GetSql().Updateable<UserInfo>().SetColumns(it => new UserInfo() { FriendList = jsFriendNew.ToString() }).Where(it => it.MemberID == packet.MemberID).ExecuteCommand() > 0)
-                                        {
-                                            log.SaveLog($"[Info] Controller::OnUpdateBlackList Remove MemberID:{packet.MemberID} From Friend List");
-                                        }
-                                        else
-                                        {
-                                            log.SaveLog($"[Warning] Controller::OnUpdateBlackList Can Not Remove MemberID:{packet.MemberID} From Friend List");
-                                        }
-
-                                    }
+                                    log.SaveLog($"[Info] Controller::OnUpdateBlackList Remove MemberID:{packet.MemberID} From Friend List");
+                                }
+                                else
+                                {
+                                    log.SaveLog($"[Warning] Controller::OnUpdateBlackList Can Not Remove MemberID:{packet.MemberID} From Friend List");
                                 }
 
                             }
-                            else
-                            {
-                                rData.Result = 0;
-                            }
 
                         }
-                        // 刪除
-                        else if (packet.Action == -1)
+                        else
                         {
-                            if (idList.Contains(packet.BlackID))
-                            {
-                                idList.Remove(packet.BlackID);
-
-                                rData.Result = 1;
-                            }
-                            else
-                            {
-                                rData.Result = 0;
-                            }
-                        }
-
-                        if (rData.Result == 1)
-                        {
-                            JObject jsNew = new JObject();
-                            jsNew.Add("BlackList", JArray.FromObject(idList));
-
-                            if (dbConnect.GetSql().Updateable<UserInfo>().SetColumns(it => new UserInfo() { BlackList = jsNew.ToString() }).Where(it => it.MemberID == packet.MemberID).ExecuteCommand() > 0)
-                            {
-                                rData.Result = 1;
-
-                                log.SaveLog($"[Error] Controller::OnUpdateBlackList Member: {packet.MemberID} Update BlackList Success");
-                            }
-                            else
-                            {
-                                rData.Result = 0;
-
-                                log.SaveLog($"[Error] Controller::OnUpdateBlackList Member: {packet.MemberID} Update BlackList Success");
-
-                            }
+                            rData.Result = 0;
                         }
 
                     }
-                    else
+                    // 刪除
+                    else if (packet.Action == -1)
                     {
-                        rData.Result = 0;
+                        if (idList.Contains(packet.BlackID))
+                        {
+                            idList.Remove(packet.BlackID);
+
+                            rData.Result = 1;
+                        }
+                        else
+                        {
+                            rData.Result = 0;
+                        }
+                    }
+
+                    if (rData.Result == 1)
+                    {
+                        JArray jsNew = JArray.FromObject(idList);
+
+                        if (dbConnect.GetSql().Updateable<UserInfo>().SetColumns(it => new UserInfo() { BlackList = jsNew.ToString() }).Where(it => it.MemberID == packet.MemberID).ExecuteCommand() > 0)
+                        {
+                            rData.Result = 1;
+
+                            log.SaveLog($"[Error] Controller::OnUpdateBlackList Member: {packet.MemberID} Update BlackList Success");
+                        }
+                        else
+                        {
+                            rData.Result = 0;
+
+                            log.SaveLog($"[Error] Controller::OnUpdateBlackList Member: {packet.MemberID} Update BlackList Success");
+
+                        }
                     }
 
                 }
                 else
                 {
                     rData.Result = 0;
-
-                    log.SaveLog($"[Error] Controller::OnUpdateBlackList Can Not Find Member:{packet.MemberID}");
-
                 }
+
             }
             catch (Exception ex)
             {
