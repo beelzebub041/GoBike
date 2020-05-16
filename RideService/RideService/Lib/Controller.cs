@@ -33,7 +33,7 @@ namespace RideService
 
         private Server wsServer = null;                 // Web Socket Server
 
-        private string ControllerVersion = "Version003";
+        private string version = "Ride004";
 
 
         public Controller(Form1 fm1)
@@ -59,7 +59,7 @@ namespace RideService
 
                 weekProcess = new WeekProcess();
 
-                log.SaveLog($"Controller Version: {ControllerVersion}");
+                log.SaveLog($"Controller Version: {version}");
 
                 wsServer = new Server(log.SaveLog, MessageProcess);
 
