@@ -30,7 +30,7 @@ namespace TeamService
 
         private Server wsServer = null;                 // Web Socket Server
 
-        private string version = "Team004";
+        private string version = "Team005";
 
 
         public Controller(Form1 fm1)
@@ -716,7 +716,7 @@ namespace TeamService
                     {
                         JArray jsNew = JArray.FromObject(idList);
 
-                        if (dbConnect.GetSql().Updateable<TeamData>().SetColumns(it => new TeamData() { TeamViceLeaderIDs = jsNew.ToString() }).Where(it => it.TeamID == packet.TeamID).ExecuteCommand() > 0)
+                        if (dbConnect.GetSql().Updateable<TeamData>().SetColumns(it => new TeamData() { TeamMemberIDs = jsNew.ToString() }).Where(it => it.TeamID == packet.TeamID).ExecuteCommand() > 0)
                         {
                             rData.Result = 1;
 
