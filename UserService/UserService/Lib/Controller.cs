@@ -30,7 +30,7 @@ namespace UserService
 
         private Server wsServer = null;                 // Web Socket Server
 
-        private string ControllerVersion = "User017";
+        private string ControllerVersion = "User018";
 
 
         public Controller(Form1 fm1)
@@ -444,6 +444,7 @@ namespace UserService
         private string OnUpdatePassword(UpdatePassword packet)
         {
             UpdatePasswordResult rData = new UpdatePasswordResult();
+            rData.Action = packet.Action;
 
             try
             {
@@ -452,18 +453,51 @@ namespace UserService
                 // 有找到帳號
                 if (accountList.Count() == 1)
                 {
-                    if (dbConnect.GetSql().Updateable<UserAccount>().SetColumns(it => new UserAccount() { Password = packet.NewPassword }).Where(it => it.MemberID == packet.MemberID).ExecuteCommand() > 0)
-                    { 
-                        rData.Result = 1;
+                    bool canUpdate = false;
 
-                        log.SaveLog($"[Warning] Controller::OnUpdateUserInfo Member:{packet.MemberID} Update Password Success ");
+                    log.SaveLog($"[Warning] Controller::OnUpdateUserInfo, Member:{packet.MemberID} Action:{packet.Action}");
+
+                    if (packet.Action == 1)
+                    {   
+                        // 舊密碼相同
+                        if (accountList[0].Password == packet.Password)
+                        {
+                            canUpdate = true;
+                        }
+                        else
+                        {
+                            canUpdate = false;
+
+                            log.SaveLog($"[Warning] Controller::OnUpdateUserInfo, Member:{packet.MemberID} Old Password Error");
+                        }
+                    }
+                    // 忘記密碼可直接修改
+                    else if (packet.Action == 2)
+                    {
+                        canUpdate = true;
+                    }
+
+                    if (canUpdate)
+                    {
+                        if (dbConnect.GetSql().Updateable<UserAccount>().SetColumns(it => new UserAccount() { Password = packet.NewPassword }).Where(it => it.MemberID == packet.MemberID).ExecuteCommand() > 0)
+                        {
+                            rData.Result = 1;
+
+                            log.SaveLog($"[Warning] Controller::OnUpdateUserInfo Member:{packet.MemberID} Update Password Success ");
+                        }
+                        else
+                        {
+                            rData.Result = 0;
+
+                            log.SaveLog($"[Warning] Controller::OnUpdateUserInfo Member:{packet.MemberID} Can Not Change Password");
+
+                        }
                     }
                     else
                     {
                         rData.Result = 0;
 
-                        log.SaveLog($"[Warning] Controller::OnUpdateUserInfo Member:{packet.MemberID} Can Not Change Password");
-
+                        log.SaveLog($"[Warning] Controller::OnUpdateUserInfo Member:{packet.MemberID} Update Fail");
                     }
                 }
                 else

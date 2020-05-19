@@ -55,6 +55,14 @@ namespace UserPacket.ServerToClient
     // 更新密碼結果
     class UpdatePasswordResult
     {
+        /**
+         * 動作
+         * 0: 無動作
+         * 1: 更新密碼
+         * 2: 忘記密碼
+         */
+        public int Action { get; set; }
+
         /*
         * 0: 更新失敗
         * 1: 更新成功
@@ -231,6 +239,14 @@ namespace UserPacket.ClientToServer
     */
     class UpdatePassword
     {
+        /**
+         * 動作
+         * 0: 無動作
+         * 1: 更新密碼
+         * 2: 忘記密碼
+         */
+        public int Action { get; set; }
+
         // 使用者索引
         public string MemberID { get; set; }
 
