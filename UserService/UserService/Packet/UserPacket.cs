@@ -7,7 +7,6 @@ namespace UserPacket.ServerToClient
         emUserLoginResult,
         emUpdateUserInfoResult,
         emUpdatePasswordResult,
-        emUpdateTeamListResult,
         emUpdateFriendListResult,
         emUpdateBlackListResult
     }
@@ -72,25 +71,6 @@ namespace UserPacket.ServerToClient
 
     }
 
-    // 更新車隊列表結果
-    class UpdateTeamListResult
-    {
-        /**
-          * 更新動作
-          * -1: 無動作
-          * 0: 新增
-          * 1: 刪除
-          */
-        public int Action { get; set; }
-
-        /*
-        * 0: 失敗
-        * 1: 成功
-        */
-        public int Result { get; set; }
-
-    }
-
     // 更新好友列表結果
     class UpdateFriendListResult
     {
@@ -140,7 +120,6 @@ namespace UserPacket.ClientToServer
         emUserLogin,
         emUpdateUserInfo,
         emUpdatePassword,
-        emUpdateTeamList,
         emUpdateFriendList,
         emUpdateBlackList,
     }
@@ -256,26 +235,6 @@ namespace UserPacket.ClientToServer
         // 新密碼
         public string NewPassword { get; set; }
 
-    }
-
-    /*
-    * 更新車隊列表
-    */
-    class UpdateTeamList
-    {
-        // 會員ID
-        public string MemberID { get; set; }
-
-        /**
-        * 更新動作
-        * -1: 刪除
-        * 0: 無動作
-        * 1: 新增
-        */
-        public int Action { get; set; }
-
-        // 車隊ID
-        public string TeamID { get; set; }
     }
 
     /*

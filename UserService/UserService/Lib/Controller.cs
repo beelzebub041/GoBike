@@ -30,7 +30,7 @@ namespace UserService
 
         private Server wsServer = null;                 // Web Socket Server
 
-        private string ControllerVersion = "User018";
+        private string ControllerVersion = "User020";
 
 
         public Controller(Form1 fm1)
@@ -140,13 +140,6 @@ namespace UserService
 
                                     break;
 
-                                case (int)C2S_CmdID.emUpdateTeamList:
-                                    UpdateTeamList teamMsg = JsonConvert.DeserializeObject<UpdateTeamList>(packetData);
-
-                                    sReturn = OnUpdateTeamList(teamMsg);
-
-                                    break;
-
                                 case (int)C2S_CmdID.emUpdateFriendList:
                                     UpdateFriendList friendMsg = JsonConvert.DeserializeObject<UpdateFriendList>(packetData);
 
@@ -246,7 +239,7 @@ namespace UserService
                         UserInfo info = new UserInfo
                         {
                             MemberID = account.MemberID,
-                            NickName = "",
+                            NickName = account.MemberID,
                             Birthday = dateTime,
                             BodyHeight = 0,
                             BodyWeight = 0,
@@ -516,99 +509,6 @@ namespace UserService
 
             JObject jsMain = new JObject();
             jsMain.Add("CmdID", (int)S2C_CmdID.emUpdatePasswordResult);
-            jsMain.Add("Data", JsonConvert.DeserializeObject<JObject>(JsonConvert.SerializeObject(rData)));
-
-            return jsMain.ToString();
-        }
-
-        /**
-         * 更新車隊列表
-         */
-        private string OnUpdateTeamList(UpdateTeamList packet)
-        {
-            UpdateTeamListResult rData = new UpdateTeamListResult();
-            rData.Action = packet.Action;
-
-            try
-            {
-                List<UserInfo> userList = dbConnect.GetSql().Queryable<UserInfo>().Where(it => it.MemberID == packet.MemberID).ToList();
-
-                // 有找到會員
-                if (userList.Count() == 1)
-                {
-                    JArray jsData = JArray.Parse(userList[0].TeamList);
-
-                    List<string> idList = jsData.ToObject<List<string>>();
-
-                    // 新增
-                    if (packet.Action == 1)
-                    {
-                        if (!idList.Contains(packet.TeamID))
-                        {
-                            idList.Add(packet.TeamID);
-
-                            rData.Result = 1;
-
-                        }
-                        else
-                        {
-                            rData.Result = 0;
-                        }
-
-                    }
-                    // 刪除
-                    else if (packet.Action == -1)
-                    {
-                        if (idList.Contains(packet.TeamID))
-                        {
-                            idList.Remove(packet.TeamID);
-
-                            rData.Result = 1;
-                        }
-                        else
-                        {
-                            rData.Result = 0;
-                        }
-                    }
-
-                    if (rData.Result == 1)
-                    {
-                        JArray jsNew = JArray.FromObject(idList);
-
-                        if (dbConnect.GetSql().Updateable<UserInfo>().SetColumns(it => new UserInfo() { TeamList = jsNew.ToString() }).Where(it => it.MemberID == packet.MemberID).ExecuteCommand() > 0)
-                        {
-                            rData.Result = 1;
-
-                            log.SaveLog($"[Error] Controller::OnUpdateTeamList Member: {packet.MemberID} Update TeamList Success");
-
-                        }
-                        else
-                        {
-                            rData.Result = 0;
-
-                            log.SaveLog($"[Error] Controller::OnUpdateTeamList Member: {packet.MemberID} Update TeamList Fail");
-
-                        }
-                    }
-
-                }
-                else
-                {
-                    rData.Result = 0;
-
-                    log.SaveLog($"[Error] Controller::OnUpdateTeamList Can Not Find Member:{packet.MemberID}");
-
-                }
-            }
-            catch (Exception ex)
-            {
-                log.SaveLog($"[Error] Controller::OnUpdateTeamList Catch Error, Msg:{ex.Message}");
-
-                rData.Result = 0;
-            }
-
-            JObject jsMain = new JObject();
-            jsMain.Add("CmdID", (int)S2C_CmdID.emUpdateTeamListResult);
             jsMain.Add("Data", JsonConvert.DeserializeObject<JObject>(JsonConvert.SerializeObject(rData)));
 
             return jsMain.ToString();
