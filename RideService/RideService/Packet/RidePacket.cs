@@ -1,5 +1,5 @@
 ﻿
-namespace Packet.ServerToClient
+namespace RidePacket.ServerToClient
 {
     public enum S2C_CmdID : int
     {
@@ -29,7 +29,7 @@ namespace Packet.ServerToClient
 
 }
 
-namespace Packet.ClientToServer
+namespace RidePacket.ClientToServer
 {
     public enum C2S_CmdID : int
     {

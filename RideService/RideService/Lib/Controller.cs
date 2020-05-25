@@ -15,8 +15,8 @@ using Tools.WeekProcess;
 using DataBaseDef;
 using Connect;
 
-using Packet.ClientToServer;
-using Packet.ServerToClient;
+using RidePacket.ClientToServer;
+using RidePacket.ServerToClient;
 
 
 namespace RideService

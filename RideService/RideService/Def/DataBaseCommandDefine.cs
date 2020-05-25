@@ -257,10 +257,10 @@ namespace DataBaseDef
         public string MeetTime { get; set; }
 
         // 總距離
-        public int TotalDistance { get; set; }
+        public float TotalDistance { get; set; }
 
         // 最高海拔
-        public int MaxAltitude { get; set; }
+        public float MaxAltitude { get; set; }
 
         // 路線
         public string Route { get; set; }
@@ -268,7 +268,59 @@ namespace DataBaseDef
         // 路線描述
         public string Description { get; set; }
 
+        // 活動地圖
+        public string Photo { get; set; }
+
     }
 
+    // 車隊資料暫存區
+    public class TeamDataStorageCache
+    {
+        // 車隊ID
+        public string TeamID { get; set; }
+
+        // 建立日期
+        public string CreateDate { get; set; }
+
+        // 車隊長的MemberID
+        public string Leader { get; set; }
+
+        // 副隊長的MemberID列表
+        public string TeamViceLeaderIDs { get; set; }
+
+        // 車隊成員的MemberID列表
+        public string TeamMemberIDs { get; set; }
+
+        // 車隊名稱
+        public string TeamName { get; set; }
+
+        // 車隊簡介
+        public string TeamInfo { get; set; }
+
+        // 車隊頭像
+        public string Avatar { get; set; }
+
+        // 車隊封面
+        public string FrontCover { get; set; }
+
+        // 車隊所在地
+        public int County { get; set; }
+
+        // 是否開放搜尋
+        public int SearchStatus { get; set; }
+
+        // 加入車隊是否需要審核
+        public int ExamineStatus { get; set; }
+
+        // 申請加入的會員ID列表
+        public string ApplyJoinList { get; set; }
+
+        // 邀請加入的會員ID列表
+        public string InviteJoinList { get; set; }
+
+        // 暫存日期
+        public string StorageDate { get; set; }
+
+    }
 
 }
