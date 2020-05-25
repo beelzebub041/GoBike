@@ -12,6 +12,10 @@ namespace TeamPacket.ServerToClient
         emUpdateInviteJoinListResult,
         emUpdateBulletinResult,
         emUpdateActivityResult,
+        emDeleteTeamResult,
+        emJoinOrLeaveTeamActivityResult,
+        emJoinOrLeaveTeamResult,
+
     }
 
     // 建立新車隊
@@ -46,6 +50,7 @@ namespace TeamPacket.ServerToClient
         * 0: 改變失敗
         * 1: 改變成功
         * 2: 重複擔任
+        * 3: 權限不足
         */
         public int Result { get; set; }
     }
@@ -64,6 +69,7 @@ namespace TeamPacket.ServerToClient
         /*
         * 0: 更新失敗
         * 1: 更新成功
+        * 2: 權限不足
         */
         public int Result { get; set; }
 
@@ -174,6 +180,55 @@ namespace TeamPacket.ServerToClient
 
     }
 
+    // 解散車隊結果
+    class DeleteTeamResult
+    {
+        /*
+        * 0: 解散失敗
+        * 1: 解散成功
+        * 2: 權限不足
+        */
+        public int Result { get; set; }
+
+    }
+
+    // 加入或離開車隊活動結果
+    class JoinOrLeaveTeamActivityResult
+    {
+        /*
+        * -1: 離開 
+        * 0: 無動作
+        * 1: 加入
+        */
+        public int Action { get; set; }
+
+        /*
+        * 0: 失敗
+        * 1: 成功
+        */
+        public int Result { get; set; }
+
+    }
+
+    // 加入或離開車隊結果
+    class JoinOrLeaveTeamResult
+    {
+        /*
+        * -1: 離開 
+        * 0: 無動作
+        * 1: 加入
+        */
+        public int Action { get; set; }
+
+        /*
+        * 0: 失敗
+        * 1: 成功
+        */
+        public int Result { get; set; }
+
+    }
+
+
 }
 
 namespace TeamPacket.ClientToServer
@@ -189,6 +244,9 @@ namespace TeamPacket.ClientToServer
         emUpdateInviteJoinList,
         emUpdateBulletin,
         emUpdateActivity,
+        emDeleteTeam,
+        emJoinOrLeaveTeamActivity,
+        emJoinOrLeaveTeam,
 
     }
 
@@ -265,6 +323,9 @@ namespace TeamPacket.ClientToServer
         public string TeamID { get; set; }
 
         // 隊長的MemberID
+        public string LeaderID { get; set; }
+
+        // 新隊長的MemberID
         public string MemberID { get; set; }
 
     }
@@ -284,6 +345,9 @@ namespace TeamPacket.ClientToServer
          * 1: 新增
          */
         public int Action { get; set; }
+
+        // 隊長的MemberID
+        public string LeaderID { get; set; }
 
         // 隊長的MemberID
         public string MemberID { get; set; }
@@ -424,10 +488,10 @@ namespace TeamPacket.ClientToServer
         public string MeetTime { get; set; }
 
         // 總距離
-        public int TotalDistance { get; set; }
+        public float TotalDistance { get; set; }
 
         // 最高海拔
-        public int MaxAltitude { get; set; }
+        public float MaxAltitude { get; set; }
 
         // 路線
         public string Route { get; set; }
@@ -435,7 +499,62 @@ namespace TeamPacket.ClientToServer
         // 路線描述
         public string Description { get; set; }
 
+        // 活動地圖
+        public string Photo { get; set; }
+
     }
 
+    /*
+    * 解散車隊
+    */
+    class DeleteTeam
+    {
+        // 車隊ID
+        public string TeamID { get; set; }
+
+        // 隊員的MemberID
+        public string MemberID { get; set; }
+    }
+
+    /*
+    * 加入或離開車隊活動
+    */
+    class JoinOrLeaveTeamActivity
+    {
+        /**
+         * -1: 離開
+         * 0: 無動作
+         * 1: 加入
+         */
+        public int Action { get; set; }
+
+        // 車隊ID
+        public string TeamID { get; set; }
+
+        // 活動ID
+        public string ActID { get; set; }
+
+        // 隊員的MemberID
+        public string MemberID { get; set; }
+    }
+
+    /*
+    * 加入或離開車隊
+    */
+    class JoinOrLeaveTeam
+    {
+        /**
+         * -1: 離開
+         * 0: 無動作
+         * 1: 加入
+         */
+        public int Action { get; set; }
+
+        // 車隊ID
+        public string TeamID { get; set; }
+
+        // 加入或離開的會員的MemberID
+        public string MemberID { get; set; }
+    }
 
 }

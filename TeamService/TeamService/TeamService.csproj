@@ -109,6 +109,7 @@
   <ItemGroup>
     <Compile Include="Def\DataBaseCommandDefine.cs" />
     <Compile Include="Lib\Connect\DataBaseConnect.cs" />
+    <Compile Include="Lib\Connect\BrocastConnect.cs" />
     <Compile Include="Lib\Connect\RedisConnect.cs" />
     <Compile Include="Lib\Server.cs" />
     <Compile Include="Lib\Controller.cs" />
