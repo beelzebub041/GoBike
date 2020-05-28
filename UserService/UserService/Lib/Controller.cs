@@ -30,7 +30,7 @@ namespace UserService
 
         private Server wsServer = null;                 // Web Socket Server
 
-        private string ControllerVersion = "User020";
+        private string ControllerVersion = "User021";
 
 
         public Controller(Form1 fm1)
@@ -240,7 +240,7 @@ namespace UserService
                         {
                             MemberID = account.MemberID,
                             NickName = account.MemberID,
-                            Birthday = dateTime,
+                            Birthday = "",
                             BodyHeight = 0,
                             BodyWeight = 0,
                             FrontCover = "",
