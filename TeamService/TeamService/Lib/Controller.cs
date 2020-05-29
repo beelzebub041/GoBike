@@ -32,7 +32,7 @@ namespace TeamService
 
         private BrocastConnect bsConnect = null;        // Brocast Service Connect
 
-        private string version = "Team009";
+        private string version = "Team016";
 
 
         public Controller(Form1 fm1)
@@ -80,7 +80,7 @@ namespace TeamService
                     {
                         if (wsServer.Initialize())
                         {
-                            //if (bsConnect.Initialize())
+                            if (bsConnect.Initialize())
                             {
                                 bReturn = true;
                             }
@@ -441,19 +441,31 @@ namespace TeamService
                 // 有找到車隊
                 if (TeamList.Count() == 1)
                 {
-                    TeamList[0].CreateDate = Convert.ToDateTime(TeamList[0].CreateDate).ToString("yyyy-MM-dd hh:mm:ss");
+                    JArray jsViceLeaderList = JArray.Parse(TeamList[0].TeamViceLeaderIDs);
+                    List<string> viceLeaderList = jsViceLeaderList.ToObject<List<string>>();
 
-                    TeamList[0].TeamName = packet.TeamName == null ? TeamList[0].TeamName : packet.TeamName;
-                    TeamList[0].TeamInfo = packet.TeamInfo == null ? TeamList[0].TeamInfo : packet.TeamInfo;
-                    TeamList[0].Avatar = packet.Avatar == null ? TeamList[0].Avatar : packet.Avatar;
-                    TeamList[0].FrontCover = packet.FrontCover == null ? TeamList[0].FrontCover : packet.FrontCover;
-                    TeamList[0].County = packet.County == 0 ? TeamList[0].County : packet.County;
-                    TeamList[0].SearchStatus = packet.SearchStatus == 0 ? TeamList[0].SearchStatus : packet.SearchStatus;
-                    TeamList[0].ExamineStatus = packet.ExamineStatus == 0 ? TeamList[0].ExamineStatus : packet.ExamineStatus;
-
-                    if (dbConnect.GetSql().Updateable<TeamData>(TeamList[0]).Where(it => it.TeamID == packet.TeamID).ExecuteCommand() > 0)
+                    // 為隊長或副隊長
+                    if (TeamList[0].Leader == packet.MemberID || viceLeaderList.Contains(packet.MemberID))
                     {
-                        rData.Result = 1;
+                        TeamList[0].CreateDate = Convert.ToDateTime(TeamList[0].CreateDate).ToString("yyyy-MM-dd hh:mm:ss");
+
+                        TeamList[0].TeamName = packet.TeamName == null ? TeamList[0].TeamName : packet.TeamName;
+                        TeamList[0].TeamInfo = packet.TeamInfo == null ? TeamList[0].TeamInfo : packet.TeamInfo;
+                        TeamList[0].Avatar = packet.Avatar == null ? TeamList[0].Avatar : packet.Avatar;
+                        TeamList[0].FrontCover = packet.FrontCover == null ? TeamList[0].FrontCover : packet.FrontCover;
+                        TeamList[0].County = packet.County == 0 ? TeamList[0].County : packet.County;
+                        TeamList[0].SearchStatus = packet.SearchStatus == 0 ? TeamList[0].SearchStatus : packet.SearchStatus;
+                        TeamList[0].ExamineStatus = packet.ExamineStatus == 0 ? TeamList[0].ExamineStatus : packet.ExamineStatus;
+
+                        if (dbConnect.GetSql().Updateable<TeamData>(TeamList[0]).Where(it => it.TeamID == packet.TeamID).ExecuteCommand() > 0)
+                        {
+                            rData.Result = 1;
+
+                        }
+                        else
+                        {
+                            rData.Result = 0;
+                        }
 
                     }
                     else
@@ -502,41 +514,76 @@ namespace TeamService
                         // 新隊長不為其他車隊的隊長
                         if (LeaderList.Count() == 0)
                         {
-                            string oldLeaderID = TeamList[0].Leader;
+                            JArray jsMemberList = JArray.Parse(TeamList[0].TeamMemberIDs);
+                            List<string> memberList = jsMemberList.ToObject<List<string>>();
 
-                            TeamList[0].Leader = packet.MemberID == null ? TeamList[0].Leader : packet.MemberID;
+                            JArray jsViceLeaderList = JArray.Parse(TeamList[0].TeamViceLeaderIDs);
+                            List<string> viceLeaderList = jsViceLeaderList.ToObject<List<string>>();
 
-                            if (dbConnect.GetSql().Updateable<TeamData>(TeamList[0]).Where(it => it.TeamID == packet.TeamID).ExecuteCommand() > 0)
+                            // 新隊長為車隊中的隊員 或 副隊長
+                            if (memberList.Contains(packet.MemberID) || viceLeaderList.Contains(packet.MemberID))
                             {
-                                rData.Result = 1;
+                                string oldLeaderID = TeamList[0].Leader;
 
-                                log.SaveLog($"[Info] Controller::OnChangeLander, Change New Leader:{packet.MemberID} Success");
+                                TeamList[0].Leader = packet.MemberID == null ? TeamList[0].Leader : packet.MemberID;
 
-                                // 舊隊長加入車隊隊員列表
-                                UpdateTeamMemberList oldLeader = new UpdateTeamMemberList
+                                if (dbConnect.GetSql().Updateable<TeamData>(TeamList[0]).Where(it => it.TeamID == packet.TeamID).ExecuteCommand() > 0)
                                 {
-                                    TeamID = packet.TeamID,
-                                    Action = 1,
-                                    MemberID = oldLeaderID
-                                };
+                                    rData.Result = 1;
 
-                                OnUpdateTeamMemberList(oldLeader);
+                                    log.SaveLog($"[Info] Controller::OnChangeLander, Change New Leader:{packet.MemberID} Success");
 
-                                // 新隊長從車隊隊員列表中移除
-                                UpdateTeamMemberList newLeader = new UpdateTeamMemberList
+                                    // 舊隊長加入車隊隊員列表
+                                    UpdateTeamMemberList oldLeader = new UpdateTeamMemberList
+                                    {
+                                        TeamID = packet.TeamID,
+                                        Action = 1,
+                                        MemberID = oldLeaderID
+                                    };
+
+                                    OnUpdateTeamMemberList(oldLeader);
+
+                                    // 新隊長為車隊一般成員
+                                    if (memberList.Contains(packet.MemberID))
+                                    {
+                                        // 新隊長從車隊隊員列表中移除
+                                        UpdateTeamMemberList newLeader = new UpdateTeamMemberList
+                                        {
+                                            TeamID = packet.TeamID,
+                                            Action = -1,
+                                            MemberID = packet.MemberID
+                                        };
+
+                                        OnUpdateTeamMemberList(newLeader);
+                                    }
+
+                                    // 新隊長原為副隊長
+                                    if (viceLeaderList.Contains(packet.MemberID))
+                                    {
+                                        UpdateViceLeaderList oldViceLeader = new UpdateViceLeaderList
+                                        {
+                                            TeamID = packet.TeamID,
+                                            Action = -1,
+                                            LeaderID = packet.MemberID,
+                                            MemberID = packet.MemberID
+                                        };
+
+                                        OnUpdateViceLeaderList(oldViceLeader);
+                                    }
+                                }
+                                else
                                 {
-                                    TeamID = packet.TeamID,
-                                    Action = -1,
-                                    MemberID = packet.MemberID
-                                };
+                                    rData.Result = 0;
 
-                                OnUpdateTeamMemberList(oldLeader);
+                                    log.SaveLog($"[Warning] Controller::OnChangeLander, Change New Leader:{packet.MemberID} Data Base Can Not Update");
+                                }
+
                             }
                             else
                             {
                                 rData.Result = 0;
 
-                                log.SaveLog($"[Warning] Controller::OnChangeLander, Change New Leader:{packet.MemberID} Data Base Can Not Update");
+                                log.SaveLog($"[Warning] Controller::OnChangeLander, Member:{packet.MemberID} Not Tame:{packet.TeamID}'s Member");
                             }
 
                         }
@@ -595,92 +642,104 @@ namespace TeamService
                     // 只有隊長有更改權限
                     if (TeamList[0].Leader == packet.LeaderID)
                     {
+                        JArray jsMemberList = JArray.Parse(TeamList[0].TeamMemberIDs);
+                        List<string> memberList = jsMemberList.ToObject<List<string>>();
 
-                        JArray jsData = JArray.Parse(TeamList[0].TeamViceLeaderIDs);
-
-                        List<string> idList = jsData.ToObject<List<string>>();
-
-                        // 新增
-                        if (packet.Action == 1)
+                        // 為車隊中的隊員
+                        if (memberList.Contains(packet.MemberID))
                         {
-                            if (!idList.Contains(packet.MemberID))
+                            JArray jsData = JArray.Parse(TeamList[0].TeamViceLeaderIDs);
+
+                            List<string> idList = jsData.ToObject<List<string>>();
+
+                            // 新增
+                            if (packet.Action == 1)
                             {
-                                idList.Add(packet.MemberID);
-
-                                rData.Result = 1;
-
-                                log.SaveLog($"[Info] Controller::OnChangeLander, Add Vice Leader:{packet.TeamID} Success");
-
-                            }
-                            else
-                            {
-                                rData.Result = 0;
-
-                                log.SaveLog($"[Info] Controller::OnChangeLander, Vice Leader:{packet.TeamID} Repeat");
-                            }
-
-                        }
-                        // 刪除
-                        else if (packet.Action == -1)
-                        {
-                            if (idList.Contains(packet.MemberID))
-                            {
-                                idList.Remove(packet.MemberID);
-
-                                rData.Result = 1;
-
-                                log.SaveLog($"[Info] Controller::OnChangeLander, Remove Vice Leader:{packet.TeamID} Success");
-                            }
-                            else
-                            {
-                                rData.Result = 0;
-
-                                log.SaveLog($"[Info] Controller::OnChangeLander, Can Not Find Vice Leader:{packet.TeamID}");
-
-                            }
-                        }
-
-                        if (rData.Result == 1)
-                        {
-                            JArray jsNew = JArray.FromObject(idList);
-
-                            if (dbConnect.GetSql().Updateable<TeamData>().SetColumns(it => new TeamData() { TeamViceLeaderIDs = jsNew.ToString() }).Where(it => it.TeamID == packet.TeamID).ExecuteCommand() > 0)
-                            {
-                                rData.Result = 1;
-
-                                log.SaveLog($"[Info] Controller::OnChangeLander, Update Vice Leader:{packet.TeamID} Success");
-
-                                if (packet.Action == 1)
+                                if (!idList.Contains(packet.MemberID))
                                 {
-                                    // 新副隊長從車隊隊員列表中移除
-                                    UpdateTeamMemberList oldLeader = new UpdateTeamMemberList
-                                    {
-                                        TeamID = packet.TeamID,
-                                        Action = -1,
-                                        MemberID = packet.MemberID
-                                    };
+                                    idList.Add(packet.MemberID);
 
-                                    OnUpdateTeamMemberList(oldLeader);
+                                    rData.Result = 1;
+
+                                    log.SaveLog($"[Info] Controller::OnUpdateViceLeaderList, Add Vice Leader:{packet.TeamID} Success");
+
                                 }
-                                else if (packet.Action == -1)
+                                else
                                 {
-                                    // 舊副隊長加入車隊隊員列表中
-                                    UpdateTeamMemberList oldLeader = new UpdateTeamMemberList
-                                    {
-                                        TeamID = packet.TeamID,
-                                        Action = 1,
-                                        MemberID = packet.MemberID
-                                    };
+                                    rData.Result = 0;
 
-                                    OnUpdateTeamMemberList(oldLeader);
+                                    log.SaveLog($"[Info] Controller::OnUpdateViceLeaderList, Vice Leader:{packet.TeamID} Repeat");
+                                }
+
+                            }
+                            // 刪除
+                            else if (packet.Action == -1)
+                            {
+                                if (idList.Contains(packet.MemberID))
+                                {
+                                    idList.Remove(packet.MemberID);
+
+                                    rData.Result = 1;
+
+                                    log.SaveLog($"[Info] Controller::OnUpdateViceLeaderList, Remove Vice Leader:{packet.TeamID} Success");
+                                }
+                                else
+                                {
+                                    rData.Result = 0;
+
+                                    log.SaveLog($"[Info] Controller::OnUpdateViceLeaderList, Can Not Find Vice Leader:{packet.TeamID}");
+
                                 }
                             }
-                            else
-                            {
-                                rData.Result = 0;
 
-                                log.SaveLog($"[Info] Controller::OnChangeLander, Update Vice Leader:{packet.TeamID} Fail, Data Base Con Not Update");
+                            if (rData.Result == 1)
+                            {
+                                JArray jsNew = JArray.FromObject(idList);
+
+                                if (dbConnect.GetSql().Updateable<TeamData>().SetColumns(it => new TeamData() { TeamViceLeaderIDs = jsNew.ToString() }).Where(it => it.TeamID == packet.TeamID).ExecuteCommand() > 0)
+                                {
+                                    rData.Result = 1;
+
+                                    log.SaveLog($"[Info] Controller::OnUpdateViceLeaderList, Update Vice Leader:{packet.TeamID} Success");
+
+                                    if (packet.Action == 1)
+                                    {
+                                        // 新副隊長從車隊隊員列表中移除
+                                        UpdateTeamMemberList oldLeader = new UpdateTeamMemberList
+                                        {
+                                            TeamID = packet.TeamID,
+                                            Action = -1,
+                                            MemberID = packet.MemberID
+                                        };
+
+                                        OnUpdateTeamMemberList(oldLeader);
+                                    }
+                                    else if (packet.Action == -1)
+                                    {
+                                        // 舊副隊長加入車隊隊員列表中
+                                        UpdateTeamMemberList oldLeader = new UpdateTeamMemberList
+                                        {
+                                            TeamID = packet.TeamID,
+                                            Action = 1,
+                                            MemberID = packet.MemberID
+                                        };
+
+                                        OnUpdateTeamMemberList(oldLeader);
+                                    }
+                                }
+                                else
+                                {
+                                    rData.Result = 0;
+
+                                    log.SaveLog($"[Info] Controller::OnUpdateViceLeaderList, Update Vice Leader:{packet.TeamID} Fail, Data Base Con Not Update");
+                                }
                             }
+                        }
+                        else
+                        {
+                            rData.Result = 0;
+
+                            log.SaveLog($"[Info] Controller::OnUpdateViceLeaderList, {packet.MemberID} Not Team:{packet.TeamID}'s Member");
                         }
 
                     }
@@ -1026,8 +1085,32 @@ namespace TeamService
             UpdateBulletin rSendToBs = packet;
 
             try
-            {   
-                List<TeamData> TeamList = dbConnect.GetSql().Queryable<TeamData>().Where(it => it.TeamID == packet.TeamID).ToList();
+            {
+                List<TeamData> TeamList = new List<TeamData>();
+
+                List<TeamBulletin> BulletinList = new List<TeamBulletin>();
+
+                // 新增 或 刪除公告
+                if (packet.Action == 1 || packet.Action == -1)
+                {
+                    TeamList = dbConnect.GetSql().Queryable<TeamData>().Where(it => it.TeamID == packet.TeamID).ToList();
+                }
+                // 修改公告
+                else if (packet.Action == 2)
+                {
+                    BulletinList = dbConnect.GetSql().Queryable<TeamBulletin>().Where(it => it.BulletinID == packet.BulletinID).ToList();
+
+                    if (BulletinList.Count() == 1)
+                    {
+                        TeamList = dbConnect.GetSql().Queryable<TeamData>().Where(it => it.TeamID == BulletinList[0].TeamID).ToList();
+                    }
+                    else
+                    {
+                        rData.Result = 0;
+
+                        log.SaveLog($"[Info] Controller::OnUpdateBulletin, Update Team Bulletin Fail, BulletinID:{rData.BulletinID}");
+                    }
+                }
 
                 // 有找到車隊
                 if (TeamList.Count() == 1)
@@ -1093,8 +1176,6 @@ namespace TeamService
                         // 修改公告
                         else if (packet.Action == 2)
                         {
-                            List<TeamBulletin> BulletinList = dbConnect.GetSql().Queryable<TeamBulletin>().Where(it => it.BulletinID == packet.BulletinID).ToList();
-
                             // 有找到公告
                             if (BulletinList.Count() == 1)
                             {
@@ -1151,8 +1232,8 @@ namespace TeamService
                 rData.Result = 0;
             }
 
-            // 新增或修改動作 且 有成功
-            if ((packet.Action == 1 || packet.Action == 2) && rData.Result == 1)
+            // 更新有成功
+            if (rData.Result == 1)
             {
                 string sData = JsonConvert.SerializeObject(rSendToBs);
 
@@ -1161,7 +1242,22 @@ namespace TeamService
                 jsSendToBs.Add("CmdID", (int)C2S_CmdID.emUpdateBulletin);
                 jsSendToBs.Add("Data", JsonConvert.DeserializeObject<JObject>(sData));
 
-                bsConnect.GetConnect().Send(jsSendToBs.ToString());
+                if (bsConnect.GetConnect() != null)
+                {
+                    if (bsConnect.Connect())
+                    {
+                        bsConnect.GetConnect().Send(jsSendToBs.ToString());
+                    }
+                    else 
+                    {
+                        log.SaveLog($"[Warning] Controller::OnUpdateBulletin, bsConnect Can Not Connect");
+                    }
+
+                }
+                else
+                {
+
+                }
             }
 
             JObject jsMain = new JObject();
@@ -1184,18 +1280,44 @@ namespace TeamService
 
             try
             {
-                List<TeamData> TeamList = dbConnect.GetSql().Queryable<TeamData>().Where(it => it.TeamID == packet.TeamID).ToList();
+                List<TeamData> TeamList = new List<TeamData>();
+                List<TeamActivity> ActList = new List<TeamActivity>();
+
+                // 新增 或 刪除活動
+                if (packet.Action == 1 || packet.Action == -1)
+                {
+                    TeamList = dbConnect.GetSql().Queryable<TeamData>().Where(it => it.TeamID == packet.TeamID).ToList();
+                }
+                else if (packet.Action == 2)
+                {
+                    ActList = dbConnect.GetSql().Queryable<TeamActivity>().Where(it => it.ActID == packet.ActID).ToList();
+
+                    // 有找到活動
+                    if (ActList.Count() == 1)
+                    {
+                        TeamList = dbConnect.GetSql().Queryable<TeamData>().Where(it => it.TeamID == packet.TeamID).ToList();
+                    }
+                    else 
+                    {
+                        rData.Result = 0;
+
+                        log.SaveLog($"[Info] Controller::OnUpdateBulletin, Update Team Bulletin Fail, BulletinID:{rData.ActID}");
+                    }
+                }
 
                 // 有找到車隊
                 if (TeamList.Count() == 1)
                 {
                     // 取得副隊長列表
                     JArray jsViceLeader = JArray.Parse(TeamList[0].TeamViceLeaderIDs);
-
                     List<string> viceLeaderList = jsViceLeader.ToObject<List<string>>();
 
-                    // 檢查發活動的人是否為隊長或副隊長
-                    if (packet.MemberID == TeamList[0].Leader || viceLeaderList.Contains(packet.MemberID))
+                    // 取得隊員列表
+                    JArray jsMemberList = JArray.Parse(TeamList[0].TeamMemberIDs);
+                    List<string> memberList = jsMemberList.ToObject<List<string>>();
+
+                    // 檢查發活動的人是否為車隊隊員
+                    if (packet.MemberID == TeamList[0].Leader || viceLeaderList.Contains(packet.MemberID) || memberList.Contains(packet.MemberID))
                     {
                         // 新增活動
                         if (packet.Action == 1)
@@ -1239,65 +1361,84 @@ namespace TeamService
                                 log.SaveLog($"[Warning] Controller::OnUpdateActivity, Create Team Activity Fail, Data Base Can Not Inseart");
                             }
                         }
-                        // 刪除公告
-                        else if (packet.Action == -1)
+                        else
                         {
-                            if (dbConnect.GetSql().Deleteable<TeamActivity>().Where(it => it.ActID == packet.ActID).ExecuteCommand() > 0)
-                            {
-                                rData.Result = 1;
-
-                                log.SaveLog($"[Info] Controller::OnUpdateActivity, Remove Team Activity Success, BulletinID:{rData.ActID}");
-                            }
-                            else
-                            {
-                                rData.Result = 0;
-
-                                log.SaveLog($"[Info] Controller::OnUpdateActivity, Remove Team Activity Fail, BulletinID:{rData.ActID}");
-                            }
-                        }
-                        // 修改公告
-                        else if (packet.Action == 2)
-                        {
-                            List<TeamActivity> ActList = dbConnect.GetSql().Queryable<TeamActivity>().Where(it => it.ActID == packet.ActID).ToList();
-
-                            // 有找到公告
                             if (ActList.Count() == 1)
                             {
-                                ActList[0].MemberList = packet.MemberList == null ? ActList[0].MemberList : packet.MemberList;
-                                ActList[0].ActDate = packet.ActDate == null ? ActList[0].ActDate : packet.ActDate;
-                                ActList[0].Title = packet.Title == null ? ActList[0].Title : packet.Title;
-                                ActList[0].MeetTime = packet.MeetTime == null ? ActList[0].MeetTime : packet.MeetTime;
-                                ActList[0].TotalDistance = packet.TotalDistance == 0 ? ActList[0].TotalDistance : packet.TotalDistance;
-                                ActList[0].MaxAltitude = packet.MaxAltitude == 0 ? ActList[0].MaxAltitude : packet.MaxAltitude;
-                                ActList[0].Route = packet.Route == null ? ActList[0].Route : packet.Route;
-                                ActList[0].Description = packet.Description == null ? ActList[0].Description : packet.Description;
-                                ActList[0].Photo = packet.Photo == null ? ActList[0].Photo : packet.Photo;
-
-                                if (dbConnect.GetSql().Updateable<TeamActivity>(TeamList[0]).Where(it => it.ActID == packet.ActID).ExecuteCommand() > 0)
+                                // 為活動發起人 或正副隊長
+                                if (ActList[0].MemberID == packet.MemberID || packet.MemberID == TeamList[0].Leader || viceLeaderList.Contains(packet.MemberID))
                                 {
-                                    rData.Result = 1;
+                                    // 刪除活動
+                                    if (packet.Action == -1)
+                                    {
+                                        if (dbConnect.GetSql().Deleteable<TeamActivity>().Where(it => it.ActID == packet.ActID).ExecuteCommand() > 0)
+                                        {
+                                            rData.Result = 1;
 
-                                    rSendToBs.Action = packet.Action;
-                                    rSendToBs.TeamID = ActList[0].TeamID;
-                                    rSendToBs.MemberID = ActList[0].MemberID;
-                                    rSendToBs.MemberList = ActList[0].MemberList;
-                                    rSendToBs.MemberList = ActList[0].MemberList;
-                                    rSendToBs.ActDate = ActList[0].ActDate;
-                                    rSendToBs.Title = ActList[0].Title;
-                                    rSendToBs.MeetTime = ActList[0].MeetTime;
-                                    rSendToBs.TotalDistance = ActList[0].TotalDistance;
-                                    rSendToBs.MaxAltitude = ActList[0].MaxAltitude;
-                                    rSendToBs.Route = ActList[0].Route;
-                                    rSendToBs.Description = ActList[0].Description;
-                                    rSendToBs.Photo = ActList[0].Photo;
+                                            log.SaveLog($"[Info] Controller::OnUpdateActivity, Remove Team Activity Success, BulletinID:{rData.ActID}");
+                                        }
+                                        else
+                                        {
+                                            rData.Result = 0;
 
-                                    log.SaveLog($"[Info] Controller::OnUpdateActivity, Update Team Activity Success, ActID:{rData.ActID}");
+                                            log.SaveLog($"[Info] Controller::OnUpdateActivity, Remove Team Activity Fail, BulletinID:{rData.ActID}");
+                                        }
+                                    }
+                                    // 修改活動
+                                    else if (packet.Action == 2)
+                                    {
+
+                                        ActList[0].MemberList = packet.MemberList == null ? ActList[0].MemberList : packet.MemberList;
+                                        ActList[0].ActDate = packet.ActDate == null ? ActList[0].ActDate : packet.ActDate;
+                                        ActList[0].Title = packet.Title == null ? ActList[0].Title : packet.Title;
+                                        ActList[0].MeetTime = packet.MeetTime == null ? ActList[0].MeetTime : packet.MeetTime;
+                                        ActList[0].TotalDistance = packet.TotalDistance == 0 ? ActList[0].TotalDistance : packet.TotalDistance;
+                                        ActList[0].MaxAltitude = packet.MaxAltitude == 0 ? ActList[0].MaxAltitude : packet.MaxAltitude;
+                                        ActList[0].Route = packet.Route == null ? ActList[0].Route : packet.Route;
+                                        ActList[0].Description = packet.Description == null ? ActList[0].Description : packet.Description;
+                                        ActList[0].Photo = packet.Photo == null ? ActList[0].Photo : packet.Photo;
+
+                                        if (dbConnect.GetSql().Updateable<TeamActivity>(TeamList[0]).Where(it => it.ActID == packet.ActID).ExecuteCommand() > 0)
+                                        {
+                                            rData.Result = 1;
+
+                                            rSendToBs.Action = packet.Action;
+                                            rSendToBs.TeamID = ActList[0].TeamID;
+                                            rSendToBs.MemberID = ActList[0].MemberID;
+                                            rSendToBs.MemberList = ActList[0].MemberList;
+                                            rSendToBs.MemberList = ActList[0].MemberList;
+                                            rSendToBs.ActDate = ActList[0].ActDate;
+                                            rSendToBs.Title = ActList[0].Title;
+                                            rSendToBs.MeetTime = ActList[0].MeetTime;
+                                            rSendToBs.TotalDistance = ActList[0].TotalDistance;
+                                            rSendToBs.MaxAltitude = ActList[0].MaxAltitude;
+                                            rSendToBs.Route = ActList[0].Route;
+                                            rSendToBs.Description = ActList[0].Description;
+                                            rSendToBs.Photo = ActList[0].Photo;
+
+                                            log.SaveLog($"[Info] Controller::OnUpdateActivity, Update Team Activity Success, ActID:{rData.ActID}");
+                                        }
+                                        else
+                                        {
+                                            rData.Result = 0;
+
+                                            log.SaveLog($"[Info] Controller::OnUpdateActivity, Update Team Activity Fail, ActID:{rData.ActID}");
+                                        }
+
+                                    }
+                                    else
+                                    {
+                                        rData.Result = 2;
+
+                                        log.SaveLog($"[Info] Controller::OnUpdateActivity, {packet.MemberID} Action: 0");
+
+                                    }
                                 }
                                 else
                                 {
-                                    rData.Result = 0;
+                                    rData.Result = 2;
 
-                                    log.SaveLog($"[Info] Controller::OnUpdateActivity, Update Team Activity Fail, ActID:{rData.ActID}");
+                                    log.SaveLog($"[Info] Controller::OnUpdateActivity, {packet.MemberID} Can Not Update Act:{packet.ActID}");
                                 }
                             }
                             else
@@ -1305,8 +1446,11 @@ namespace TeamService
                                 rData.Result = 0;
 
                                 log.SaveLog($"[Info] Controller::OnUpdateActivity, Update Team Bulletin Fail, ActID:{rData.ActID}");
+
                             }
+
                         }
+                        
                     }
                     else
                     {
@@ -1331,8 +1475,8 @@ namespace TeamService
                 rData.Result = 0;
             }
 
-            // 新增或修改動作 且 有成功
-            if ((packet.Action == 1 || packet.Action == 2) && rData.Result == 1)
+            // 更新動作有成功
+            if (rData.Result == 1)
             {
                 string sData = JsonConvert.SerializeObject(rSendToBs);
 
@@ -1341,7 +1485,21 @@ namespace TeamService
                 jsSendToBs.Add("CmdID", (int)C2S_CmdID.emUpdateActivity);
                 jsSendToBs.Add("Data", JsonConvert.DeserializeObject<JObject>(sData));
 
-                bsConnect.GetConnect().Send(jsSendToBs.ToString());
+                if (bsConnect.GetConnect() != null)
+                {
+                    if (bsConnect.Connect())
+                    {
+                        bsConnect.GetConnect().Send(jsSendToBs.ToString());
+                    }
+                    else
+                    {
+                        log.SaveLog($"[Warning] Controller::OnUpdateActivity, bsConnect Can Not Connect");
+                    }
+                }
+                else
+                {
+                    
+                }
             }
 
             JObject jsMain = new JObject();
@@ -1368,7 +1526,6 @@ namespace TeamService
                     // 檢查解散車隊的人是否為隊長
                     if (packet.MemberID == TeamList[0].Leader)
                     {
-                        
                         // 移入暫時區, 帶時間到期後刪除
                         TeamDataStorageCache stroge = new TeamDataStorageCache();
                         stroge.TeamID = TeamList[0].TeamID;
@@ -1390,7 +1547,7 @@ namespace TeamService
                         if (dbConnect.GetSql().Insertable(stroge).ExecuteCommand() > 0)
                         {
                             // 刪除車隊
-                            if (dbConnect.GetSql().Deleteable<TeamActivity>().Where(it => it.TeamID == packet.TeamID).ExecuteCommand() > 0)
+                            if (dbConnect.GetSql().Deleteable<TeamData>().Where(it => it.TeamID == packet.TeamID).ExecuteCommand() > 0)
                             {
                                 // 變更車隊成員的車隊列表
                                 JArray jsData = JArray.Parse(TeamList[0].TeamMemberIDs);
@@ -1534,6 +1691,22 @@ namespace TeamService
                                     rData.Result = 1;
 
                                     log.SaveLog($"[Info] Controller::OnJoinOrLeaveTeamActivity, Upsate {packet.ActID} To Member List Success");
+                                
+                                    // 若為車隊發起人 則解散車隊
+                                    if (ActList[0].MemberID == packet.MemberID)
+                                    {
+                                        log.SaveLog($"[Info] Controller::OnJoinOrLeaveTeamActivity, Leave Member: {packet.MemberID} is Activity Member: {ActList[0].MemberID}");
+
+                                        UpdateActivity updateAct = new UpdateActivity
+                                        {
+                                            Action = -1,
+                                            ActID = ActList[0].ActID,
+                                            TeamID = ActList[0].TeamID,
+                                            MemberID = packet.MemberID
+                                        };
+
+                                        OnUpdateActivity(updateAct);
+                                    }
                                 }
                                 else
                                 {
@@ -1610,18 +1783,35 @@ namespace TeamService
                         {
                             ApplyList.Remove(packet.MemberID);
 
-                            rData.Result = 1;
+                            if (dbConnect.GetSql().Updateable<TeamData>().SetColumns(it => new TeamData() { ApplyJoinList = JArray.FromObject(ApplyList).ToString() }).Where(it => it.TeamID == packet.TeamID).ExecuteCommand() > 0)
+                            {
+                                rData.Result = 1;
 
-                            log.SaveLog($"[Info] Controller::OnJoinOrLeaveTeam, Remove Member:{packet.MemberID} From Team:{packet.TeamID}'s ApplyJoinList");
+                                log.SaveLog($"[Info] Controller::OnJoinOrLeaveTeam, Remove Member:{packet.MemberID} From Team:{packet.TeamID}'s ApplyJoinList Success");
+                            }
+                            else
+                            {
+                                rData.Result = 0;
+
+                                log.SaveLog($"[Info] Controller::OnJoinOrLeaveTeam, Remove Member:{packet.MemberID} From Team:{packet.TeamID}'s ApplyJoinList Fail");
+                            }
 
                         }
                         else if (InviteList.Contains(packet.MemberID))
                         {
                             InviteList.Remove(packet.MemberID);
 
-                            rData.Result = 1;
+                            if (dbConnect.GetSql().Updateable<TeamData>().SetColumns(it => new TeamData() { InviteJoinList = JArray.FromObject(InviteList).ToString() }).Where(it => it.TeamID == packet.TeamID).ExecuteCommand() > 0)
+                            {
+                                rData.Result = 1;
 
-                            log.SaveLog($"[Info] Controller::OnJoinOrLeaveTeam, Remove Member:{packet.MemberID} From Team:{packet.TeamID}'s InviteJoinList");
+                                log.SaveLog($"[Info] Controller::OnJoinOrLeaveTeam, Remove Member:{packet.MemberID} From Team:{packet.TeamID}'s InviteJoinList Success");
+                            }
+                            else
+                            {
+                                log.SaveLog($"[Info] Controller::OnJoinOrLeaveTeam, Remove Member:{packet.MemberID} From Team:{packet.TeamID}'s InviteJoinList Fail");
+                            }
+
                         }
                         else
                         {

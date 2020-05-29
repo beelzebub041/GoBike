@@ -39,15 +39,11 @@ namespace Connect
 
             if (LoadConfig())
             {
-                WebSocket ws = new WebSocket($"ws://{ip}:{port}/TeamService");
-
-                ws.Connect();
+                ws = new WebSocket($"ws://{ip}:{port}/TeamService");
 
                 bReturn = true;
 
                 log.SaveLog("[Info] BrocastConnect::Initialize, Connect Brocast Service Success");
-
-                bReturn = true;
             }
             else
             {
@@ -102,6 +98,37 @@ namespace Connect
         }
 
         /**
+         * 開啟連線
+         */
+        public bool Connect()
+        {
+            bool bReturn = false;
+
+            try
+            {
+                if (ws != null)
+                {
+                    ws.Connect();
+
+                    bReturn = true;
+
+                    log.SaveLog("[Info] BrocastConnect::Connect, Connect Success");
+                }
+                else
+                {
+                    log.SaveLog($"[Error] BrocastConnect::Connect, Web Socket Object Is Null");
+                }
+
+            }
+            catch (Exception ex)
+            {
+                log.SaveLog($"[Error] BrocastConnect::Connect,Catch Error, Msg:{ex.Message}");
+            }
+
+            return bReturn;
+        }
+
+        /**
          * 關閉連線
          */
         public bool Disconnect()
@@ -110,12 +137,19 @@ namespace Connect
 
             try
             {
-                // 關閉連線
-                ws.Close();
+                if (ws != null)
+                {
+                    // 關閉連線
+                    ws.Close();
 
-                bReturn = true;
+                    bReturn = true;
 
-                log.SaveLog("[Info] BrocastConnect::Disconnect, Disconnect Success");
+                    log.SaveLog("[Info] BrocastConnect::Disconnect, Disconnect Success");
+                }
+                else
+                {
+                    log.SaveLog($"[Error] BrocastConnect::Disconnect, Web Socket Object Is Null");
+                }
 
             }
             catch (Exception ex)
