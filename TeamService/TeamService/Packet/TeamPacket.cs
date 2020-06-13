@@ -9,7 +9,6 @@ namespace TeamPacket.ServerToClient
         emUpdateViceLeaderListResult,
         emUpdateTeamMemberListResult,
         emUpdateApplyJoinListResult,
-        emUpdateInviteJoinListResult,
         emUpdateBulletinResult,
         emUpdateActivityResult,
         emDeleteTeamResult,
@@ -97,25 +96,6 @@ namespace TeamPacket.ServerToClient
 
     // 更新申請加入車隊列表結果
     class UpdateApplyJoinListResult
-    {
-        /**
-          * 更新動作
-          * -1: 無動作
-          * 0: 新增
-          * 1: 刪除
-          */
-        public int Action { get; set; }
-
-        /*
-        * 0: 失敗
-        * 1: 成功
-        */
-        public int Result { get; set; }
-
-    }
-
-    // 更新邀請加入車隊列表結果
-    class UpdateInviteJoinListResult
     {
         /**
           * 更新動作
@@ -242,7 +222,6 @@ namespace TeamPacket.ClientToServer
         emUpdateViceLeaderList,
         emUpdateTeamMemberList,
         emUpdateApplyJoinList,
-        emUpdateInviteJoinList,
         emUpdateBulletin,
         emUpdateActivity,
         emDeleteTeam,
@@ -383,26 +362,6 @@ namespace TeamPacket.ClientToServer
     * 更新申請加入車隊列表
     */
     class UpdateApplyJoinList
-    {
-        // 車隊ID
-        public string TeamID { get; set; }
-
-        /**
-        * 更新動作
-        * -1: 刪除
-        * 0: 無動作
-        * 1: 新增
-        */
-        public int Action { get; set; }
-
-        // 隊員的MemberID
-        public string MemberID { get; set; }
-    }
-
-    /*
-    * 更新邀請加入車隊列表
-    */
-    class UpdateInviteJoinList
     {
         // 車隊ID
         public string TeamID { get; set; }

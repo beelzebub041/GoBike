@@ -11,7 +11,7 @@ using Tools.Logger;
 
 namespace Connect
 {
-    class BrocastConnect
+    class NotifyConnect
     {
         [DllImport("kernel32")]
         private static extern int GetPrivateProfileString(string section, string key, string def, StringBuilder retVal, int size, string filePath);
@@ -24,12 +24,12 @@ namespace Connect
 
         private Tools.Logger.Logger log = null;
 
-        public BrocastConnect(Tools.Logger.Logger log)
+        public NotifyConnect(Tools.Logger.Logger log)
         {
             this.log = log;
         }
 
-        ~BrocastConnect()
+        ~NotifyConnect()
         {
 
         }
@@ -43,11 +43,11 @@ namespace Connect
 
                 bReturn = true;
 
-                log.SaveLog("[Info] BrocastConnect::Initialize, Connect Brocast Service Success");
+                log.SaveLog("[Info] NotifyConnect::Initialize, Connect Notify Service Success");
             }
             else
             {
-                log.SaveLog("[Error] BrocastConnect::Initialize, LoadConfig Fail");
+                log.SaveLog("[Error] NotifyConnect::Initialize, LoadConfig Fail");
             }
 
             return bReturn;
@@ -62,7 +62,7 @@ namespace Connect
 
             try
             {
-                string configPath = @"./Config/BrocastSetting.ini";
+                string configPath = @"./Config/NotifySetting.ini";
 
                 StringBuilder temp = new StringBuilder(255);
 
@@ -91,7 +91,7 @@ namespace Connect
             {
                 bReturn = false;
 
-                log.SaveLog("[Error] BrocastConnect::LoadConfig, Config Parameter Error");
+                log.SaveLog("[Error] NotifyConnect::LoadConfig, Config Parameter Error");
             }
 
             return bReturn;
@@ -110,19 +110,26 @@ namespace Connect
                 {
                     ws.Connect();
 
-                    bReturn = true;
+                    if (ws.IsAlive)
+                    {
+                        bReturn = true;
 
-                    log.SaveLog("[Info] BrocastConnect::Connect, Connect Success");
+                        log.SaveLog("[Info] NotifyConnect::Connect, Connect Success");
+                    }
+                    else
+                    {
+                        log.SaveLog($"[Error] NotifyConnect::Connect, Connect Fail");
+                    }
                 }
                 else
                 {
-                    log.SaveLog($"[Error] BrocastConnect::Connect, Web Socket Object Is Null");
+                    log.SaveLog($"[Error] NotifyConnect::Connect, Web Socket Object Is Null");
                 }
 
             }
             catch (Exception ex)
             {
-                log.SaveLog($"[Error] BrocastConnect::Connect,Catch Error, Msg:{ex.Message}");
+                log.SaveLog($"[Error] NotifyConnect::Connect,Catch Error, Msg:{ex.Message}");
             }
 
             return bReturn;
@@ -144,17 +151,17 @@ namespace Connect
 
                     bReturn = true;
 
-                    log.SaveLog("[Info] BrocastConnect::Disconnect, Disconnect Success");
+                    log.SaveLog("[Info] NotifyConnect::Disconnect, Disconnect Success");
                 }
                 else
                 {
-                    log.SaveLog($"[Error] BrocastConnect::Disconnect, Web Socket Object Is Null");
+                    log.SaveLog($"[Error] NotifyConnect::Disconnect, Web Socket Object Is Null");
                 }
 
             }
             catch (Exception ex)
             {
-                log.SaveLog($"[Error] BrocastConnect::Disconnect,Catch Error, Msg:{ex.Message}");
+                log.SaveLog($"[Error] NotifyConnect::Disconnect,Catch Error, Msg:{ex.Message}");
             }
 
             return bReturn;
