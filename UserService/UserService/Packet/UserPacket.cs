@@ -8,7 +8,8 @@ namespace UserPacket.ServerToClient
         emUpdateUserInfoResult,
         emUpdatePasswordResult,
         emUpdateFriendListResult,
-        emUpdateBlackListResult
+        emUpdateBlackListResult,
+        emUpdateNotifyTokenResult,
     }
 
     // 使用者註冊結果
@@ -110,6 +111,16 @@ namespace UserPacket.ServerToClient
     }
 
 
+    // 更新推播Token結果
+    class UpdateNotifyTokenResult
+    {
+        /*
+        * 0: 失敗
+        * 1: 成功
+        */
+        public int Result { get; set; }
+    }
+
 }
 
 namespace UserPacket.ClientToServer
@@ -122,6 +133,7 @@ namespace UserPacket.ClientToServer
         emUpdatePassword,
         emUpdateFriendList,
         emUpdateBlackList,
+        emUpdateNotifyToken,
     }
 
     // ======================= User ======================= //
@@ -277,6 +289,18 @@ namespace UserPacket.ClientToServer
         public string BlackID { get; set; }
     }
 
+    /*
+    * 更新推播Token
+    */
+    class UpdateNotifyToken
+    {
+        // 會員ID
+        public string MemberID { get; set; }
+
+        // 使用者資料
+        public string NotifyToken { get; set; }
+
+    }
 
 }
 

@@ -30,7 +30,7 @@ namespace UserService
 
         private Server wsServer = null;                 // Web Socket Server
 
-        private string ControllerVersion = "User021";
+        private string ControllerVersion = "User023";
 
 
         public Controller(Form1 fm1)
@@ -154,6 +154,13 @@ namespace UserService
 
                                     break;
 
+                                case (int)C2S_CmdID.emUpdateNotifyToken:
+                                    UpdateNotifyToken tokenMsg = JsonConvert.DeserializeObject<UpdateNotifyToken>(packetData);
+
+                                    sReturn = OnUpdateNotifyToken(tokenMsg);
+
+                                    break;
+
                                 default:
                                     log.SaveLog($"[Warning] Controller::MessageProcess Can't Find CmdID {cmdID}");
 
@@ -231,6 +238,7 @@ namespace UserService
                             Password = packet.Password,
                             FBToken = packet.FBToken,
                             GoogleToken = packet.GoogleToken,
+                            NotifyToken = "",
                             RegisterSource = packet.RegisterSource,
                             RegisterDate = dateTime,
                         };
@@ -384,7 +392,7 @@ namespace UserService
                 if (infoList.Count() == 1)
                 {
                     infoList[0].NickName = packet.UpdateData.NickName == null ? infoList[0].NickName : packet.UpdateData.NickName;
-                    infoList[0].Birthday = packet.UpdateData.Birthday == null ? DateTime.Parse(infoList[0].Birthday).ToString("yyyy-MM-dd hh:mm:ss") : packet.UpdateData.Birthday;
+                    infoList[0].Birthday = packet.UpdateData.Birthday == null ? infoList[0].Birthday : packet.UpdateData.Birthday;
                     infoList[0].BodyHeight = packet.UpdateData.BodyHeight == 0 ? infoList[0].BodyHeight : packet.UpdateData.BodyHeight;
                     infoList[0].BodyWeight = packet.UpdateData.BodyWeight == 0 ? infoList[0].BodyWeight : packet.UpdateData.BodyWeight;
                     infoList[0].FrontCover = packet.UpdateData.FrontCover == null ? infoList[0].FrontCover : packet.UpdateData.FrontCover;
@@ -717,6 +725,56 @@ namespace UserService
             return jsMain.ToString();
         }
 
+        /**
+         * 更新推播Token
+         */
+        private string OnUpdateNotifyToken(UpdateNotifyToken packet)
+        {
+            UpdateNotifyTokenResult rData = new UpdateNotifyTokenResult();
+
+            try
+            {
+                List<UserAccount> infoList = dbConnect.GetSql().Queryable<UserAccount>().Where(it => it.MemberID == packet.MemberID).ToList();
+
+                // 有找到資料
+                if (infoList.Count() == 1)
+                {
+                    if (dbConnect.GetSql().Updateable<UserAccount>().SetColumns(it => new UserAccount() { NotifyToken = packet.NotifyToken }).Where(it => it.MemberID == packet.MemberID).ExecuteCommand() > 0)
+                    {
+                        rData.Result = 1;
+
+                        log.SaveLog($"[Info] Controller::OnUpdateNotifyToken Update User: {packet.MemberID} Info Success");
+
+                    }
+                    else
+                    {
+                        rData.Result = 0;
+
+                        log.SaveLog($"[Info] Controller::OnUpdateNotifyToken Update User: {packet.MemberID} Info Fail");
+
+                    }
+                }
+                else
+                {
+                    rData.Result = 0;
+
+                    log.SaveLog($"[Info] Controller::OnUpdateNotifyToken Can Not Find User: {packet.MemberID}");
+
+                }
+            }
+            catch (Exception ex)
+            {
+                log.SaveLog($"[Error] Controller::OnUpdateNotifyToken Catch Error, Msg: {ex.Message}");
+
+                rData.Result = 0;
+            }
+
+            JObject jsMain = new JObject();
+            jsMain.Add("CmdID", (int)S2C_CmdID.emUpdateNotifyTokenResult);
+            jsMain.Add("Data", JsonConvert.DeserializeObject<JObject>(JsonConvert.SerializeObject(rData)));
+
+            return jsMain.ToString();
+        }
     }
 
 }
