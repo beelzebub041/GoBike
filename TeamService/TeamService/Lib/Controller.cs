@@ -10,6 +10,7 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
 using Tools.Logger;
+using Tools.NotifyMessage;
 
 using DataBaseDef;
 using Connect;
@@ -26,13 +27,13 @@ namespace TeamService
 
         private Logger log = null;                      // Logger
 
+        private NotifyMessage ntMsg = null;
+
         private DataBaseConnect dbConnect = null;
 
         private Server wsServer = null;                 // Web Socket Server
 
-        private NotifyConnect nyConnect = null;        // Notify Service Connect
-
-        private string version = "Team019";
+        private string version = "Team022";
 
 
         public Controller(Form1 fm1)
@@ -51,11 +52,6 @@ namespace TeamService
             {
                 wsServer.Stop();
             }
-
-            if (nyConnect != null)
-            {
-                nyConnect.Disconnect();
-            }
         }
 
         public bool Initialize()
@@ -70,9 +66,9 @@ namespace TeamService
 
                 wsServer = new Server(log.SaveLog, MessageProcess);
 
-                nyConnect = new NotifyConnect(log);
-
                 dbConnect = new DataBaseConnect(log);
+
+                ntMsg = new NotifyMessage(log);
 
                 if (dbConnect.Initialize())
                 {
@@ -80,7 +76,7 @@ namespace TeamService
                     {
                         if (wsServer.Initialize())
                         {
-                            //if (nyConnect.Initialize())
+                            if (ntMsg.Initialize())
                             {
                                 bReturn = true;
                             }
@@ -251,24 +247,6 @@ namespace TeamService
 
             return bReturn;
 
-        }
-
-        /**
-         * 送出訊息至Notify Service
-         */
-         private void SendToNotifyService(string msg)
-        {
-            if (nyConnect.GetConnect() != null)
-            {
-                if (nyConnect.Connect())
-                {
-                    nyConnect.GetConnect().Send(msg);
-                }
-            }
-            else
-            {
-                log.SaveLog($"[Warning] Controller::SendToNotifyService, nyConnect Is Null");
-            }
         }
 
         /**
@@ -1159,7 +1137,7 @@ namespace TeamService
                 rData.Result = 0;
             }
 
-            // 更新有成功
+            // 更新有成功, 送出推播
             if (rData.Result == 1)
             {
                 string sData = JsonConvert.SerializeObject(rSendToNy);
@@ -1169,7 +1147,7 @@ namespace TeamService
                 jsSendToNy.Add("CmdID", (int)C2S_CmdID.emUpdateBulletin);
                 jsSendToNy.Add("Data", JsonConvert.DeserializeObject<JObject>(sData));
 
-                SendToNotifyService(jsSendToNy.ToString());
+                //SendToNotifyService(jsSendToNy.ToString());
             }
 
             JObject jsMain = new JObject();
@@ -1253,9 +1231,7 @@ namespace TeamService
                                 MeetTime = packet.MeetTime,
                                 TotalDistance = packet.TotalDistance,
                                 MaxAltitude = packet.MaxAltitude,
-                                Route = packet.Route,
-                                Description = packet.Description,
-                                Photo = packet.Photo
+                                Route = packet.Route
 
                             };
 
@@ -1310,8 +1286,6 @@ namespace TeamService
                                         ActList[0].TotalDistance = packet.TotalDistance == 0 ? ActList[0].TotalDistance : packet.TotalDistance;
                                         ActList[0].MaxAltitude = packet.MaxAltitude == 0 ? ActList[0].MaxAltitude : packet.MaxAltitude;
                                         ActList[0].Route = packet.Route == null ? ActList[0].Route : packet.Route;
-                                        ActList[0].Description = packet.Description == null ? ActList[0].Description : packet.Description;
-                                        ActList[0].Photo = packet.Photo == null ? ActList[0].Photo : packet.Photo;
 
                                         if (dbConnect.GetSql().Updateable<TeamActivity>(TeamList[0]).Where(it => it.ActID == packet.ActID).ExecuteCommand() > 0)
                                         {
@@ -1328,8 +1302,6 @@ namespace TeamService
                                             rSendToNy.TotalDistance = ActList[0].TotalDistance;
                                             rSendToNy.MaxAltitude = ActList[0].MaxAltitude;
                                             rSendToNy.Route = ActList[0].Route;
-                                            rSendToNy.Description = ActList[0].Description;
-                                            rSendToNy.Photo = ActList[0].Photo;
 
                                             log.SaveLog($"[Info] Controller::OnUpdateActivity, Update Team Activity Success, ActID:{rData.ActID}");
                                         }
@@ -1390,7 +1362,7 @@ namespace TeamService
                 rData.Result = 0;
             }
 
-            // 更新動作有成功
+            // 更新有成功, 送出推播
             if (rData.Result == 1)
             {
                 string sData = JsonConvert.SerializeObject(rSendToNy);
@@ -1399,7 +1371,7 @@ namespace TeamService
                 jsSendToNy.Add("CmdID", (int)C2S_CmdID.emUpdateActivity);
                 jsSendToNy.Add("Data", JsonConvert.DeserializeObject<JObject>(sData));
 
-                SendToNotifyService(jsSendToNy.ToString());
+                //SendToNotifyService(jsSendToNy.ToString());
             }
 
             JObject jsMain = new JObject();

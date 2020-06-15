@@ -462,9 +462,6 @@ namespace TeamPacket.ClientToServer
         // 路線描述
         public string Description { get; set; }
 
-        // 活動地圖
-        public string Photo { get; set; }
-
     }
 
     /*
