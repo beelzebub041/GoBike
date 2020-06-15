@@ -24,6 +24,9 @@ namespace DataBaseDef
 
         // Google Token
         public string GoogleToken { get; set; }
+		
+		// 推播Token
+        public string NotifyToken { get; set; }
 
         // 註冊來源
         public int RegisterSource { get; set; }
@@ -200,9 +203,6 @@ namespace DataBaseDef
         // 申請加入的會員ID列表
         public string ApplyJoinList { get; set; }
 
-        // 邀請加入的會員ID列表
-        public string InviteJoinList { get; set; }
-
     }
 
     // 車隊公告
@@ -265,12 +265,6 @@ namespace DataBaseDef
         // 路線
         public string Route { get; set; }
 
-        // 路線描述
-        public string Description { get; set; }
-
-        // 活動地圖
-        public string Photo { get; set; }
-
     }
 
     // 車隊資料暫存區
@@ -314,9 +308,6 @@ namespace DataBaseDef
 
         // 申請加入的會員ID列表
         public string ApplyJoinList { get; set; }
-
-        // 邀請加入的會員ID列表
-        public string InviteJoinList { get; set; }
 
         // 暫存日期
         public string StorageDate { get; set; }

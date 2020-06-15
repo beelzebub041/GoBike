@@ -33,7 +33,7 @@ namespace RideService
 
         private Server wsServer = null;                 // Web Socket Server
 
-        private string version = "Ride004";
+        private string version = "Ride005";
 
 
         public Controller(Form1 fm1)
@@ -185,7 +185,7 @@ namespace RideService
                 // 有找到帳號 且 有找到 騎乘資料
                 if (accountList.Count() == 1 && rideDataList.Count() == 1)
                 {
-                    string dateTime = DateTime.UtcNow.ToString("MMdd-hhmmss");
+                    string dateTime = DateTime.UtcNow.ToString("yyyy-MM-dd hh:mm:ss");
 
                     string guidAll = Guid.NewGuid().ToString();
 
@@ -194,9 +194,9 @@ namespace RideService
                     // ======================= 新增騎乘紀錄 =======================
                     RideRecord record = new RideRecord
                     {
-                        RideID = "DbRr-" + guidList[0] + "-" + dateTime,
+                        RideID = "DbRr-" + guidList[0] + "-" + DateTime.UtcNow.ToString("MMdd-hhmmss"),
                         MemberID = packet.MemberID,
-                        CreateDate = packet.CreateDate,
+                        CreateDate = dateTime,
                         Title = packet.Title,
                         Photo = packet.Photo,
                         Time = packet.Time,
