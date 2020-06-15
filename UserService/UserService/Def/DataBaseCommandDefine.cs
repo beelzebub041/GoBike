@@ -265,12 +265,6 @@ namespace DataBaseDef
         // 路線
         public string Route { get; set; }
 
-        // 路線描述
-        public string Description { get; set; }
-		
-		// 活動地圖
-        public string Photo { get; set; }
-
     }
 
     // 車隊資料暫存區
@@ -314,9 +308,6 @@ namespace DataBaseDef
 
         // 申請加入的會員ID列表
         public string ApplyJoinList { get; set; }
-
-        // 邀請加入的會員ID列表
-        public string InviteJoinList { get; set; }
 
         // 暫存日期
         public string StorageDate { get; set; }
