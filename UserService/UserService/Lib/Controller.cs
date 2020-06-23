@@ -30,7 +30,9 @@ namespace UserService
 
         private Server wsServer = null;                 // Web Socket Server
 
-        private string ControllerVersion = "User023";
+        private object msgLock = new object();
+
+        private string ControllerVersion = "User024";
 
 
         public Controller(Form1 fm1)
@@ -93,97 +95,99 @@ namespace UserService
 
             string sReturn = string.Empty;
 
-            // TODO Lock ??
-
             if (msg != string.Empty)
             {
-                try
+                lock (msgLock)
                 {
-                    JObject jsMain = JObject.Parse(msg);
-
-                    if (jsMain.ContainsKey("CmdID"))
+                    try
                     {
-                        int cmdID = (int)jsMain["CmdID"];
+                        JObject jsMain = JObject.Parse(msg);
 
-                        if (jsMain.ContainsKey("Data")) 
+                        if (jsMain.ContainsKey("CmdID"))
                         {
-                            string packetData = jsMain["Data"].ToString();
+                            int cmdID = (int)jsMain["CmdID"];
 
-                            switch (cmdID)
+                            if (jsMain.ContainsKey("Data"))
                             {
-                                case (int)C2S_CmdID.emUserRegistered:
+                                string packetData = jsMain["Data"].ToString();
 
-                                    UserRegistered registeredMsg = JsonConvert.DeserializeObject<UserRegistered>(packetData);
+                                switch (cmdID)
+                                {
+                                    case (int)C2S_CmdID.emUserRegistered:
 
-                                    sReturn = OnCreateNewAccount(registeredMsg);
+                                        UserRegistered registeredMsg = JsonConvert.DeserializeObject<UserRegistered>(packetData);
 
-                                    break;
+                                        sReturn = OnCreateNewAccount(registeredMsg);
 
-                                case (int)C2S_CmdID.emUserLogin:
-                                    UserLogin loginMsg = JsonConvert.DeserializeObject<UserLogin>(packetData);
+                                        break;
 
-                                    sReturn = OnUserLogin(loginMsg);
+                                    case (int)C2S_CmdID.emUserLogin:
+                                        UserLogin loginMsg = JsonConvert.DeserializeObject<UserLogin>(packetData);
 
-                                    break;
+                                        sReturn = OnUserLogin(loginMsg);
 
-                                case (int)C2S_CmdID.emUpdateUserInfo:
-                                    UpdateUserInfo updateMsg = JsonConvert.DeserializeObject<UpdateUserInfo>(packetData);
+                                        break;
 
-                                    sReturn = OnUpdateUserInfo(updateMsg);
+                                    case (int)C2S_CmdID.emUpdateUserInfo:
+                                        UpdateUserInfo updateMsg = JsonConvert.DeserializeObject<UpdateUserInfo>(packetData);
 
-                                    break;
+                                        sReturn = OnUpdateUserInfo(updateMsg);
 
-                                case (int)C2S_CmdID.emUpdatePassword:
-                                    UpdatePassword passwordMsg = JsonConvert.DeserializeObject<UpdatePassword>(packetData);
+                                        break;
 
-                                    sReturn = OnUpdatePassword(passwordMsg);
+                                    case (int)C2S_CmdID.emUpdatePassword:
+                                        UpdatePassword passwordMsg = JsonConvert.DeserializeObject<UpdatePassword>(packetData);
 
-                                    break;
+                                        sReturn = OnUpdatePassword(passwordMsg);
 
-                                case (int)C2S_CmdID.emUpdateFriendList:
-                                    UpdateFriendList friendMsg = JsonConvert.DeserializeObject<UpdateFriendList>(packetData);
+                                        break;
 
-                                    sReturn = OnUpdateFriendList(friendMsg);
+                                    case (int)C2S_CmdID.emUpdateFriendList:
+                                        UpdateFriendList friendMsg = JsonConvert.DeserializeObject<UpdateFriendList>(packetData);
 
-                                    break;
+                                        sReturn = OnUpdateFriendList(friendMsg);
 
-                                case (int)C2S_CmdID.emUpdateBlackList:
-                                    UpdateBlackList blackMsg = JsonConvert.DeserializeObject<UpdateBlackList>(packetData);
+                                        break;
 
-                                    sReturn = OnUpdateBlackList(blackMsg);
+                                    case (int)C2S_CmdID.emUpdateBlackList:
+                                        UpdateBlackList blackMsg = JsonConvert.DeserializeObject<UpdateBlackList>(packetData);
 
-                                    break;
+                                        sReturn = OnUpdateBlackList(blackMsg);
 
-                                case (int)C2S_CmdID.emUpdateNotifyToken:
-                                    UpdateNotifyToken tokenMsg = JsonConvert.DeserializeObject<UpdateNotifyToken>(packetData);
+                                        break;
 
-                                    sReturn = OnUpdateNotifyToken(tokenMsg);
+                                    case (int)C2S_CmdID.emUpdateNotifyToken:
+                                        UpdateNotifyToken tokenMsg = JsonConvert.DeserializeObject<UpdateNotifyToken>(packetData);
 
-                                    break;
+                                        sReturn = OnUpdateNotifyToken(tokenMsg);
 
-                                default:
-                                    log.SaveLog($"[Warning] Controller::MessageProcess Can't Find CmdID {cmdID}");
+                                        break;
 
-                                    break;
+                                    default:
+                                        log.SaveLog($"[Warning] Controller::MessageProcess Can't Find CmdID {cmdID}");
+
+                                        break;
+                                }
+
+                            }
+                            else
+                            {
+                                log.SaveLog("[Warning] Controller::MessageProcess Can't Find Member \"Data\" ");
                             }
 
                         }
                         else
                         {
-                            log.SaveLog("[Warning] Controller::MessageProcess Can't Find Member \"Data\" ");
+                            log.SaveLog("[Warning] Controller::MessageProcess Can't Find Member \"CmdID\" ");
                         }
 
                     }
-                    else
+                    catch (Exception ex)
                     {
-                        log.SaveLog("[Warning] Controller::MessageProcess Can't Find Member \"CmdID\" ");
+                        log.SaveLog("[Error] Controller::MessageProcess Process Error Msg:" + ex.Message);
                     }
-
                 }
-                catch (Exception ex)
-                {
-                    log.SaveLog("[Error] Controller::MessageProcess Process Error Msg:" + ex.Message);
-                }
+                
             }
             else
             {
@@ -219,8 +223,8 @@ namespace UserService
             {
                 try
                 {
-                    List<UserAccount> accountList = dbConnect.GetSql().Queryable<UserAccount>().Where(it => it.Email == packet.Email).ToList();
-                
+                    List<UserAccount> accountList = dbConnect.GetSql().Queryable<UserAccount>().With(SqlSugar.SqlWith.RowLock).Where(it => it.Email == packet.Email).ToList();
+
                     // 未包含該Email
                     if (accountList.Count() == 0)
                     {
@@ -258,7 +262,8 @@ namespace UserService
                             County = -1,
                             TeamList = "[]",
                             FriendList = "[]",
-                            BlackList = "[]"
+                            BlackList = "[]",
+                            SpecificationModel = ""
                         };
 
                         // 新增騎乘資料
@@ -271,9 +276,9 @@ namespace UserService
                         };
 
                         // 資料有寫入資料庫
-                        if (dbConnect.GetSql().Insertable(account).ExecuteCommand() > 0 &&
-                            dbConnect.GetSql().Insertable(info).ExecuteCommand() > 0 &&
-                            dbConnect.GetSql().Insertable(data).ExecuteCommand() > 0)
+                        if (dbConnect.GetSql().Insertable(account).With(SqlSugar.SqlWith.TabLockX).ExecuteCommand() > 0 &&
+                            dbConnect.GetSql().Insertable(info).With(SqlSugar.SqlWith.TabLockX).ExecuteCommand() > 0 &&
+                            dbConnect.GetSql().Insertable(data).With(SqlSugar.SqlWith.TabLockX).ExecuteCommand() > 0)
                         {
                             rData.Result = 1;
 
@@ -386,7 +391,7 @@ namespace UserService
 
             try
             {
-                List<UserInfo> infoList = dbConnect.GetSql().Queryable<UserInfo>().Where(it => it.MemberID == packet.MemberID).ToList();
+                List<UserInfo> infoList = dbConnect.GetSql().Queryable<UserInfo>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).ToList();
 
                 // 有找到資料
                 if (infoList.Count() == 1)
@@ -401,8 +406,9 @@ namespace UserService
                     infoList[0].Mobile = packet.UpdateData.Mobile == null ? infoList[0].Mobile : packet.UpdateData.Mobile;
                     infoList[0].Gender = packet.UpdateData.Gender == 0 ? infoList[0].Gender : packet.UpdateData.Gender;
                     infoList[0].County = packet.UpdateData.Country == 0 ? infoList[0].County : packet.UpdateData.Country;
+                    infoList[0].SpecificationModel = packet.UpdateData.SpecificationModel == "" ? infoList[0].SpecificationModel : packet.UpdateData.SpecificationModel;
 
-                    if (dbConnect.GetSql().Updateable<UserInfo>(infoList[0]).Where(it => it.MemberID == packet.MemberID).ExecuteCommand() > 0)
+                    if (dbConnect.GetSql().Updateable<UserInfo>(infoList[0]).With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).ExecuteCommand() > 0)
                     {
                         rData.Result = 1;
                         
@@ -449,7 +455,7 @@ namespace UserService
 
             try
             {
-                List<UserAccount> accountList = dbConnect.GetSql().Queryable<UserAccount>().Where(it => it.MemberID == packet.MemberID).ToList();
+                List<UserAccount> accountList = dbConnect.GetSql().Queryable<UserAccount>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).ToList();
 
                 // 有找到帳號
                 if (accountList.Count() == 1)
@@ -480,7 +486,7 @@ namespace UserService
 
                     if (canUpdate)
                     {
-                        if (dbConnect.GetSql().Updateable<UserAccount>().SetColumns(it => new UserAccount() { Password = packet.NewPassword }).Where(it => it.MemberID == packet.MemberID).ExecuteCommand() > 0)
+                        if (dbConnect.GetSql().Updateable<UserAccount>().SetColumns(it => new UserAccount() { Password = packet.NewPassword }).With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).ExecuteCommand() > 0)
                         {
                             rData.Result = 1;
 
@@ -532,7 +538,7 @@ namespace UserService
 
             try
             {
-                List<UserInfo> userList = dbConnect.GetSql().Queryable<UserInfo>().Where(it => it.MemberID == packet.MemberID).ToList();
+                List<UserInfo> userList = dbConnect.GetSql().Queryable<UserInfo>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).ToList();
 
                 // 有找到會員
                 if (userList.Count() == 1)
@@ -576,7 +582,7 @@ namespace UserService
                     {
                         JArray jsNew = JArray.FromObject(idList);
 
-                        if (dbConnect.GetSql().Updateable<UserInfo>().SetColumns(it => new UserInfo() { FriendList = jsNew.ToString() }).Where(it => it.MemberID == packet.MemberID).ExecuteCommand() > 0)
+                        if (dbConnect.GetSql().Updateable<UserInfo>().SetColumns(it => new UserInfo() { FriendList = jsNew.ToString() }).With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).ExecuteCommand() > 0)
                         {
                             rData.Result = 1;
 
@@ -623,7 +629,7 @@ namespace UserService
 
             try
             {
-                List<UserInfo> userList = dbConnect.GetSql().Queryable<UserInfo>().Where(it => it.MemberID == packet.MemberID).ToList();
+                List<UserInfo> userList = dbConnect.GetSql().Queryable<UserInfo>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).ToList();
 
                 // 有找到會員
                 if (userList.Count() == 1)
@@ -652,7 +658,7 @@ namespace UserService
 
                                 JArray jsFriendNew = JArray.FromObject(friendList);
 
-                                if (dbConnect.GetSql().Updateable<UserInfo>().SetColumns(it => new UserInfo() { FriendList = jsFriendNew.ToString() }).Where(it => it.MemberID == packet.MemberID).ExecuteCommand() > 0)
+                                if (dbConnect.GetSql().Updateable<UserInfo>().SetColumns(it => new UserInfo() { FriendList = jsFriendNew.ToString() }).With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).ExecuteCommand() > 0)
                                 {
                                     log.SaveLog($"[Info] Controller::OnUpdateBlackList Remove MemberID:{packet.MemberID} From Friend List");
                                 }
@@ -689,7 +695,7 @@ namespace UserService
                     {
                         JArray jsNew = JArray.FromObject(idList);
 
-                        if (dbConnect.GetSql().Updateable<UserInfo>().SetColumns(it => new UserInfo() { BlackList = jsNew.ToString() }).Where(it => it.MemberID == packet.MemberID).ExecuteCommand() > 0)
+                        if (dbConnect.GetSql().Updateable<UserInfo>().SetColumns(it => new UserInfo() { BlackList = jsNew.ToString() }).With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).ExecuteCommand() > 0)
                         {
                             rData.Result = 1;
 
@@ -734,12 +740,12 @@ namespace UserService
 
             try
             {
-                List<UserAccount> infoList = dbConnect.GetSql().Queryable<UserAccount>().Where(it => it.MemberID == packet.MemberID).ToList();
+                List<UserAccount> infoList = dbConnect.GetSql().Queryable<UserAccount>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).ToList();
 
                 // 有找到資料
                 if (infoList.Count() == 1)
                 {
-                    if (dbConnect.GetSql().Updateable<UserAccount>().SetColumns(it => new UserAccount() { NotifyToken = packet.NotifyToken }).Where(it => it.MemberID == packet.MemberID).ExecuteCommand() > 0)
+                    if (dbConnect.GetSql().Updateable<UserAccount>().SetColumns(it => new UserAccount() { NotifyToken = packet.NotifyToken }).With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).ExecuteCommand() > 0)
                     {
                         rData.Result = 1;
 

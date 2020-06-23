@@ -15,6 +15,8 @@ namespace Tools.Logger
     {
         private Form1 fm = null;
 
+        private object logLock = new object();
+
         public Logger(Form1 fm)
         {
             this.fm = fm;
@@ -44,26 +46,31 @@ namespace Tools.Logger
 
         public void SaveLog(string msg)
         {
-            try
+            lock (logLock)
             {
-                Console.WriteLine(msg);
+                try
+                {
 
-                fm.updateTextBox(msg);
+                    Console.WriteLine(msg);
 
-                FileStream fs = new FileStream(@"./Log/system.txt", FileMode.Append, FileAccess.Write);
+                    fm.updateTextBox(msg);
 
-                StreamWriter swWriter = new StreamWriter(fs);
-                //寫入數據
-                swWriter.WriteLine("{0} {1}", DateTime.Now.ToString("yyyy/MM/dd HH:mm:ss"), msg);
-                swWriter.Close();
+                    FileStream fs = new FileStream(@"./Log/system.txt", FileMode.Append, FileAccess.Write);
 
-                fs.Close();
-                
+                    StreamWriter swWriter = new StreamWriter(fs);
+                    //寫入數據
+                    swWriter.WriteLine("{0} {1}", DateTime.Now.ToString("yyyy/MM/dd HH:mm:ss"), msg);
+                    swWriter.Close();
+
+                    fs.Close();
+
+                }
+                catch (Exception e)
+                {
+                    throw e;
+                }
             }
-            catch (Exception e)
-            {
-                throw e;
-            }
+            
         }
 
         

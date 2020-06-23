@@ -210,6 +210,9 @@ namespace UserPacket.ClientToServer
         // 國家
         public int Country { get; set; }
 
+        // 手機規格型號
+        public string SpecificationModel { get; set; }
+
     }
 
     /*
