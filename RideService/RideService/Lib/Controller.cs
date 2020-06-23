@@ -33,7 +33,9 @@ namespace RideService
 
         private Server wsServer = null;                 // Web Socket Server
 
-        private string version = "Ride005";
+        private object msgLock = new object();
+
+        private string version = "Ride006";
 
 
         public Controller(Form1 fm1)
@@ -97,54 +99,56 @@ namespace RideService
 
             string sReturn = string.Empty;
 
-            // TODO Lock ??
-
             if (msg != string.Empty)
             {
-                try
+                lock (msgLock)
                 {
-                    JObject jsMain = JObject.Parse(msg);
-
-                    if (jsMain.ContainsKey("CmdID"))
+                    try
                     {
-                        int cmdID = (int)jsMain["CmdID"];
+                        JObject jsMain = JObject.Parse(msg);
 
-                        if (jsMain.ContainsKey("Data")) 
+                        if (jsMain.ContainsKey("CmdID"))
                         {
-                            string packetData = jsMain["Data"].ToString();
+                            int cmdID = (int)jsMain["CmdID"];
 
-                            switch (cmdID)
+                            if (jsMain.ContainsKey("Data"))
                             {
-                                case (int)C2S_CmdID.CreateRideRecord:
-                                    CreateRideRecord CreateData = JsonConvert.DeserializeObject<CreateRideRecord>(packetData);
+                                string packetData = jsMain["Data"].ToString();
 
-                                    sReturn = OnCreateRideRecord(CreateData);
+                                switch (cmdID)
+                                {
+                                    case (int)C2S_CmdID.CreateRideRecord:
+                                        CreateRideRecord CreateData = JsonConvert.DeserializeObject<CreateRideRecord>(packetData);
 
-                                    break;
+                                        sReturn = OnCreateRideRecord(CreateData);
 
-                                default:
-                                    log.SaveLog($"[Warning] Controller::MessageProcess Can't Find CmdID {cmdID}");
+                                        break;
 
-                                    break;
+                                    default:
+                                        log.SaveLog($"[Warning] Controller::MessageProcess Can't Find CmdID {cmdID}");
+
+                                        break;
+                                }
+
+                            }
+                            else
+                            {
+                                log.SaveLog("[Warning] Controller::MessageProcess Can't Find Member \"Data\" ");
                             }
 
                         }
                         else
                         {
-                            log.SaveLog("[Warning] Controller::MessageProcess Can't Find Member \"Data\" ");
+                            log.SaveLog("[Warning] Controller::MessageProcess Can't Find Member \"CmdID\" ");
                         }
 
                     }
-                    else
+                    catch (Exception ex)
                     {
-                        log.SaveLog("[Warning] Controller::MessageProcess Can't Find Member \"CmdID\" ");
+                        log.SaveLog("[Error] Controller::MessageProcess Process Error Msg:" + ex.Message);
                     }
-
                 }
-                catch (Exception ex)
-                {
-                    log.SaveLog("[Error] Controller::MessageProcess Process Error Msg:" + ex.Message);
-                }
+                
             }
             else
             {
@@ -178,9 +182,9 @@ namespace RideService
 
             try 
             {
-                List<UserAccount> accountList = dbConnect.GetSql().Queryable<UserAccount>().Where(it => it.MemberID == packet.MemberID).ToList();
+                List<UserAccount> accountList = dbConnect.GetSql().Queryable<UserAccount>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).ToList();
 
-                List<RideData> rideDataList = dbConnect.GetSql().Queryable<RideData>().Where(it => it.MemberID == packet.MemberID).ToList();
+                List<RideData> rideDataList = dbConnect.GetSql().Queryable<RideData>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).ToList();
 
                 // 有找到帳號 且 有找到 騎乘資料
                 if (accountList.Count() == 1 && rideDataList.Count() == 1)
@@ -209,48 +213,52 @@ namespace RideService
                         SharedType = packet.SharedType
                     };
 
-                    dbConnect.GetSql().Insertable(record).ExecuteCommand();
-
-                    // ======================= 更新騎乘資料 =======================
-                    rideDataList[0].TotalDistance += packet.Distance;
-                    rideDataList[0].TotalAltitude += packet.Altitude;
-                    rideDataList[0].TotalRideTime += packet.Time;
-
-                    dbConnect.GetSql().Updateable<RideData>(rideDataList[0]).Where(it => it.MemberID == packet.MemberID).ExecuteCommand();
-
-                    // ======================= 更新周騎乘資料 =======================
-                    string firsDay = weekProcess.GetWeekFirstDay(DateTime.UtcNow);
-                    string lastDay = weekProcess.GetWeekLastDay(DateTime.UtcNow);
-
-                    List<WeekRideData> wRideDataList = dbConnect.GetSql().Queryable<WeekRideData>()
-                        .Where(it => it.MemberID == packet.MemberID && it.WeekFirstDay == firsDay && it.WeekLastDay == lastDay).ToList();
-
-                    // 有找到資料
-                    if (wRideDataList.Count() == 1)
+                    if (dbConnect.GetSql().Insertable(record).With(SqlSugar.SqlWith.TabLockX).ExecuteCommand() > 0)
                     {
-                        wRideDataList[0].WeekDistance += packet.Distance;
+                        // ======================= 更新騎乘資料 =======================
+                        rideDataList[0].TotalDistance += packet.Distance;
+                        rideDataList[0].TotalAltitude += packet.Altitude;
+                        rideDataList[0].TotalRideTime += packet.Time;
 
-                        dbConnect.GetSql().Updateable<WeekRideData>(wRideDataList[0])
-                            .Where(it => it.MemberID == packet.MemberID && it.WeekFirstDay == firsDay && it.WeekLastDay == lastDay).ExecuteCommand();
+                        dbConnect.GetSql().Updateable<RideData>(rideDataList[0]).With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).ExecuteCommand();
+
+
+                        // ======================= 更新周騎乘資料 =======================
+                        string firsDay = weekProcess.GetWeekFirstDay(DateTime.UtcNow);
+                        string lastDay = weekProcess.GetWeekLastDay(DateTime.UtcNow);
+
+                        List<WeekRideData> wRideDataList = dbConnect.GetSql().Queryable<WeekRideData>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID && it.WeekFirstDay == firsDay && it.WeekLastDay == lastDay).ToList();
+
+                        // 有找到資料
+                        if (wRideDataList.Count() == 1)
+                        {
+                            wRideDataList[0].WeekDistance += packet.Distance;
+
+                            dbConnect.GetSql().Updateable<WeekRideData>(wRideDataList[0]).With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID && it.WeekFirstDay == firsDay && it.WeekLastDay == lastDay).ExecuteCommand();
+                        }
+                        else
+                        {
+                            WeekRideData updateWeek = new WeekRideData
+                            {
+                                MemberID = packet.MemberID,
+                                WeekFirstDay = firsDay,
+                                WeekLastDay = lastDay,
+                                WeekDistance = packet.Distance
+                            };
+
+                            dbConnect.GetSql().Insertable(updateWeek).With(SqlSugar.SqlWith.TabLockX).ExecuteCommand();
+
+                        }
+
+                        rData.Result = 1;
+                        rData.TotalDistance = rideDataList[0].TotalDistance;
+                        rData.TotalAltitude = rideDataList[0].TotalAltitude;
+                        rData.TotalRideTime = rideDataList[0].TotalRideTime;
                     }
                     else
                     {
-                        WeekRideData updateWeek = new WeekRideData
-                        {
-                            MemberID = packet.MemberID,
-                            WeekFirstDay = firsDay,
-                            WeekLastDay = lastDay,
-                            WeekDistance = packet.Distance
-                        };
-
-                        dbConnect.GetSql().Insertable(updateWeek).ExecuteCommand();
-
+                        rData.Result = 0;
                     }
-
-                    rData.Result = 1;
-                    rData.TotalDistance = rideDataList[0].TotalDistance;
-                    rData.TotalAltitude = rideDataList[0].TotalAltitude;
-                    rData.TotalRideTime = rideDataList[0].TotalRideTime;
 
                 }
                 else
