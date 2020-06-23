@@ -110,7 +110,7 @@ namespace Tools.NotifyMessage
         /**
          * 推播訊息至裝置
          */
-        public void SendToDevice(string tit, string msg, string deviceId)
+        public void SendToDevice(string deviceId, string tit, string msg)
         {
             if (serverKey != "" && senderId != "")
             {

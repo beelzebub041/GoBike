@@ -33,8 +33,9 @@ namespace TeamService
 
         private Server wsServer = null;                 // Web Socket Server
 
-        private string version = "Team022";
+        private object msgLock = new object();
 
+        private string version = "Team023";
 
         public Controller(Form1 fm1)
         {
@@ -106,125 +107,127 @@ namespace TeamService
 
             string sReturn = string.Empty;
 
-            // TODO Lock ??
-
             if (msg != string.Empty)
             {
-                try
+                lock (msgLock)
                 {
-                    JObject jsMain = JObject.Parse(msg);
-
-                    if (jsMain.ContainsKey("CmdID"))
+                    try
                     {
-                        int cmdID = (int)jsMain["CmdID"];
+                        JObject jsMain = JObject.Parse(msg);
 
-                        if (jsMain.ContainsKey("Data")) 
+                        if (jsMain.ContainsKey("CmdID"))
                         {
-                            string packetData = jsMain["Data"].ToString();
+                            int cmdID = (int)jsMain["CmdID"];
 
-                            switch (cmdID)
+                            if (jsMain.ContainsKey("Data"))
                             {
-                                case (int)C2S_CmdID.emCreateNewTeam:
+                                string packetData = jsMain["Data"].ToString();
 
-                                    CreateNewTeam createMsg = JsonConvert.DeserializeObject<CreateNewTeam>(packetData);
+                                switch (cmdID)
+                                {
+                                    case (int)C2S_CmdID.emCreateNewTeam:
 
-                                    sReturn = OnCreateNewTeam(createMsg);
+                                        CreateNewTeam createMsg = JsonConvert.DeserializeObject<CreateNewTeam>(packetData);
 
-                                    break;
+                                        sReturn = OnCreateNewTeam(createMsg);
 
-                                case (int)C2S_CmdID.emUpdateTeamData:
-                                    UpdateTeamData dataMsg = JsonConvert.DeserializeObject<UpdateTeamData>(packetData);
+                                        break;
 
-                                    sReturn = OnUpdateTeamData(dataMsg);
+                                    case (int)C2S_CmdID.emUpdateTeamData:
+                                        UpdateTeamData dataMsg = JsonConvert.DeserializeObject<UpdateTeamData>(packetData);
 
-                                    break;
+                                        sReturn = OnUpdateTeamData(dataMsg);
 
-                                case (int)C2S_CmdID.emChangeLander:
-                                    ChangeLander changeMsg = JsonConvert.DeserializeObject<ChangeLander>(packetData);
+                                        break;
 
-                                    sReturn = OnChangeLander(changeMsg);
+                                    case (int)C2S_CmdID.emChangeLander:
+                                        ChangeLander changeMsg = JsonConvert.DeserializeObject<ChangeLander>(packetData);
 
-                                    break;
+                                        sReturn = OnChangeLander(changeMsg);
 
-                                case (int)C2S_CmdID.emUpdateViceLeaderList:
-                                    UpdateViceLeaderList viceLanderMsg = JsonConvert.DeserializeObject<UpdateViceLeaderList>(packetData);
+                                        break;
 
-                                    sReturn = OnUpdateViceLeaderList(viceLanderMsg);
+                                    case (int)C2S_CmdID.emUpdateViceLeaderList:
+                                        UpdateViceLeaderList viceLanderMsg = JsonConvert.DeserializeObject<UpdateViceLeaderList>(packetData);
 
-                                    break;
+                                        sReturn = OnUpdateViceLeaderList(viceLanderMsg);
 
-                                case (int)C2S_CmdID.emUpdateTeamMemberList:
-                                    UpdateTeamMemberList TeamMemberMsg = JsonConvert.DeserializeObject<UpdateTeamMemberList>(packetData);
+                                        break;
 
-                                    sReturn = OnUpdateTeamMemberList(TeamMemberMsg);
+                                    case (int)C2S_CmdID.emUpdateTeamMemberList:
+                                        UpdateTeamMemberList TeamMemberMsg = JsonConvert.DeserializeObject<UpdateTeamMemberList>(packetData);
 
-                                    break;
+                                        sReturn = OnUpdateTeamMemberList(TeamMemberMsg);
 
-                                case (int)C2S_CmdID.emUpdateApplyJoinList:
-                                    UpdateApplyJoinList applyMsg = JsonConvert.DeserializeObject<UpdateApplyJoinList>(packetData);
+                                        break;
 
-                                    sReturn = OnUpdateApplyJoinList(applyMsg);
+                                    case (int)C2S_CmdID.emUpdateApplyJoinList:
+                                        UpdateApplyJoinList applyMsg = JsonConvert.DeserializeObject<UpdateApplyJoinList>(packetData);
 
-                                    break;
+                                        sReturn = OnUpdateApplyJoinList(applyMsg);
 
-                                case (int)C2S_CmdID.emUpdateBulletin:
-                                    UpdateBulletin bulletinMsg = JsonConvert.DeserializeObject<UpdateBulletin>(packetData);
+                                        break;
 
-                                    sReturn = OnUpdateBulletin(bulletinMsg);
+                                    case (int)C2S_CmdID.emUpdateBulletin:
+                                        UpdateBulletin bulletinMsg = JsonConvert.DeserializeObject<UpdateBulletin>(packetData);
 
-                                    break;
+                                        sReturn = OnUpdateBulletin(bulletinMsg);
 
-                                case (int)C2S_CmdID.emUpdateActivity:
-                                    UpdateActivity actMsg = JsonConvert.DeserializeObject<UpdateActivity>(packetData);
+                                        break;
 
-                                    sReturn = OnUpdateActivity(actMsg);
+                                    case (int)C2S_CmdID.emUpdateActivity:
+                                        UpdateActivity actMsg = JsonConvert.DeserializeObject<UpdateActivity>(packetData);
 
-                                    break;
+                                        sReturn = OnUpdateActivity(actMsg);
 
-                                case (int)C2S_CmdID.emDeleteTeam:
-                                    DeleteTeam delMsg = JsonConvert.DeserializeObject<DeleteTeam>(packetData);
+                                        break;
 
-                                    sReturn = OnDeleteTeam(delMsg);
+                                    case (int)C2S_CmdID.emDeleteTeam:
+                                        DeleteTeam delMsg = JsonConvert.DeserializeObject<DeleteTeam>(packetData);
 
-                                    break;
+                                        sReturn = OnDeleteTeam(delMsg);
 
-                                case (int)C2S_CmdID.emJoinOrLeaveTeamActivity:
-                                    JoinOrLeaveTeamActivity joinOrLeaveActMsg = JsonConvert.DeserializeObject<JoinOrLeaveTeamActivity>(packetData);
+                                        break;
 
-                                    sReturn = OnJoinOrLeaveTeamActivity(joinOrLeaveActMsg);
+                                    case (int)C2S_CmdID.emJoinOrLeaveTeamActivity:
+                                        JoinOrLeaveTeamActivity joinOrLeaveActMsg = JsonConvert.DeserializeObject<JoinOrLeaveTeamActivity>(packetData);
 
-                                    break;
+                                        sReturn = OnJoinOrLeaveTeamActivity(joinOrLeaveActMsg);
 
-                                case (int)C2S_CmdID.emJoinOrLeaveTeam:
-                                    JoinOrLeaveTeam joinOrLeaveMsg = JsonConvert.DeserializeObject<JoinOrLeaveTeam>(packetData);
+                                        break;
 
-                                    sReturn = OnJoinOrLeaveTeam(joinOrLeaveMsg);
+                                    case (int)C2S_CmdID.emJoinOrLeaveTeam:
+                                        JoinOrLeaveTeam joinOrLeaveMsg = JsonConvert.DeserializeObject<JoinOrLeaveTeam>(packetData);
 
-                                    break;
+                                        sReturn = OnJoinOrLeaveTeam(joinOrLeaveMsg);
 
-                                default:
-                                    log.SaveLog($"[Warning] Controller::MessageProcess Can't Find CmdID {cmdID}");
+                                        break;
 
-                                    break;
+                                    default:
+                                        log.SaveLog($"[Warning] Controller::MessageProcess Can't Find CmdID {cmdID}");
+
+                                        break;
+                                }
+
+                            }
+                            else
+                            {
+                                log.SaveLog("[Warning] Controller::MessageProcess Can't Find Member \"Data\" ");
                             }
 
                         }
                         else
                         {
-                            log.SaveLog("[Warning] Controller::MessageProcess Can't Find Member \"Data\" ");
+                            log.SaveLog("[Warning] Controller::MessageProcess Can't Find Member \"CmdID\" ");
                         }
 
                     }
-                    else
+                    catch (Exception ex)
                     {
-                        log.SaveLog("[Warning] Controller::MessageProcess Can't Find Member \"CmdID\" ");
+                        log.SaveLog("[Error] Controller::MessageProcess Process Error Msg:" + ex.Message);
                     }
-
                 }
-                catch (Exception ex)
-                {
-                    log.SaveLog("[Error] Controller::MessageProcess Process Error Msg:" + ex.Message);
-                }
+                
             }
             else
             {
@@ -255,12 +258,11 @@ namespace TeamService
         private void UpdateUserTeamList(string memberID, string teamID, int action)
         {
             // 更新UserInfo的車隊資料
-            List<UserInfo> userInfo = dbConnect.GetSql().Queryable<UserInfo>().Where(it => it.MemberID == memberID).ToList();
+            List<UserInfo> userInfo = dbConnect.GetSql().Queryable<UserInfo>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == memberID).ToList();
 
             // 有找到會員
             if (userInfo.Count() == 1)
             {
-
                 JArray jsData = JArray.Parse(userInfo[0].TeamList);
 
                 List<string> idList = jsData.ToObject<List<string>>();
@@ -304,7 +306,7 @@ namespace TeamService
                 {
                     JArray jsNew = JArray.FromObject(idList);
 
-                    if (dbConnect.GetSql().Updateable<UserInfo>().SetColumns(it => new UserInfo() { TeamList = jsNew.ToString() }).Where(it => it.MemberID == memberID).ExecuteCommand() > 0)
+                    if (dbConnect.GetSql().Updateable<UserInfo>().SetColumns(it => new UserInfo() { TeamList = jsNew.ToString() }).With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == memberID).ExecuteCommand() > 0)
                     {
                         log.SaveLog($"[Warning] Controller::UpdateUserTeamList, Update User:{memberID} Team List Success");
                     }
@@ -330,9 +332,9 @@ namespace TeamService
 
             try
             {
-                List<TeamData> TeamList = dbConnect.GetSql().Queryable<TeamData>().Where(it => it.TeamName == packet.TeamName ).ToList();
+                List<TeamData> TeamList = dbConnect.GetSql().Queryable<TeamData>().With(SqlSugar.SqlWith.RowLock).Where(it => it.TeamName == packet.TeamName ).ToList();
 
-                List<TeamData> sameLeaderList = dbConnect.GetSql().Queryable<TeamData>().Where(it => it.Leader == packet.MemberID).ToList();
+                List<TeamData> sameLeaderList = dbConnect.GetSql().Queryable<TeamData>().With(SqlSugar.SqlWith.RowLock).Where(it => it.Leader == packet.MemberID).ToList();
 
                 // 未包含該車隊名稱
                 if (TeamList.Count() == 0)
@@ -364,7 +366,7 @@ namespace TeamService
                             ApplyJoinList = "[]"
                         };
 
-                        if (dbConnect.GetSql().Insertable(data).ExecuteCommand() > 0)
+                        if (dbConnect.GetSql().Insertable(data).With(SqlSugar.SqlWith.RowLock).ExecuteCommand() > 0)
                         {
                             rData.Result = 1;
 
@@ -424,7 +426,7 @@ namespace TeamService
 
             try
             {
-                List<TeamData> TeamList = dbConnect.GetSql().Queryable<TeamData>().Where(it => it.TeamID == packet.TeamID).ToList();
+                List<TeamData> TeamList = dbConnect.GetSql().Queryable<TeamData>().With(SqlSugar.SqlWith.RowLock).Where(it => it.TeamID == packet.TeamID).ToList();
 
                 // 有找到車隊
                 if (TeamList.Count() == 1)
@@ -445,7 +447,7 @@ namespace TeamService
                         TeamList[0].SearchStatus = packet.SearchStatus == 0 ? TeamList[0].SearchStatus : packet.SearchStatus;
                         TeamList[0].ExamineStatus = packet.ExamineStatus == 0 ? TeamList[0].ExamineStatus : packet.ExamineStatus;
 
-                        if (dbConnect.GetSql().Updateable<TeamData>(TeamList[0]).Where(it => it.TeamID == packet.TeamID).ExecuteCommand() > 0)
+                        if (dbConnect.GetSql().Updateable<TeamData>(TeamList[0]).With(SqlSugar.SqlWith.RowLock).Where(it => it.TeamID == packet.TeamID).ExecuteCommand() > 0)
                         {
                             rData.Result = 1;
 
@@ -489,9 +491,9 @@ namespace TeamService
 
             try
             {
-                List<TeamData> TeamList = dbConnect.GetSql().Queryable<TeamData>().Where(it => it.TeamID == packet.TeamID).ToList();
+                List<TeamData> TeamList = dbConnect.GetSql().Queryable<TeamData>().With(SqlSugar.SqlWith.RowLock).Where(it => it.TeamID == packet.TeamID).ToList();
 
-                List<TeamData> LeaderList = dbConnect.GetSql().Queryable<TeamData>().Where(it => it.Leader == packet.MemberID).ToList();
+                List<TeamData> LeaderList = dbConnect.GetSql().Queryable<TeamData>().With(SqlSugar.SqlWith.RowLock).Where(it => it.Leader == packet.MemberID).ToList();
 
                 // 有找到車隊 
                 if (TeamList.Count() == 1)
@@ -515,7 +517,7 @@ namespace TeamService
 
                                 TeamList[0].Leader = packet.MemberID == null ? TeamList[0].Leader : packet.MemberID;
 
-                                if (dbConnect.GetSql().Updateable<TeamData>(TeamList[0]).Where(it => it.TeamID == packet.TeamID).ExecuteCommand() > 0)
+                                if (dbConnect.GetSql().Updateable<TeamData>(TeamList[0]).With(SqlSugar.SqlWith.RowLock).Where(it => it.TeamID == packet.TeamID).ExecuteCommand() > 0)
                                 {
                                     rData.Result = 1;
 
@@ -622,7 +624,7 @@ namespace TeamService
 
             try
             {
-                List<TeamData> TeamList = dbConnect.GetSql().Queryable<TeamData>().Where(it => it.TeamID == packet.TeamID).ToList();
+                List<TeamData> TeamList = dbConnect.GetSql().Queryable<TeamData>().With(SqlSugar.SqlWith.RowLock).Where(it => it.TeamID == packet.TeamID).ToList();
 
                 // 有找到車隊
                 if (TeamList.Count() == 1)
@@ -683,7 +685,7 @@ namespace TeamService
                             {
                                 JArray jsNew = JArray.FromObject(idList);
 
-                                if (dbConnect.GetSql().Updateable<TeamData>().SetColumns(it => new TeamData() { TeamViceLeaderIDs = jsNew.ToString() }).Where(it => it.TeamID == packet.TeamID).ExecuteCommand() > 0)
+                                if (dbConnect.GetSql().Updateable<TeamData>().SetColumns(it => new TeamData() { TeamViceLeaderIDs = jsNew.ToString() }).With(SqlSugar.SqlWith.RowLock).Where(it => it.TeamID == packet.TeamID).ExecuteCommand() > 0)
                                 {
                                     rData.Result = 1;
 
@@ -769,7 +771,7 @@ namespace TeamService
 
             try
             {
-                List<TeamData> TeamList = dbConnect.GetSql().Queryable<TeamData>().Where(it => it.TeamID == packet.TeamID).ToList();
+                List<TeamData> TeamList = dbConnect.GetSql().Queryable<TeamData>().With(SqlSugar.SqlWith.RowLock).Where(it => it.TeamID == packet.TeamID).ToList();
 
                 // 有找到車隊
                 if (TeamList.Count() == 1)
@@ -827,7 +829,7 @@ namespace TeamService
                     {
                         JArray jsNew = JArray.FromObject(idMemberList);
 
-                        if (dbConnect.GetSql().Updateable<TeamData>().SetColumns(it => new TeamData() { TeamMemberIDs = jsNew.ToString() }).Where(it => it.TeamID == packet.TeamID).ExecuteCommand() > 0)
+                        if (dbConnect.GetSql().Updateable<TeamData>().SetColumns(it => new TeamData() { TeamMemberIDs = jsNew.ToString() }).With(SqlSugar.SqlWith.RowLock).Where(it => it.TeamID == packet.TeamID).ExecuteCommand() > 0)
                         {
                             rData.Result = 1;
 
@@ -877,7 +879,7 @@ namespace TeamService
 
             try
             {
-                List<TeamData> TeamList = dbConnect.GetSql().Queryable<TeamData>().Where(it => it.TeamID == packet.TeamID).ToList();
+                List<TeamData> TeamList = dbConnect.GetSql().Queryable<TeamData>().With(SqlSugar.SqlWith.RowLock).Where(it => it.TeamID == packet.TeamID).ToList();
 
                 // 有找到車隊
                 if (TeamList.Count() == 1)
@@ -928,7 +930,7 @@ namespace TeamService
                     {
                         JArray jsNew = JArray.FromObject(idList);
 
-                        if (dbConnect.GetSql().Updateable<TeamData>().SetColumns(it => new TeamData() { ApplyJoinList = jsNew.ToString() }).Where(it => it.TeamID == packet.TeamID).ExecuteCommand() > 0)
+                        if (dbConnect.GetSql().Updateable<TeamData>().SetColumns(it => new TeamData() { ApplyJoinList = jsNew.ToString() }).With(SqlSugar.SqlWith.RowLock).Where(it => it.TeamID == packet.TeamID).ExecuteCommand() > 0)
                         {
                             rData.Result = 1;
 
@@ -985,12 +987,12 @@ namespace TeamService
                 // 新增
                 if (packet.Action == 1)
                 {
-                    TeamList = dbConnect.GetSql().Queryable<TeamData>().Where(it => it.TeamID == packet.TeamID).ToList();
+                    TeamList = dbConnect.GetSql().Queryable<TeamData>().With(SqlSugar.SqlWith.RowLock).Where(it => it.TeamID == packet.TeamID).ToList();
                 }
                 // 修改公告 或 刪除公告
                 else if (packet.Action == 2 || packet.Action == -1)
                 {
-                    BulletinList = dbConnect.GetSql().Queryable<TeamBulletin>().Where(it => it.BulletinID == packet.BulletinID).ToList();
+                    BulletinList = dbConnect.GetSql().Queryable<TeamBulletin>().With(SqlSugar.SqlWith.RowLock).Where(it => it.BulletinID == packet.BulletinID).ToList();
 
                     if (BulletinList.Count() == 1)
                     {
@@ -1034,7 +1036,7 @@ namespace TeamService
                                 Day = packet.Day
                             };
 
-                            if (dbConnect.GetSql().Insertable(teamBu).ExecuteCommand() > 0)
+                            if (dbConnect.GetSql().Insertable(teamBu).With(SqlSugar.SqlWith.TabLockX).ExecuteCommand() > 0)
                             {
                                 rData.Result = 1;
 
@@ -1058,7 +1060,7 @@ namespace TeamService
                                 // 刪除公告
                                 if (packet.Action == -1)
                                 {
-                                    if (dbConnect.GetSql().Deleteable<TeamBulletin>().Where(it => it.BulletinID == packet.BulletinID).ExecuteCommand() > 0)
+                                    if (dbConnect.GetSql().Deleteable<TeamBulletin>().With(SqlSugar.SqlWith.TabLockX).Where(it => it.BulletinID == packet.BulletinID).ExecuteCommand() > 0)
                                     {
                                         rData.Result = 1;
 
@@ -1078,7 +1080,7 @@ namespace TeamService
                                     BulletinList[0].Content = packet.Content == null ? BulletinList[0].Content : packet.Content;
                                     BulletinList[0].Day = packet.Day == 0 ? BulletinList[0].Day : packet.Day;
 
-                                    if (dbConnect.GetSql().Updateable<TeamBulletin>(BulletinList[0]).Where(it => it.BulletinID == packet.BulletinID).ExecuteCommand() > 0)
+                                    if (dbConnect.GetSql().Updateable<TeamBulletin>(BulletinList[0]).With(SqlSugar.SqlWith.RowLock).Where(it => it.BulletinID == packet.BulletinID).ExecuteCommand() > 0)
                                     {
                                         rData.Result = 1;
 
@@ -1176,17 +1178,17 @@ namespace TeamService
                 // 新增活動
                 if (packet.Action == 1 )
                 {
-                    TeamList = dbConnect.GetSql().Queryable<TeamData>().Where(it => it.TeamID == packet.TeamID).ToList();
+                    TeamList = dbConnect.GetSql().Queryable<TeamData>().With(SqlSugar.SqlWith.RowLock).Where(it => it.TeamID == packet.TeamID).ToList();
                 }
                 // 修改活動 或 刪除活動
                 else if (packet.Action == 2 || packet.Action == -1)
                 {
-                    ActList = dbConnect.GetSql().Queryable<TeamActivity>().Where(it => it.ActID == packet.ActID).ToList();
+                    ActList = dbConnect.GetSql().Queryable<TeamActivity>().With(SqlSugar.SqlWith.RowLock).Where(it => it.ActID == packet.ActID).ToList();
 
                     // 有找到活動
                     if (ActList.Count() == 1)
                     {
-                        TeamList = dbConnect.GetSql().Queryable<TeamData>().Where(it => it.TeamID == packet.TeamID).ToList();
+                        TeamList = dbConnect.GetSql().Queryable<TeamData>().With(SqlSugar.SqlWith.RowLock).Where(it => it.TeamID == packet.TeamID).ToList();
                     }
                     else 
                     {
@@ -1235,7 +1237,7 @@ namespace TeamService
 
                             };
 
-                            if (dbConnect.GetSql().Insertable(teamAct).ExecuteCommand() > 0)
+                            if (dbConnect.GetSql().Insertable(teamAct).With(SqlSugar.SqlWith.TabLockX).ExecuteCommand() > 0)
                             {
                                 rData.Result = 1;
 
@@ -1262,7 +1264,7 @@ namespace TeamService
                                     // 刪除活動
                                     if (packet.Action == -1)
                                     {
-                                        if (dbConnect.GetSql().Deleteable<TeamActivity>().Where(it => it.ActID == packet.ActID).ExecuteCommand() > 0)
+                                        if (dbConnect.GetSql().Deleteable<TeamActivity>().With(SqlSugar.SqlWith.TabLockX).Where(it => it.ActID == packet.ActID).ExecuteCommand() > 0)
                                         {
                                             rData.Result = 1;
 
@@ -1287,7 +1289,7 @@ namespace TeamService
                                         ActList[0].MaxAltitude = packet.MaxAltitude == 0 ? ActList[0].MaxAltitude : packet.MaxAltitude;
                                         ActList[0].Route = packet.Route == null ? ActList[0].Route : packet.Route;
 
-                                        if (dbConnect.GetSql().Updateable<TeamActivity>(TeamList[0]).Where(it => it.ActID == packet.ActID).ExecuteCommand() > 0)
+                                        if (dbConnect.GetSql().Updateable<TeamActivity>(TeamList[0]).With(SqlSugar.SqlWith.RowLock).Where(it => it.ActID == packet.ActID).ExecuteCommand() > 0)
                                         {
                                             rData.Result = 1;
 
@@ -1390,7 +1392,7 @@ namespace TeamService
 
             try
             {
-                List<TeamData> TeamList = dbConnect.GetSql().Queryable<TeamData>().Where(it => it.TeamID == packet.TeamID).ToList();
+                List<TeamData> TeamList = dbConnect.GetSql().Queryable<TeamData>().With(SqlSugar.SqlWith.RowLock).Where(it => it.TeamID == packet.TeamID).ToList();
 
                 // 有找到車隊
                 if (TeamList.Count() == 1)
@@ -1415,10 +1417,10 @@ namespace TeamService
                         stroge.ApplyJoinList = TeamList[0].ApplyJoinList;
                         stroge.StorageDate = DateTime.UtcNow.ToString("yyyy-MM-dd");
 
-                        if (dbConnect.GetSql().Insertable(stroge).ExecuteCommand() > 0)
+                        if (dbConnect.GetSql().Insertable(stroge).With(SqlSugar.SqlWith.TabLockX).ExecuteCommand() > 0)
                         {
                             // 刪除車隊
-                            if (dbConnect.GetSql().Deleteable<TeamData>().Where(it => it.TeamID == packet.TeamID).ExecuteCommand() > 0)
+                            if (dbConnect.GetSql().Deleteable<TeamData>().With(SqlSugar.SqlWith.TabLockX).Where(it => it.TeamID == packet.TeamID).ExecuteCommand() > 0)
                             {
                                 // 變更車隊成員的車隊列表
                                 JArray jsData = JArray.Parse(TeamList[0].TeamMemberIDs);
@@ -1489,7 +1491,7 @@ namespace TeamService
 
             try
             {
-                List<TeamData> TeamList = dbConnect.GetSql().Queryable<TeamData>().Where(it => it.TeamID == packet.TeamID).ToList();
+                List<TeamData> TeamList = dbConnect.GetSql().Queryable<TeamData>().With(SqlSugar.SqlWith.RowLock).Where(it => it.TeamID == packet.TeamID).ToList();
 
                 // 有找到車隊
                 if (TeamList.Count() == 1)
@@ -1498,13 +1500,17 @@ namespace TeamService
 
                     // 有該活動
                     if (ActList.Count() == 1)
-                    {
+                    {   
+                        // 隊員列表
                         JArray jsTeamMember = JArray.Parse(TeamList[0].TeamMemberIDs);
-
                         List<string> memberList = jsTeamMember.ToObject<List<string>>();
 
+                        // 副隊長列表
+                        JArray jsViceLeader = JArray.Parse(TeamList[0].TeamViceLeaderIDs);
+                        List<string> viceLeaderList = jsViceLeader.ToObject<List<string>>();
+
                         // 加入或離開的人為該車隊的隊員
-                        if (memberList.Contains(packet.MemberID))
+                        if (memberList.Contains(packet.MemberID) || viceLeaderList.Contains(packet.MemberID) || TeamList[0].Leader == packet.MemberID)
                         {
                             JArray jsActMember = JArray.Parse(ActList[0].MemberList);
 
@@ -1557,14 +1563,14 @@ namespace TeamService
                             {
                                 JArray jsNew = JArray.FromObject(actMemberList);
 
-                                if (dbConnect.GetSql().Updateable<TeamActivity>().SetColumns(it => new TeamActivity() { MemberList = jsNew.ToString() }).Where(it => it.ActID == packet.ActID).ExecuteCommand() > 0)
+                                if (dbConnect.GetSql().Updateable<TeamActivity>().SetColumns(it => new TeamActivity() { MemberList = jsNew.ToString() }).With(SqlSugar.SqlWith.RowLock).Where(it => it.ActID == packet.ActID).ExecuteCommand() > 0)
                                 {
                                     rData.Result = 1;
 
                                     log.SaveLog($"[Info] Controller::OnJoinOrLeaveTeamActivity, Upsate {packet.ActID} To Member List Success");
-                                
-                                    // 若為車隊發起人 則解散車隊
-                                    if (ActList[0].MemberID == packet.MemberID)
+
+                                    // 若離開的人車隊發起人, 則解散活動
+                                    if (packet.Action == -1 && ActList[0].MemberID == packet.MemberID)
                                     {
                                         log.SaveLog($"[Info] Controller::OnJoinOrLeaveTeamActivity, Leave Member: {packet.MemberID} is Activity Member: {ActList[0].MemberID}");
 
@@ -1635,7 +1641,7 @@ namespace TeamService
 
             try
             {
-                List<TeamData> TeamList = dbConnect.GetSql().Queryable<TeamData>().Where(it => it.TeamID == packet.TeamID).ToList();
+                List<TeamData> TeamList = dbConnect.GetSql().Queryable<TeamData>().With(SqlSugar.SqlWith.RowLock).Where(it => it.TeamID == packet.TeamID).ToList();
 
                 // 有找到車隊
                 if (TeamList.Count() == 1)
@@ -1651,7 +1657,7 @@ namespace TeamService
                         {
                             ApplyList.Remove(packet.MemberID);
 
-                            if (dbConnect.GetSql().Updateable<TeamData>().SetColumns(it => new TeamData() { ApplyJoinList = JArray.FromObject(ApplyList).ToString() }).Where(it => it.TeamID == packet.TeamID).ExecuteCommand() > 0)
+                            if (dbConnect.GetSql().Updateable<TeamData>().SetColumns(it => new TeamData() { ApplyJoinList = JArray.FromObject(ApplyList).ToString() }).With(SqlSugar.SqlWith.RowLock).Where(it => it.TeamID == packet.TeamID).ExecuteCommand() > 0)
                             {
                                 rData.Result = 1;
 
@@ -1677,14 +1683,18 @@ namespace TeamService
                             JArray jsMemberList = JArray.Parse(TeamList[0].TeamMemberIDs);
                             List<string> MemberList = jsMemberList.ToObject<List<string>>();
 
+                            // 副隊長列表
+                            JArray jsViceLeader = JArray.Parse(TeamList[0].TeamViceLeaderIDs);
+                            List<string> viceLeaderList = jsViceLeader.ToObject<List<string>>();
+
                             // 車隊成員列表未包含要加入的會員
-                            if (!MemberList.Contains(packet.MemberID))
+                            if (!MemberList.Contains(packet.MemberID) && viceLeaderList.Contains(packet.MemberID) && TeamList[0].Leader != packet.MemberID)
                             {
                                 MemberList.Add(packet.MemberID);
 
                                 JArray jsNew = JArray.FromObject(MemberList);
 
-                                if (dbConnect.GetSql().Updateable<TeamData>().SetColumns(it => new TeamData() { TeamMemberIDs = jsNew.ToString() }).Where(it => it.TeamID == packet.TeamID).ExecuteCommand() > 0)
+                                if (dbConnect.GetSql().Updateable<TeamData>().SetColumns(it => new TeamData() { TeamMemberIDs = jsNew.ToString() }).With(SqlSugar.SqlWith.RowLock).Where(it => it.TeamID == packet.TeamID).ExecuteCommand() > 0)
                                 {
                                     rData.Result = 1;
 
@@ -1722,7 +1732,7 @@ namespace TeamService
 
                             JArray jsNew = JArray.FromObject(MemberList);
 
-                            if (dbConnect.GetSql().Updateable<TeamData>().SetColumns(it => new TeamData() { TeamMemberIDs = jsNew.ToString() }).Where(it => it.TeamID == packet.TeamID).ExecuteCommand() > 0)
+                            if (dbConnect.GetSql().Updateable<TeamData>().SetColumns(it => new TeamData() { TeamMemberIDs = jsNew.ToString() }).With(SqlSugar.SqlWith.RowLock).Where(it => it.TeamID == packet.TeamID).ExecuteCommand() > 0)
                             {
                                 rData.Result = 1;
 
