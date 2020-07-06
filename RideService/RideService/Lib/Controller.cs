@@ -11,6 +11,7 @@ using Newtonsoft.Json.Linq;
 
 using Tools.Logger;
 using Tools.WeekProcess;
+using Tools.NotifyMessage;
 
 using DataBaseDef;
 using Connect;
@@ -31,11 +32,15 @@ namespace RideService
 
         private DataBaseConnect dbConnect = null;
 
+        private NotifyMessage ntMsg = null;
+
+        RedisConnect redis = null;
+
         private Server wsServer = null;                 // Web Socket Server
 
         private object msgLock = new object();
 
-        private string version = "Ride006";
+        private string version = "Ride008";
 
 
         public Controller(Form1 fm1)
@@ -67,13 +72,23 @@ namespace RideService
 
                 dbConnect = new DataBaseConnect(log);
 
+                ntMsg = new NotifyMessage(log);
+
+                redis = new RedisConnect(log);
+
                 if (dbConnect.Initialize())
                 {
                     if (dbConnect.Connect())
                     {
                         if (wsServer.Initialize())
                         {
-                            bReturn = true;
+                            if (redis.Initialize())
+                            {
+                                if (ntMsg.Initialize())
+                                {
+                                    bReturn = true;
+                                }
+                            }
                         }
                     }
 
@@ -117,10 +132,38 @@ namespace RideService
 
                                 switch (cmdID)
                                 {
-                                    case (int)C2S_CmdID.CreateRideRecord:
+                                    case (int)C2S_CmdID.emCreateRideRecord:
                                         CreateRideRecord CreateData = JsonConvert.DeserializeObject<CreateRideRecord>(packetData);
 
                                         sReturn = OnCreateRideRecord(CreateData);
+
+                                        break;
+
+                                    case (int)C2S_CmdID.emUpdateRideGroup:
+                                        UpdateRideGroup UpdateGroup = JsonConvert.DeserializeObject<UpdateRideGroup>(packetData);
+
+                                        sReturn = OnUpdateRideGroup(UpdateGroup);
+
+                                        break;
+
+                                    case (int)C2S_CmdID.emReplyRideGroup:
+                                        ReplyRideGroup ReplyData = JsonConvert.DeserializeObject<ReplyRideGroup>(packetData);
+
+                                        sReturn = OnReplyRideGroup(ReplyData);
+
+                                        break;
+
+                                    case (int)C2S_CmdID.emUpdateCoordinate:
+                                        UpdateCoordinate CoordinateData = JsonConvert.DeserializeObject<UpdateCoordinate>(packetData);
+
+                                        sReturn = OnUpdateCoordinate(CoordinateData);
+
+                                        break;
+
+                                    case (int)C2S_CmdID.emNotifyRideGroupMember:
+                                        NotifyRideGroupMember NotifyData = JsonConvert.DeserializeObject<NotifyRideGroupMember>(packetData);
+
+                                        sReturn = OnNotifyRideGroupMember(NotifyData);
 
                                         break;
 
@@ -145,7 +188,7 @@ namespace RideService
                     }
                     catch (Exception ex)
                     {
-                        log.SaveLog("[Error] Controller::MessageProcess Process Error Msg:" + ex.Message);
+                        log.SaveLog($"[Error] Controller::MessageProcess Process Error Msg:{ex.Message}");
                     }
                 }
                 
@@ -215,13 +258,21 @@ namespace RideService
 
                     if (dbConnect.GetSql().Insertable(record).With(SqlSugar.SqlWith.TabLockX).ExecuteCommand() > 0)
                     {
+                        log.SaveLog($"[Info] Controller::OnCreateRideRecord Create {packet.MemberID}'s Ride Record:{record.RideID} Success");
+
                         // ======================= 更新騎乘資料 =======================
                         rideDataList[0].TotalDistance += packet.Distance;
                         rideDataList[0].TotalAltitude += packet.Altitude;
                         rideDataList[0].TotalRideTime += packet.Time;
 
-                        dbConnect.GetSql().Updateable<RideData>(rideDataList[0]).With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).ExecuteCommand();
-
+                        if (dbConnect.GetSql().Updateable<RideData>(rideDataList[0]).With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).ExecuteCommand() > 0)
+                        {
+                            log.SaveLog($"[Info] Controller::OnCreateRideRecord Update MemberID:{packet.MemberID}'s Ride Data Success");
+                        }
+                        else
+                        {
+                            log.SaveLog($"[Warning] Controller::OnCreateRideRecord Update MemberID:{packet.MemberID}'s Ride Data Fail");
+                        }
 
                         // ======================= 更新周騎乘資料 =======================
                         string firsDay = weekProcess.GetWeekFirstDay(DateTime.UtcNow);
@@ -234,7 +285,15 @@ namespace RideService
                         {
                             wRideDataList[0].WeekDistance += packet.Distance;
 
-                            dbConnect.GetSql().Updateable<WeekRideData>(wRideDataList[0]).With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID && it.WeekFirstDay == firsDay && it.WeekLastDay == lastDay).ExecuteCommand();
+                            if (dbConnect.GetSql().Updateable<WeekRideData>(wRideDataList[0]).With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID && it.WeekFirstDay == firsDay && it.WeekLastDay == lastDay).ExecuteCommand() > 0)
+                            {
+                                log.SaveLog($"[Info] Controller::ODnCreateRideRecord Update MemberID:{packet.MemberID}'s Week({firsDay} To {lastDay}) Ride Data Success");
+                            }
+                            else
+                            {
+                                log.SaveLog($"[Warning] Controller::ODnCreateRideRecord Update MemberID:{packet.MemberID}'s Week({firsDay} To {lastDay}) Ride Data Fail");
+                            }
+
                         }
                         else
                         {
@@ -246,8 +305,15 @@ namespace RideService
                                 WeekDistance = packet.Distance
                             };
 
-                            dbConnect.GetSql().Insertable(updateWeek).With(SqlSugar.SqlWith.TabLockX).ExecuteCommand();
+                            if (dbConnect.GetSql().Insertable(updateWeek).With(SqlSugar.SqlWith.TabLockX).ExecuteCommand() > 0)
+                            {
+                                log.SaveLog($"[Info] Controller::ODnCreateRideRecord Create MemberID:{packet.MemberID}'s Week({firsDay} To {lastDay}) Ride Data Success");
 
+                            }
+                            else
+                            {
+                                log.SaveLog($"[Warning] Controller::ODnCreateRideRecord Create MemberID:{packet.MemberID}'s Week({firsDay} To {lastDay}) Ride Data Fail");
+                            }
                         }
 
                         rData.Result = 1;
@@ -268,13 +334,578 @@ namespace RideService
             }
             catch (Exception ex)
             {
-                log.SaveLog("[Error] Controller::OnCreateRideRecord Catch Error, Msg:" + ex.Message);
+                log.SaveLog($"[Error] Controller::OnCreateRideRecord Catch Error, Msg:{ex.Message}");
 
                 rData.Result = 0;
             }
 
             JObject jsMain = new JObject();
             jsMain.Add("CmdID", (int)S2C_CmdID.emCreateRideRecordResult);
+            jsMain.Add("Data", JsonConvert.DeserializeObject<JObject>(JsonConvert.SerializeObject(rData)));
+
+            return jsMain.ToString();
+        }
+
+        /**
+         * 更新組隊騎乘
+         */
+        private string OnUpdateRideGroup(UpdateRideGroup packet)
+        {
+            UpdateRideGroupResult rData = new UpdateRideGroupResult();
+
+            try
+            {
+                List<UserAccount> accountList = dbConnect.GetSql().Queryable<UserAccount>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).ToList();
+                List<UserInfo> userInfoList = dbConnect.GetSql().Queryable<UserInfo>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).ToList();
+
+                // 有找到帳號
+                if (accountList.Count() == 1 && userInfoList.Count() == 1)
+                {
+                    string sRideGroupKey = $"RideGroup_{packet.MemberID}";
+
+                    if (packet.Action == 1)
+                    {
+                        // 該組隊不存在
+                        if (!redis.GetRedis().KeyExists(sRideGroupKey))
+                        {
+                            JArray jsInviteList = JArray.Parse(packet.InviteList);
+                            List<string> InviteList = jsInviteList.ToObject<List<string>>();
+
+                            List<string> MemberList = new List<string>();
+                            MemberList.Add(packet.MemberID);
+
+                            JObject jsGroupData = new JObject();
+                            jsGroupData.Add("Leader", packet.MemberID);
+                            jsGroupData.Add("InviteList", jsInviteList);
+                            jsGroupData.Add("MemberList", JArray.FromObject(MemberList).ToString());
+
+                            if (redis.GetRedis().StringSet(sRideGroupKey, jsGroupData.ToString())) {
+
+                                rData.Result = 1;
+
+                                log.SaveLog($"[Info] Controller::OnUpdateRideGroup Create Ride Group: {sRideGroupKey} Success");
+
+                                for (int idx =0; idx < InviteList.Count(); idx++)
+                                {
+                                    string sMemberKey = $"GroupMember_{InviteList[idx]}";
+
+                                    JObject jsMemberData = new JObject();
+                                    jsMemberData.Add("RideGroupKey", sRideGroupKey);
+                                    jsMemberData.Add("CoordinateX", "");
+                                    jsMemberData.Add("CoordinateY", "");
+
+                                    // 建立成員的Redis資料
+                                    if (redis.GetRedis().StringSet(sMemberKey, jsMemberData.ToString()))
+                                    {
+                                        log.SaveLog($"[Info] Controller::OnUpdateRideGroup Create Ride Group: {sRideGroupKey}'s Member:{InviteList[idx]} Success");
+                                    }
+                                    else
+                                    {
+                                        log.SaveLog($"[Info] Controller::OnUpdateRideGroup Create Ride Group: {sRideGroupKey}'s Member:{InviteList[idx]} Fail");
+                                    }
+
+                                    List<UserAccount> notifyAccounrList = dbConnect.GetSql().Queryable<UserAccount>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == InviteList[idx]).ToList();
+                                    List<UserInfo> notifyUserInfoList = dbConnect.GetSql().Queryable<UserInfo>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == InviteList[idx]).ToList();
+
+                                    // 有找對會員
+                                    if (notifyAccounrList.Count() == 1 && notifyUserInfoList.Count() == 1)
+                                    {
+                                        // 發送推播通知
+                                        string sTitle = $"騎乘邀請";
+
+                                        string sNotifyMsg = $"{userInfoList[0].NickName} 邀請您組隊";
+
+                                        ntMsg.NotifyMsgToDevice(notifyAccounrList[0].NotifyToken, sTitle, sNotifyMsg);
+                                    }
+                                    else
+                                    {
+                                        log.SaveLog($"[Warning] Controller::OnUpdateRideGroup Can Not Find Notify Member: {accountList[0].MemberID}");
+                                    }
+
+
+                                }
+
+                            }
+                            else
+                            {
+                                rData.Result = 0;
+
+                                log.SaveLog($"[Warning] Controller::OnUpdateRideGroup Create Ride Group: {sRideGroupKey} Fail");
+                            }
+
+                        }
+                        else
+                        {
+                            rData.Result = 2;
+
+                            log.SaveLog($"[Warning] Controller::OnUpdateRideGroup Create {packet.MemberID}'s Ride Group, The Group Repeat");
+                        }
+                    }
+                    else if (packet.Action == -1)
+                    {
+                        // 該組隊存在
+                        if (redis.GetRedis().KeyExists(sRideGroupKey))
+                        {
+                            // 刪除Redis資料
+                            if(redis.GetRedis().KeyDelete(sRideGroupKey))
+                            {
+                                rData.Result = 1;
+
+                                log.SaveLog($"[Info] Controller::OnUpdateRideGroup Remove Ride Group: {sRideGroupKey} Success");
+                            }
+                            else
+                            {
+                                rData.Result = 0;
+
+                                log.SaveLog($"[Warning] Controller::OnUpdateRideGroup Remove Ride Group: {sRideGroupKey} Fail");
+                            }
+                        }
+                        else
+                        {
+                            rData.Result = 0;
+
+                            log.SaveLog($"[Warning] Controller::OnUpdateRideGroup Can Not Find Ride Group: {sRideGroupKey}");
+                        }
+                    }
+                    else
+                    {
+                        rData.Result = 0;
+
+                        log.SaveLog($"[Warning] Controller::OnUpdateRideGroup MemberID:{packet.MemberID}'s Action: 0");
+                    }
+
+                }
+                else
+                {
+                    rData.Result = 0;
+
+                    log.SaveLog($"[Warning] Controller::OnUpdateRideGroup Can Not Find MemberID:{packet.MemberID}");
+
+                }
+            }
+            catch (Exception ex)
+            {
+                log.SaveLog($"[Error] Controller::OnUpdateRideGroup Catch Error, Msg:{ex.Message}");
+
+                rData.Result = 0;
+            }
+
+            JObject jsMain = new JObject();
+            jsMain.Add("CmdID", (int)S2C_CmdID.emUpdateRideGroupResult);
+            jsMain.Add("Data", JsonConvert.DeserializeObject<JObject>(JsonConvert.SerializeObject(rData)));
+
+            return jsMain.ToString();
+        }
+
+        /**
+         * 回覆組隊騎乘
+         */
+        private string OnReplyRideGroup(ReplyRideGroup packet)
+        {
+            ReplyRideGroupResult rData = new ReplyRideGroupResult();
+
+            List<UserAccount> leaderAccountList = new List<UserAccount>();
+            List<UserInfo> leaderUserInfoList = new List<UserInfo>();
+
+            string replyMemberNickName = "";
+
+            try
+            {
+                List<UserAccount> accountList = dbConnect.GetSql().Queryable<UserAccount>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).ToList();
+                List<UserInfo> userInfoList = dbConnect.GetSql().Queryable<UserInfo>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).ToList();
+
+                // 有找到帳號
+                if (accountList.Count() == 1 && userInfoList.Count() == 1)
+                {
+                    string sMemberKey = $"GroupMember_{packet.MemberID}";
+
+                    replyMemberNickName = userInfoList[0].NickName;
+
+                    // 該組隊成員存在
+                    if (redis.GetRedis().KeyExists(sMemberKey))
+                    {
+                        if (packet.Action == 1)
+                        {
+                            string MemberData = redis.GetRedis().StringGet(sMemberKey);
+
+                            JObject jsMemberData = JObject.Parse(MemberData);
+
+                            if (jsMemberData.ContainsKey("RideGroupKey"))
+                            {
+                                string sRideGroupKey = jsMemberData["RideGroupKey"].ToString();
+
+                                if (redis.GetRedis().KeyExists(sRideGroupKey))
+                                {
+                                    string GroupData = redis.GetRedis().StringGet(sRideGroupKey);
+
+                                    leaderAccountList = dbConnect.GetSql().Queryable<UserAccount>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).ToList();
+                                    leaderUserInfoList = dbConnect.GetSql().Queryable<UserInfo>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).ToList();
+
+                                    JObject jsGroupData = JObject.Parse(GroupData);
+
+                                    JArray jsInviteList = JArray.Parse(jsGroupData["InviteList"].ToString());
+                                    List<string> InviteList = jsInviteList.ToObject<List<string>>();
+
+                                    if (InviteList.Contains(packet.MemberID))
+                                    {
+                                        InviteList.Remove(packet.MemberID);
+
+                                        JArray jsMemberList = JArray.Parse(jsGroupData["MemberList"].ToString());
+                                        List<string> MemberList = jsMemberList.ToObject<List<string>>();
+
+                                        if (!MemberList.Contains(packet.MemberID))
+                                        {
+                                            MemberList.Add(packet.MemberID);
+
+                                            jsGroupData["InviteList"] = JArray.FromObject(InviteList);
+                                            jsGroupData["MemberList"] = JArray.FromObject(MemberList);
+
+                                            GroupData = jsGroupData.ToString();
+
+                                            if (redis.GetRedis().StringSet(sRideGroupKey, GroupData))
+                                            {
+                                                rData.Result = 1;
+
+                                                log.SaveLog($"[Info] Controller::OnReplyRideGroup, Member:{packet.MemberID} Join Ride Group: {sRideGroupKey} Success");
+                                            }
+                                            else
+                                            {
+                                                rData.Result = 0;
+
+                                                log.SaveLog($"[Warning] Controller::OnReplyRideGroup, Member:{packet.MemberID} Join Ride Group: {sRideGroupKey} Fail");
+                                            }
+                                        }
+                                        else
+                                        {
+                                            rData.Result = 0;
+
+                                            log.SaveLog($"[Warning] Controller::OnReplyRideGroup, Member:{packet.MemberID} already is Member");
+
+                                        }
+
+                                    }
+                                    else
+                                    {
+                                        rData.Result = 0;
+
+                                        log.SaveLog($"[Warning] Controller::OnReplyRideGroup, Invite List Cant Not Find Member:{packet.MemberID}");
+
+                                    }
+                                }
+                                else
+                                {
+                                    rData.Result = 0;
+
+                                    log.SaveLog($"[Warning] Controller::OnReplyRideGroup, Can Not Find Ride Group: {sRideGroupKey}");
+                                }
+                            }
+                            else
+                            {
+                                rData.Result = 0;
+
+                                log.SaveLog($"[Warning] Controller::OnReplyRideGroup, Can Not Find Json Ride Group Key");
+
+                            }
+
+                        }
+                        else if (packet.Action == -1)
+                        {
+                            // 刪除Redis資料
+                            if (redis.GetRedis().KeyDelete(sMemberKey))
+                            {
+                                rData.Result = 1;
+
+                                log.SaveLog($"[Info] Controller::OnReplyRideGroup Remove Group Member Temp Data: {sMemberKey} Success");
+                            }
+                            else
+                            {
+                                rData.Result = 0;
+
+                                log.SaveLog($"[Warning] Controller::OnReplyRideGroup Remove Group Member Temp Data: {sMemberKey} Fail");
+                            }
+                        }
+                        else
+                        {
+                            rData.Result = 0;
+
+                            log.SaveLog($"[Warning] Controller::OnUpdateRideGroup MemberID:{packet.MemberID}'s Action: 0");
+                        }
+                    }
+                    else
+                    {
+                        rData.Result = 0;
+
+                        log.SaveLog($"[Warning] Controller::OnUpdateRideGroup Can Not Find Group Member Temp Data: {sMemberKey}");
+                    }
+
+                }
+                else
+                {
+                    rData.Result = 0;
+
+                    log.SaveLog($"[Warning] Controller::OnUpdateRideGroup Can Not Find MemberID:{packet.MemberID}");
+
+                }
+            }
+            catch (Exception ex)
+            {
+                log.SaveLog($"[Error] Controller::OnUpdateRideGroup Catch Error, Msg:{ex.Message}");
+
+                rData.Result = 0;
+            }
+
+            if (rData.Result == 1)
+            {
+                string sAction = packet.Action == 1 ? "加入" : packet.Action == -1 ? "拒絕" : "Error";
+
+                if (leaderAccountList.Count() == 1 && leaderUserInfoList.Count() == 1)
+                {
+                    // 發送推播通知
+                    string sTitle = $"組隊回覆";
+
+                    string sNotifyMsg = $"{replyMemberNickName} 已{sAction}組隊";
+
+                    ntMsg.NotifyMsgToDevice(leaderAccountList[0].NotifyToken, sTitle, sNotifyMsg);
+                }
+                else
+                {
+                    log.SaveLog($"[Error] Controller::OnReplyRideGroup, Can Not Notify");
+                }
+            }
+
+            JObject jsMain = new JObject();
+            jsMain.Add("CmdID", (int)S2C_CmdID.emReplyRideGroupResult);
+            jsMain.Add("Data", JsonConvert.DeserializeObject<JObject>(JsonConvert.SerializeObject(rData)));
+
+            return jsMain.ToString();
+        }
+
+        /**
+         * 更新座標
+         */
+        private string OnUpdateCoordinate(UpdateCoordinate packet)
+        {
+            UpdateCoordinateResult rData = new UpdateCoordinateResult();
+
+            try
+            {
+                List<UserAccount> accountList = dbConnect.GetSql().Queryable<UserAccount>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).ToList();
+
+                // 有找到帳號
+                if (accountList.Count() == 1)
+                {
+                    string sMemberKey = $"GroupMember_{packet.MemberID}";
+
+                    // 該組隊成員存在
+                    if (redis.GetRedis().KeyExists(sMemberKey))
+                    {
+                        string MemberData = redis.GetRedis().StringGet(sMemberKey);
+
+                        JObject jsMemberData = JObject.Parse(MemberData);
+
+                        if (redis.GetRedis().KeyExists(jsMemberData["RideGroupKey"].ToString()))
+                        {
+                            jsMemberData["CoordinateX"] = packet.CoordinateX;
+                            jsMemberData["CoordinateY"] = packet.CoordinateY;
+
+                            if (redis.GetRedis().StringSet(sMemberKey, jsMemberData.ToString()))
+                            {
+                                rData.Result = 1;
+
+                                log.SaveLog($"[Info] Controller::OnUpdateCoordinate, Update Member:{packet.MemberID}'s Coordinate: {packet.CoordinateX}, {packet.CoordinateY} Success");
+
+                                string sGroupData = redis.GetRedis().StringGet("RideGroupKey");
+
+                                JObject jsGroupData = JObject.Parse(sGroupData);
+
+                                JArray jsMemberList = JArray.Parse(jsGroupData["MemberList"].ToString());
+                                List<string> MemberList = jsMemberList.ToObject<List<string>>();
+
+                                for (int idx = 0; idx < MemberList.Count(); idx++)
+                                {
+                                    if (MemberList[idx] != packet.MemberID)
+                                    {
+                                        List<UserAccount> notifyAccountList = dbConnect.GetSql().Queryable<UserAccount>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == MemberList[idx]).ToList();
+                                        List<UserInfo> notifyUserInfoList = dbConnect.GetSql().Queryable<UserInfo>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == MemberList[idx]).ToList();
+
+                                        if (notifyAccountList.Count() == 1 && notifyUserInfoList.Count() == 1)
+                                        {
+                                            // 發送推播通知
+                                            string sTitle = $"更新座標";
+
+                                            string sNotifyMsg = $"{packet.CoordinateX},{packet.CoordinateY}";
+
+                                            ntMsg.NotifyMsgToDevice(notifyAccountList[0].NotifyToken, sTitle, sNotifyMsg);
+                                        }
+                                        else {
+                                            log.SaveLog($"[Warning] Controller::OnUpdateCoordinate, Can Not Finf Notify Member:{MemberList[idx]}");
+                                        }
+
+                                    }
+                                }
+                            }
+                            else
+                            {
+                                rData.Result = 0;
+
+                                log.SaveLog($"[Warning] Controller::OnUpdateCoordinate, Update Member:{packet.MemberID} 's Coordinate Fail");
+                            }
+
+                        }
+                        else
+                        {
+                            log.SaveLog($"[Error] Controller::OnUpdateCoordinate, Can Not Find Ride Group: {sMemberKey}");
+                        }
+
+                    }
+                    else
+                    {
+                        rData.Result = 0;
+
+                        log.SaveLog($"[Warning] Controller::OnUpdateCoordinate Group Member: {packet.MemberID} Not Exist");
+                    }
+
+                }
+                else
+                {
+                    rData.Result = 0;
+
+                    log.SaveLog($"[Warning] Controller::OnUpdateCoordinate Can Not Find MemberID:{packet.MemberID}");
+
+                }
+            }
+            catch (Exception ex)
+            {
+                log.SaveLog($"[Error] Controller::OnUpdateCoordinate Catch Error, Msg:{ex.Message}");
+
+                rData.Result = 0;
+            }
+
+            JObject jsMain = new JObject();
+            jsMain.Add("CmdID", (int)S2C_CmdID.emUpdateCoordinateResult);
+            jsMain.Add("Data", JsonConvert.DeserializeObject<JObject>(JsonConvert.SerializeObject(rData)));
+
+            return jsMain.ToString();
+        }
+
+        /**
+         * 通知隊友
+         */
+        private string OnNotifyRideGroupMember(NotifyRideGroupMember packet)
+        {
+            NotifyRideGroupMemberResult rData = new NotifyRideGroupMemberResult();
+
+            try
+            {
+                List<UserAccount> accountList = dbConnect.GetSql().Queryable<UserAccount>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).ToList();
+                List<UserInfo> userInfoList = dbConnect.GetSql().Queryable<UserInfo>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).ToList();
+
+                // 有找到帳號
+                if (accountList.Count() == 1 && userInfoList.Count() == 1)
+                {
+                    string sMemberKey = $"GroupMember_{packet.MemberID}";
+
+                    // 該組隊成員存在
+                    if (redis.GetRedis().KeyExists(sMemberKey))
+                    {
+                        string MemberData = redis.GetRedis().StringGet(sMemberKey);
+
+                        JObject jsMemberData = JObject.Parse(MemberData);
+
+                        if (jsMemberData.ContainsKey("RideGroupKey"))
+                        {
+                            string sRideGroupKey = jsMemberData["RideGroupKey"].ToString();
+
+                            // 該組隊騎乘存在
+                            if (redis.GetRedis().KeyExists(sRideGroupKey))
+                            {
+                                string GroupData = redis.GetRedis().StringGet(sRideGroupKey);
+
+                                JObject jsGroupData = JObject.Parse(GroupData);
+
+                                JArray jsMemberList = JArray.Parse(jsGroupData["MemberList"].ToString());
+                                List<string> MemberList = jsMemberList.ToObject<List<string>>();
+
+                                for (int idx = 0; idx < MemberList.Count(); idx++)
+                                {
+                                    if (MemberList[idx] != packet.MemberID)
+                                    {
+                                        List<UserAccount> notifyAccountList = dbConnect.GetSql().Queryable<UserAccount>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == MemberList[idx]).ToList();
+                                        List<UserInfo> notifyUserInfoList = dbConnect.GetSql().Queryable<UserInfo>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == MemberList[idx]).ToList();
+
+                                        if (notifyAccountList.Count() == 1 && notifyUserInfoList.Count() == 1)
+                                        {
+                                            rData.Result = 1;
+
+                                            log.SaveLog($"[Info] Controller::OnNotifyRideGroupMember MemberID:{packet.MemberID}'s Notify Warning To Group Member");
+
+                                            string sAction = packet.Action == 1 ? "發生" : packet.Action == -1 ? "取消" : "Error";
+
+                                            // 發送推播通知
+                                            string sTitle = $"緊急通知";
+
+                                            string sNotifyMsg = $"{userInfoList[0].NickName} {sAction}緊急狀況";
+
+                                            ntMsg.NotifyMsgToDevice(notifyAccountList[0].NotifyToken, sTitle, sNotifyMsg);
+
+                                            // 推播通知
+                                            if (packet.Action == 0)
+                                            {
+                                                rData.Result = 0;
+
+                                                log.SaveLog($"[Warning] Controller::OnNotifyRideGroupMember MemberID:{packet.MemberID}'s Action: 0");
+
+                                                break;
+                                            }
+                                        }
+                                        else
+                                        {
+                                            log.SaveLog($"[Warning] Controller::OnNotifyRideGroupMember Can Not Find Notify MemberID:{MemberList[idx]}");
+
+                                        }
+                                    }
+                                }
+                            }
+                            else
+                            {
+                                rData.Result = 0;
+
+                                log.SaveLog($"[Warning] Controller::OnNotifyRideGroupMember, Can Not Find Ride Group: {sRideGroupKey}");
+                            }
+                        }
+                        else
+                        {
+                            rData.Result = 0;
+
+                            log.SaveLog($"[Warning] Controller::OnNotifyRideGroupMember, Can Not Find Json Ride Group Key");
+                        }
+
+                    }
+                    else
+                    {
+                        rData.Result = 0;
+
+                        log.SaveLog($"[Warning] Controller::OnNotifyRideGroupMember Group Member: {packet.MemberID} Not Exist");
+                    }
+
+                }
+                else
+                {
+                    rData.Result = 0;
+
+                    log.SaveLog($"[Warning] Controller::OnNotifyRideGroupMember Can Not Find MemberID:{packet.MemberID}");
+
+                }
+            }
+            catch (Exception ex)
+            {
+                log.SaveLog($"[Error] Controller::OnNotifyRideGroupMember Catch Error, Msg:{ex.Message}");
+
+                rData.Result = 0;
+            }
+
+            JObject jsMain = new JObject();
+            jsMain.Add("CmdID", (int)S2C_CmdID.emNotifyRideGroupMemberResult);
             jsMain.Add("Data", JsonConvert.DeserializeObject<JObject>(JsonConvert.SerializeObject(rData)));
 
             return jsMain.ToString();
