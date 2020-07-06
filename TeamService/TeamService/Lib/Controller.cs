@@ -35,7 +35,7 @@ namespace TeamService
 
         private object msgLock = new object();
 
-        private string version = "Team023";
+        private string version = "Team024";
 
         public Controller(Form1 fm1)
         {
@@ -250,6 +250,32 @@ namespace TeamService
 
             return bReturn;
 
+        }
+
+        /**
+         * 取得車隊所有成員列表 (含隊長與副隊長)
+         */
+        private List<string> GetAllMemberID(TeamData data)
+        {
+            List<string> ret = new List<string>();
+
+            ret.Add(data.Leader);
+
+            JArray jsViceLeaderList = JArray.Parse(data.TeamViceLeaderIDs);
+            List<string> viceLeaderList = jsViceLeaderList.ToObject<List<string>>();
+            for (int idx = 0; idx < viceLeaderList.Count(); idx++)
+            {
+                ret.Add(viceLeaderList[idx]);
+            }
+
+            JArray jsMemberList = JArray.Parse(data.TeamMemberIDs);
+            List<string> memberList = jsMemberList.ToObject<List<string>>();
+            for (int idx = 0; idx < memberList.Count(); idx++)
+            {
+                ret.Add(memberList[idx]);
+            }
+
+            return ret;
         }
 
         /**
@@ -510,6 +536,8 @@ namespace TeamService
                             JArray jsViceLeaderList = JArray.Parse(TeamList[0].TeamViceLeaderIDs);
                             List<string> viceLeaderList = jsViceLeaderList.ToObject<List<string>>();
 
+                            List<string> notifyTargetList = GetAllMemberID(TeamList[0]);
+
                             // 新隊長為車隊中的隊員 或 副隊長
                             if (memberList.Contains(packet.MemberID) || viceLeaderList.Contains(packet.MemberID))
                             {
@@ -545,6 +573,7 @@ namespace TeamService
                                         };
 
                                         OnUpdateTeamMemberList(newLeader);
+
                                     }
 
                                     // 新隊長原為副隊長
@@ -559,6 +588,28 @@ namespace TeamService
                                         };
 
                                         OnUpdateViceLeaderList(oldViceLeader);
+                                    }
+
+                                    notifyTargetList.Remove(packet.MemberID);
+
+                                    for (int idx = 0; idx < notifyTargetList.Count(); idx++)
+                                    {
+                                        string targetID = notifyTargetList[idx];
+
+                                        List<UserAccount> accountList = dbConnect.GetSql().Queryable<UserAccount>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == targetID).ToList();
+
+                                        List<UserInfo> oldLeaderInfoList = dbConnect.GetSql().Queryable<UserInfo>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == TeamList[0].Leader).ToList();
+                                        List<UserInfo> newLeaderInfoList = dbConnect.GetSql().Queryable<UserInfo>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).ToList();
+
+                                        if (accountList.Count() == 1 && oldLeaderInfoList.Count() == 1 && newLeaderInfoList.Count() == 1)
+                                        {
+                                            string sTitle = $"系統公告";
+
+                                            string sNotifyMsg = $"{TeamList[0].TeamName} 隊長由 {oldLeaderInfoList[0].NickName} 更換為 {newLeaderInfoList[0].NickName} ";
+
+                                            ntMsg.NotifyMsgToDevice(accountList[0].NotifyToken, sTitle, sNotifyMsg);
+                                        }
+
                                     }
                                 }
                                 else
@@ -877,10 +928,10 @@ namespace TeamService
             UpdateApplyJoinListResult rData = new UpdateApplyJoinListResult();
             rData.Action = packet.Action;
 
+            List<TeamData> TeamList = dbConnect.GetSql().Queryable<TeamData>().With(SqlSugar.SqlWith.RowLock).Where(it => it.TeamID == packet.TeamID).ToList();
+
             try
             {
-                List<TeamData> TeamList = dbConnect.GetSql().Queryable<TeamData>().With(SqlSugar.SqlWith.RowLock).Where(it => it.TeamID == packet.TeamID).ToList();
-
                 // 有找到車隊
                 if (TeamList.Count() == 1)
                 {
@@ -933,6 +984,29 @@ namespace TeamService
                         if (dbConnect.GetSql().Updateable<TeamData>().SetColumns(it => new TeamData() { ApplyJoinList = jsNew.ToString() }).With(SqlSugar.SqlWith.RowLock).Where(it => it.TeamID == packet.TeamID).ExecuteCommand() > 0)
                         {
                             rData.Result = 1;
+
+                            JArray jsViceLeader = JArray.Parse(TeamList[0].TeamViceLeaderIDs);
+
+                            List<string> notifyTargrtList = jsViceLeader.ToObject<List<string>>();
+                            notifyTargrtList.Add(TeamList[0].Leader);
+
+                            for (int idx = 0; idx < notifyTargrtList.Count(); idx++)
+                            {
+                                string targetID = notifyTargrtList[idx];
+
+                                List<UserAccount> accountList = dbConnect.GetSql().Queryable<UserAccount>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == targetID).ToList();
+                                List<UserInfo> userList = dbConnect.GetSql().Queryable<UserInfo>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == targetID).ToList();
+
+                                if (accountList.Count() == 1 && userList.Count() == 1)
+                                {
+                                    string sTitle = $"系統公告";
+
+                                    string sNotifyMsg = $"{userList[0].NickName} 申請加入 {TeamList[0].TeamName}";
+
+                                    ntMsg.NotifyMsgToDevice(accountList[0].NotifyToken, sTitle, sNotifyMsg);
+                                }
+
+                            }
 
                             log.SaveLog($"[Info] Controller::OnUpdateApplyJoinList, {packet.MemberID} Update Apply List Success");
                         }
@@ -1011,7 +1085,6 @@ namespace TeamService
                 {
                     // 取得副隊長列表
                     JArray jsViceLeader = JArray.Parse(TeamList[0].TeamViceLeaderIDs);
-
                     List<string> viceLeaderList = jsViceLeader.ToObject<List<string>>();
 
                     // 檢查發公告的人是否為隊長或副隊長
@@ -1043,6 +1116,27 @@ namespace TeamService
                                 rData.BulletinID = teamBu.BulletinID;
 
                                 log.SaveLog($"[Info] Controller::OnUpdateBulletin, Create Team Bulletin Success, BulletinID:{rData.BulletinID}");
+                            
+                                List<string> notifyTargetList = GetAllMemberID(TeamList[0]);
+                                notifyTargetList.Remove(packet.MemberID);
+
+                                for (int idx = 0; idx < notifyTargetList.Count(); idx++)
+                                {
+                                    string targetID = notifyTargetList[idx];
+
+                                    List<UserAccount> accountList = dbConnect.GetSql().Queryable<UserAccount>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == targetID).ToList();
+
+                                    if (accountList.Count() == 1)
+                                    {
+                                        string sTitle = $"車隊公告";
+
+                                        string sNotifyMsg = packet.Content;
+
+                                        ntMsg.NotifyMsgToDevice(accountList[0].NotifyToken, sTitle, sNotifyMsg);
+                                    }
+
+                                }
+
                             }
                             else
                             {
@@ -1139,19 +1233,6 @@ namespace TeamService
                 rData.Result = 0;
             }
 
-            // 更新有成功, 送出推播
-            if (rData.Result == 1)
-            {
-                string sData = JsonConvert.SerializeObject(rSendToNy);
-
-                JObject jsSendToNy = new JObject();
-
-                jsSendToNy.Add("CmdID", (int)C2S_CmdID.emUpdateBulletin);
-                jsSendToNy.Add("Data", JsonConvert.DeserializeObject<JObject>(sData));
-
-                //SendToNotifyService(jsSendToNy.ToString());
-            }
-
             JObject jsMain = new JObject();
             jsMain.Add("CmdID", (int)S2C_CmdID.emUpdateBulletinResult);
             jsMain.Add("Data", JsonConvert.DeserializeObject<JObject>(JsonConvert.SerializeObject(rData)));
@@ -1244,6 +1325,31 @@ namespace TeamService
                                 rData.ActID = teamAct.ActID;
 
                                 log.SaveLog($"[Info] Controller::OnUpdateActivity, Create Team Activity Success, ActID:{rData.ActID}");
+
+                                List<string> notifyTargetList = GetAllMemberID(TeamList[0]);
+                                notifyTargetList.Remove(packet.MemberID);
+
+                                for (int idx = 0; idx < notifyTargetList.Count(); idx++)
+                                {
+                                    string targetID = notifyTargetList[idx];
+
+                                    // 活動發起人
+                                    List<UserInfo> userInfoList = dbConnect.GetSql().Queryable<UserInfo>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).ToList();
+                                    
+                                    // 收到公告的人
+                                    List<UserAccount> accountList = dbConnect.GetSql().Queryable<UserAccount>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == targetID).ToList();
+
+                                    if (userInfoList.Count() == 1 && accountList.Count() == 1)
+                                    {
+                                        string sTitle = $"車隊活動";
+
+                                        string sNotifyMsg = $"{userInfoList[0].NickName} 建立活動 {packet.Title}";
+
+                                        ntMsg.NotifyMsgToDevice(accountList[0].NotifyToken, sTitle, sNotifyMsg);
+                                    }
+
+                                }
+
                             }
                             else
                             {
@@ -1258,8 +1364,8 @@ namespace TeamService
                             // 有找到活動
                             if (ActList.Count() == 1)
                             {
-                                // 為活動發起人 或正副隊長
-                                if (ActList[0].MemberID == packet.MemberID || packet.MemberID == TeamList[0].Leader || viceLeaderList.Contains(packet.MemberID))
+                                // 為活動發起人
+                                if (ActList[0].MemberID == packet.MemberID)
                                 {
                                     // 刪除活動
                                     if (packet.Action == -1)
@@ -1306,6 +1412,28 @@ namespace TeamService
                                             rSendToNy.Route = ActList[0].Route;
 
                                             log.SaveLog($"[Info] Controller::OnUpdateActivity, Update Team Activity Success, ActID:{rData.ActID}");
+
+                                            List<string> notifyTargetList = GetAllMemberID(TeamList[0]);
+                                            notifyTargetList.Remove(packet.MemberID);
+
+                                            for (int idx = 0; idx < notifyTargetList.Count(); idx++)
+                                            {
+                                                string targetID = notifyTargetList[idx];
+
+                                                // 收到公告的人
+                                                List<UserAccount> accountList = dbConnect.GetSql().Queryable<UserAccount>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == targetID).ToList();
+
+                                                if (accountList.Count() == 1)
+                                                {
+                                                    string sTitle = $"車隊活動";
+
+                                                    string sNotifyMsg = $"{ActList[0].Title} 已更新內容";
+
+                                                    ntMsg.NotifyMsgToDevice(accountList[0].NotifyToken, sTitle, sNotifyMsg);
+                                                }
+
+                                            }
+
                                         }
                                         else
                                         {
@@ -1646,8 +1774,10 @@ namespace TeamService
                 // 有找到車隊
                 if (TeamList.Count() == 1)
                 {
-                    
-                    if(packet.Action == 1)
+                    // 加入或離開的玩家資訊
+                    List<UserInfo> userList = dbConnect.GetSql().Queryable<UserInfo>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).ToList();
+
+                    if (packet.Action == 1)
                     {
                         JArray jsApplyList = JArray.Parse(TeamList[0].ApplyJoinList);
                         List<string> ApplyList = jsApplyList.ToObject<List<string>>();
@@ -1660,6 +1790,15 @@ namespace TeamService
                             if (dbConnect.GetSql().Updateable<TeamData>().SetColumns(it => new TeamData() { ApplyJoinList = JArray.FromObject(ApplyList).ToString() }).With(SqlSugar.SqlWith.RowLock).Where(it => it.TeamID == packet.TeamID).ExecuteCommand() > 0)
                             {
                                 rData.Result = 1;
+
+                                string userNickName = userList.Count() == 1 ? userList[0].NickName : "未定義";
+
+                                string sTitle = $"系統公告";
+
+                                string sNotifyMsg = $"{userNickName} 加入 {TeamList[0].TeamName}";
+
+                                ntMsg.NotifyMsgToDevice(TeamList[0].TeamID, sTitle, sNotifyMsg);
+
 
                                 log.SaveLog($"[Info] Controller::OnJoinOrLeaveTeam, Remove Member:{packet.MemberID} From Team:{packet.TeamID}'s ApplyJoinList Success");
                             }
@@ -1688,7 +1827,7 @@ namespace TeamService
                             List<string> viceLeaderList = jsViceLeader.ToObject<List<string>>();
 
                             // 車隊成員列表未包含要加入的會員
-                            if (!MemberList.Contains(packet.MemberID) && viceLeaderList.Contains(packet.MemberID) && TeamList[0].Leader != packet.MemberID)
+                            if (!MemberList.Contains(packet.MemberID) && !viceLeaderList.Contains(packet.MemberID) && TeamList[0].Leader != packet.MemberID)
                             {
                                 MemberList.Add(packet.MemberID);
 
@@ -1715,7 +1854,7 @@ namespace TeamService
                             {
                                 rData.Result = 0;
 
-                                log.SaveLog($"[Warning] Controller::OnJoinOrLeaveTeam, Member:{packet.MemberID} Action = 0");
+                                log.SaveLog($"[Warning] Controller::OnJoinOrLeaveTeam, Member:{packet.MemberID} Already Join Team");
 
                             }
                         }
@@ -1735,6 +1874,14 @@ namespace TeamService
                             if (dbConnect.GetSql().Updateable<TeamData>().SetColumns(it => new TeamData() { TeamMemberIDs = jsNew.ToString() }).With(SqlSugar.SqlWith.RowLock).Where(it => it.TeamID == packet.TeamID).ExecuteCommand() > 0)
                             {
                                 rData.Result = 1;
+
+                                string userNickName = userList.Count() == 1 ? userList[0].NickName : "未定義";
+
+                                string sTitle = $"系統公告";
+
+                                string sNotifyMsg = $"{userNickName} 離開 {TeamList[0].TeamName}";
+
+                                ntMsg.NotifyMsgToDevice(TeamList[0].TeamID, sTitle, sNotifyMsg);
 
                                 log.SaveLog($"[Info] Controller::OnJoinOrLeaveTeam, Remove Member:{packet.MemberID} To Team:{packet.TeamID}'s TeamMemberIDs Success");
 
