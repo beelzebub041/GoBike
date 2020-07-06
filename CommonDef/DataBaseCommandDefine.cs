@@ -80,6 +80,9 @@ namespace DataBaseDef
 
         // 黑名單列表 (紀錄會員ID)
         public string BlackList { get; set; }
+		
+		// 手機規格型號
+		public string SpecificationModel { get; set; }
 
     }
 
