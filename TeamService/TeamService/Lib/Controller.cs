@@ -35,7 +35,7 @@ namespace TeamService
 
         private object msgLock = new object();
 
-        private string version = "Team024";
+        private string version = "Team026";
 
         public Controller(Form1 fm1)
         {
@@ -63,7 +63,7 @@ namespace TeamService
             {
                 log = new Logger(fm1);
 
-                log.SaveLog($"Controller Version: {version}");
+                log.SaveLog($"Team Service Version: {version}");
 
                 wsServer = new Server(log.SaveLog, MessageProcess);
 
@@ -71,24 +71,13 @@ namespace TeamService
 
                 ntMsg = new NotifyMessage(log);
 
-                if (dbConnect.Initialize())
+                if (dbConnect.Initialize() && dbConnect.Connect() && wsServer.Initialize() && ntMsg.Initialize())
                 {
-                    if (dbConnect.Connect())
-                    {
-                        if (wsServer.Initialize())
-                        {
-                            if (ntMsg.Initialize())
-                            {
-                                bReturn = true;
-                            }
-                        }
-                    }
-
+                    bReturn = true;
                 }
-
-                if (!bReturn)
+                else
                 {
-                    log.SaveLog("[Error] Controller::Initialize, Initialize Fail");
+                    log.SaveLog($"[Error] Controller::Initialize, Initialize Fail");
                 }
 
             }
@@ -284,12 +273,12 @@ namespace TeamService
         private void UpdateUserTeamList(string memberID, string teamID, int action)
         {
             // 更新UserInfo的車隊資料
-            List<UserInfo> userInfo = dbConnect.GetSql().Queryable<UserInfo>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == memberID).ToList();
+            UserInfo userInfo = dbConnect.GetSql().Queryable<UserInfo>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == memberID).Single();
 
             // 有找到會員
-            if (userInfo.Count() == 1)
+            if (userInfo != null)
             {
-                JArray jsData = JArray.Parse(userInfo[0].TeamList);
+                JArray jsData = JArray.Parse(userInfo.TeamList);
 
                 List<string> idList = jsData.ToObject<List<string>>();
 
@@ -358,15 +347,15 @@ namespace TeamService
 
             try
             {
-                List<TeamData> TeamList = dbConnect.GetSql().Queryable<TeamData>().With(SqlSugar.SqlWith.RowLock).Where(it => it.TeamName == packet.TeamName ).ToList();
+                TeamData teamData = dbConnect.GetSql().Queryable<TeamData>().With(SqlSugar.SqlWith.RowLock).Where(it => it.TeamName == packet.TeamName ).Single();
 
-                List<TeamData> sameLeaderList = dbConnect.GetSql().Queryable<TeamData>().With(SqlSugar.SqlWith.RowLock).Where(it => it.Leader == packet.MemberID).ToList();
+                List<TeamData> sameLeaderTeamList = dbConnect.GetSql().Queryable<TeamData>().With(SqlSugar.SqlWith.RowLock).Where(it => it.Leader == packet.MemberID).ToList();
 
-                // 未包含該車隊名稱
-                if (TeamList.Count() == 0)
+                // 未包含該車隊
+                if (teamData == null)
                 {
                     // 非其他車隊的隊長
-                    if (sameLeaderList.Count() == 0)
+                    if (sameLeaderTeamList.Count() == 0)
                     {
                         string dateTime = DateTime.UtcNow.ToString("yyyy-MM-dd hh:mm:ss");
 
@@ -375,7 +364,7 @@ namespace TeamService
                         string[] guidList = guidAll.Split('-');
 
                         // 建立新車隊
-                        TeamData data = new TeamData
+                        TeamData newTeamData = new TeamData
                         {
                             TeamID = "DbTeam-" + guidList[0],        // 取GUID前8碼
                             CreateDate = dateTime,
@@ -392,11 +381,11 @@ namespace TeamService
                             ApplyJoinList = "[]"
                         };
 
-                        if (dbConnect.GetSql().Insertable(data).With(SqlSugar.SqlWith.RowLock).ExecuteCommand() > 0)
+                        if (dbConnect.GetSql().Insertable(newTeamData).With(SqlSugar.SqlWith.RowLock).ExecuteCommand() > 0)
                         {
                             rData.Result = 1;
 
-                            rData.TeamID = data.TeamID;
+                            rData.TeamID = newTeamData.TeamID;
 
                             log.SaveLog($"[Info] Controller::OnCreateNewTeam, Create Team Success, TeamID:{rData.TeamID}");
 
@@ -452,28 +441,27 @@ namespace TeamService
 
             try
             {
-                List<TeamData> TeamList = dbConnect.GetSql().Queryable<TeamData>().With(SqlSugar.SqlWith.RowLock).Where(it => it.TeamID == packet.TeamID).ToList();
+                TeamData teamData = dbConnect.GetSql().Queryable<TeamData>().With(SqlSugar.SqlWith.RowLock).Where(it => it.TeamID == packet.TeamID).Single();
 
                 // 有找到車隊
-                if (TeamList.Count() == 1)
+                if (teamData != null)
                 {
-                    JArray jsViceLeaderList = JArray.Parse(TeamList[0].TeamViceLeaderIDs);
+                    JArray jsViceLeaderList = JArray.Parse(teamData.TeamViceLeaderIDs);
                     List<string> viceLeaderList = jsViceLeaderList.ToObject<List<string>>();
 
                     // 為隊長或副隊長
-                    if (TeamList[0].Leader == packet.MemberID || viceLeaderList.Contains(packet.MemberID))
+                    if (teamData.Leader == packet.MemberID || viceLeaderList.Contains(packet.MemberID))
                     {
-                        TeamList[0].CreateDate = Convert.ToDateTime(TeamList[0].CreateDate).ToString("yyyy-MM-dd hh:mm:ss");
+                        teamData.CreateDate = Convert.ToDateTime(teamData.CreateDate).ToString("yyyy-MM-dd hh:mm:ss");
+                        teamData.TeamName = packet.TeamName == null ? teamData.TeamName : packet.TeamName;
+                        teamData.TeamInfo = packet.TeamInfo == null ? teamData.TeamInfo : packet.TeamInfo;
+                        teamData.Avatar = packet.Avatar == null ? teamData.Avatar : packet.Avatar;
+                        teamData.FrontCover = packet.FrontCover == null ? teamData.FrontCover : packet.FrontCover;
+                        teamData.County = packet.County == 0 ? teamData.County : packet.County;
+                        teamData.SearchStatus = packet.SearchStatus == 0 ? teamData.SearchStatus : packet.SearchStatus;
+                        teamData.ExamineStatus = packet.ExamineStatus == 0 ? teamData.ExamineStatus : packet.ExamineStatus;
 
-                        TeamList[0].TeamName = packet.TeamName == null ? TeamList[0].TeamName : packet.TeamName;
-                        TeamList[0].TeamInfo = packet.TeamInfo == null ? TeamList[0].TeamInfo : packet.TeamInfo;
-                        TeamList[0].Avatar = packet.Avatar == null ? TeamList[0].Avatar : packet.Avatar;
-                        TeamList[0].FrontCover = packet.FrontCover == null ? TeamList[0].FrontCover : packet.FrontCover;
-                        TeamList[0].County = packet.County == 0 ? TeamList[0].County : packet.County;
-                        TeamList[0].SearchStatus = packet.SearchStatus == 0 ? TeamList[0].SearchStatus : packet.SearchStatus;
-                        TeamList[0].ExamineStatus = packet.ExamineStatus == 0 ? TeamList[0].ExamineStatus : packet.ExamineStatus;
-
-                        if (dbConnect.GetSql().Updateable<TeamData>(TeamList[0]).With(SqlSugar.SqlWith.RowLock).Where(it => it.TeamID == packet.TeamID).ExecuteCommand() > 0)
+                        if (dbConnect.GetSql().Updateable<TeamData>(teamData).With(SqlSugar.SqlWith.RowLock).Where(it => it.TeamID == packet.TeamID).ExecuteCommand() > 0)
                         {
                             rData.Result = 1;
 
@@ -517,35 +505,35 @@ namespace TeamService
 
             try
             {
-                List<TeamData> TeamList = dbConnect.GetSql().Queryable<TeamData>().With(SqlSugar.SqlWith.RowLock).Where(it => it.TeamID == packet.TeamID).ToList();
+                TeamData teamData = dbConnect.GetSql().Queryable<TeamData>().With(SqlSugar.SqlWith.RowLock).Where(it => it.TeamID == packet.TeamID).Single();
 
                 List<TeamData> LeaderList = dbConnect.GetSql().Queryable<TeamData>().With(SqlSugar.SqlWith.RowLock).Where(it => it.Leader == packet.MemberID).ToList();
 
                 // 有找到車隊 
-                if (TeamList.Count() == 1)
+                if (teamData != null)
                 {   
                     // 只有隊長有更改權限
-                    if (TeamList[0].Leader == packet.LeaderID)
+                    if (teamData.Leader == packet.LeaderID)
                     {
                         // 新隊長不為其他車隊的隊長
                         if (LeaderList.Count() == 0)
                         {
-                            JArray jsMemberList = JArray.Parse(TeamList[0].TeamMemberIDs);
+                            JArray jsMemberList = JArray.Parse(teamData.TeamMemberIDs);
                             List<string> memberList = jsMemberList.ToObject<List<string>>();
 
-                            JArray jsViceLeaderList = JArray.Parse(TeamList[0].TeamViceLeaderIDs);
+                            JArray jsViceLeaderList = JArray.Parse(teamData.TeamViceLeaderIDs);
                             List<string> viceLeaderList = jsViceLeaderList.ToObject<List<string>>();
 
-                            List<string> notifyTargetList = GetAllMemberID(TeamList[0]);
+                            List<string> notifyTargetList = GetAllMemberID(teamData);
 
                             // 新隊長為車隊中的隊員 或 副隊長
                             if (memberList.Contains(packet.MemberID) || viceLeaderList.Contains(packet.MemberID))
                             {
-                                string oldLeaderID = TeamList[0].Leader;
+                                string oldLeaderID = teamData.Leader;
 
-                                TeamList[0].Leader = packet.MemberID == null ? TeamList[0].Leader : packet.MemberID;
+                                teamData.Leader = packet.MemberID == null ? teamData.Leader : packet.MemberID;
 
-                                if (dbConnect.GetSql().Updateable<TeamData>(TeamList[0]).With(SqlSugar.SqlWith.RowLock).Where(it => it.TeamID == packet.TeamID).ExecuteCommand() > 0)
+                                if (dbConnect.GetSql().Updateable<TeamData>(teamData).With(SqlSugar.SqlWith.RowLock).Where(it => it.TeamID == packet.TeamID).ExecuteCommand() > 0)
                                 {
                                     rData.Result = 1;
 
@@ -596,18 +584,18 @@ namespace TeamService
                                     {
                                         string targetID = notifyTargetList[idx];
 
-                                        List<UserAccount> accountList = dbConnect.GetSql().Queryable<UserAccount>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == targetID).ToList();
+                                        UserAccount account = dbConnect.GetSql().Queryable<UserAccount>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == targetID).Single();
 
-                                        List<UserInfo> oldLeaderInfoList = dbConnect.GetSql().Queryable<UserInfo>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == TeamList[0].Leader).ToList();
-                                        List<UserInfo> newLeaderInfoList = dbConnect.GetSql().Queryable<UserInfo>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).ToList();
+                                        UserInfo oldLeaderInfo = dbConnect.GetSql().Queryable<UserInfo>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == teamData.Leader).Single();
+                                        UserInfo newLeaderInfo = dbConnect.GetSql().Queryable<UserInfo>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).Single();
 
-                                        if (accountList.Count() == 1 && oldLeaderInfoList.Count() == 1 && newLeaderInfoList.Count() == 1)
+                                        if (account != null && oldLeaderInfo != null && newLeaderInfo != null)
                                         {
                                             string sTitle = $"系統公告";
 
-                                            string sNotifyMsg = $"{TeamList[0].TeamName} 隊長由 {oldLeaderInfoList[0].NickName} 更換為 {newLeaderInfoList[0].NickName} ";
+                                            string sNotifyMsg = $"{teamData.TeamName} 隊長由 {oldLeaderInfo.NickName} 更換為 {newLeaderInfo.NickName} ";
 
-                                            ntMsg.NotifyMsgToDevice(accountList[0].NotifyToken, sTitle, sNotifyMsg);
+                                            ntMsg.NotifyMsgToDevice(account.NotifyToken, sTitle, sNotifyMsg);
                                         }
 
                                     }
@@ -675,18 +663,18 @@ namespace TeamService
 
             try
             {
-                List<TeamData> TeamList = dbConnect.GetSql().Queryable<TeamData>().With(SqlSugar.SqlWith.RowLock).Where(it => it.TeamID == packet.TeamID).ToList();
+                TeamData teamData = dbConnect.GetSql().Queryable<TeamData>().With(SqlSugar.SqlWith.RowLock).Where(it => it.TeamID == packet.TeamID).Single();
 
                 // 有找到車隊
-                if (TeamList.Count() == 1)
+                if (teamData != null)
                 {
                     // 只有隊長有更改權限
-                    if (TeamList[0].Leader == packet.LeaderID)
+                    if (teamData.Leader == packet.LeaderID)
                     {
-                        JArray jsMemberList = JArray.Parse(TeamList[0].TeamMemberIDs);
+                        JArray jsMemberList = JArray.Parse(teamData.TeamMemberIDs);
                         List<string> memberList = jsMemberList.ToObject<List<string>>();
 
-                        JArray jsData = JArray.Parse(TeamList[0].TeamViceLeaderIDs);
+                        JArray jsData = JArray.Parse(teamData.TeamViceLeaderIDs);
                         List<string> idList = jsData.ToObject<List<string>>();
 
                         // 為一般隊員 或 副隊長
@@ -822,22 +810,22 @@ namespace TeamService
 
             try
             {
-                List<TeamData> TeamList = dbConnect.GetSql().Queryable<TeamData>().With(SqlSugar.SqlWith.RowLock).Where(it => it.TeamID == packet.TeamID).ToList();
+                TeamData teamData = dbConnect.GetSql().Queryable<TeamData>().With(SqlSugar.SqlWith.RowLock).Where(it => it.TeamID == packet.TeamID).Single();
 
                 // 有找到車隊
-                if (TeamList.Count() == 1)
+                if (teamData != null)
                 {
-                    JArray jsMemberData = JArray.Parse(TeamList[0].TeamMemberIDs);
+                    JArray jsMemberData = JArray.Parse(teamData.TeamMemberIDs);
                     List<string> idMemberList = jsMemberData.ToObject<List<string>>();
 
-                    JArray jsData = JArray.Parse(TeamList[0].TeamViceLeaderIDs);
+                    JArray jsData = JArray.Parse(teamData.TeamViceLeaderIDs);
                     List<string> idList = jsData.ToObject<List<string>>();
 
                     // 新增
                     if (packet.Action == 1)
                     {
                         // 非一般隊員 且 非副隊長 且 非隊長
-                        if (!idMemberList.Contains(packet.MemberID) && !idList.Contains(packet.MemberID) && TeamList[0].Leader != packet.MemberID)
+                        if (!idMemberList.Contains(packet.MemberID) && !idList.Contains(packet.MemberID) && teamData.Leader != packet.MemberID)
                         {
                             idMemberList.Add(packet.MemberID);
 
@@ -928,14 +916,14 @@ namespace TeamService
             UpdateApplyJoinListResult rData = new UpdateApplyJoinListResult();
             rData.Action = packet.Action;
 
-            List<TeamData> TeamList = dbConnect.GetSql().Queryable<TeamData>().With(SqlSugar.SqlWith.RowLock).Where(it => it.TeamID == packet.TeamID).ToList();
+            TeamData teamData = dbConnect.GetSql().Queryable<TeamData>().With(SqlSugar.SqlWith.RowLock).Where(it => it.TeamID == packet.TeamID).Single();
 
             try
             {
                 // 有找到車隊
-                if (TeamList.Count() == 1)
+                if (teamData != null)
                 {
-                    JArray jsData = JArray.Parse(TeamList[0].ApplyJoinList);
+                    JArray jsData = JArray.Parse(teamData.ApplyJoinList);
 
                     List<string> idList = jsData.ToObject<List<string>>();
 
@@ -985,25 +973,25 @@ namespace TeamService
                         {
                             rData.Result = 1;
 
-                            JArray jsViceLeader = JArray.Parse(TeamList[0].TeamViceLeaderIDs);
+                            JArray jsViceLeader = JArray.Parse(teamData.TeamViceLeaderIDs);
 
                             List<string> notifyTargrtList = jsViceLeader.ToObject<List<string>>();
-                            notifyTargrtList.Add(TeamList[0].Leader);
+                            notifyTargrtList.Add(teamData.Leader);
 
                             for (int idx = 0; idx < notifyTargrtList.Count(); idx++)
                             {
                                 string targetID = notifyTargrtList[idx];
 
-                                List<UserAccount> accountList = dbConnect.GetSql().Queryable<UserAccount>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == targetID).ToList();
-                                List<UserInfo> userList = dbConnect.GetSql().Queryable<UserInfo>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == targetID).ToList();
+                               UserAccount account= dbConnect.GetSql().Queryable<UserAccount>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == targetID).Single();
+                               UserInfo userInfo = dbConnect.GetSql().Queryable<UserInfo>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == targetID).Single();
 
-                                if (accountList.Count() == 1 && userList.Count() == 1)
+                                if (account != null && userInfo != null)
                                 {
                                     string sTitle = $"系統公告";
 
-                                    string sNotifyMsg = $"{userList[0].NickName} 申請加入 {TeamList[0].TeamName}";
+                                    string sNotifyMsg = $"{userInfo.NickName} 申請加入 {teamData.TeamName}";
 
-                                    ntMsg.NotifyMsgToDevice(accountList[0].NotifyToken, sTitle, sNotifyMsg);
+                                    ntMsg.NotifyMsgToDevice(account.NotifyToken, sTitle, sNotifyMsg);
                                 }
 
                             }
@@ -1054,23 +1042,23 @@ namespace TeamService
 
             try
             {
-                List<TeamData> TeamList = new List<TeamData>();
+                TeamData teamData = null;
 
-                List<TeamBulletin> BulletinList = new List<TeamBulletin>();
+                TeamBulletin bulletin = null;
 
                 // 新增
                 if (packet.Action == 1)
                 {
-                    TeamList = dbConnect.GetSql().Queryable<TeamData>().With(SqlSugar.SqlWith.RowLock).Where(it => it.TeamID == packet.TeamID).ToList();
+                    teamData = dbConnect.GetSql().Queryable<TeamData>().With(SqlSugar.SqlWith.RowLock).Where(it => it.TeamID == packet.TeamID).Single();
                 }
                 // 修改公告 或 刪除公告
                 else if (packet.Action == 2 || packet.Action == -1)
                 {
-                    BulletinList = dbConnect.GetSql().Queryable<TeamBulletin>().With(SqlSugar.SqlWith.RowLock).Where(it => it.BulletinID == packet.BulletinID).ToList();
+                    bulletin = dbConnect.GetSql().Queryable<TeamBulletin>().With(SqlSugar.SqlWith.RowLock).Where(it => it.BulletinID == packet.BulletinID).Single();
 
-                    if (BulletinList.Count() == 1)
+                    if (bulletin != null)
                     {
-                        TeamList = dbConnect.GetSql().Queryable<TeamData>().Where(it => it.TeamID == BulletinList[0].TeamID).ToList();
+                        teamData = dbConnect.GetSql().Queryable<TeamData>().Where(it => it.TeamID == bulletin.TeamID).Single();
                     }
                     else
                     {
@@ -1081,14 +1069,14 @@ namespace TeamService
                 }
 
                 // 有找到車隊
-                if (TeamList.Count() == 1)
+                if (teamData != null)
                 {
                     // 取得副隊長列表
-                    JArray jsViceLeader = JArray.Parse(TeamList[0].TeamViceLeaderIDs);
+                    JArray jsViceLeader = JArray.Parse(teamData.TeamViceLeaderIDs);
                     List<string> viceLeaderList = jsViceLeader.ToObject<List<string>>();
 
                     // 檢查發公告的人是否為隊長或副隊長
-                    if (packet.MemberID == TeamList[0].Leader || viceLeaderList.Contains(packet.MemberID))
+                    if (packet.MemberID == teamData.Leader || viceLeaderList.Contains(packet.MemberID))
                     {
                         // 新增公告
                         if (packet.Action == 1)
@@ -1099,7 +1087,7 @@ namespace TeamService
 
                             string[] guidList = guidAll.Split('-');
 
-                            TeamBulletin teamBu = new TeamBulletin
+                            TeamBulletin newBulletin = new TeamBulletin
                             {
                                 BulletinID = "DbBu-" + guidList[0],        // 取GUID前8碼
                                 TeamID = packet.TeamID,
@@ -1109,30 +1097,30 @@ namespace TeamService
                                 Day = packet.Day
                             };
 
-                            if (dbConnect.GetSql().Insertable(teamBu).With(SqlSugar.SqlWith.TabLockX).ExecuteCommand() > 0)
+                            if (dbConnect.GetSql().Insertable(newBulletin).With(SqlSugar.SqlWith.TabLockX).ExecuteCommand() > 0)
                             {
                                 rData.Result = 1;
 
-                                rData.BulletinID = teamBu.BulletinID;
+                                rData.BulletinID = newBulletin.BulletinID;
 
                                 log.SaveLog($"[Info] Controller::OnUpdateBulletin, Create Team Bulletin Success, BulletinID:{rData.BulletinID}");
                             
-                                List<string> notifyTargetList = GetAllMemberID(TeamList[0]);
+                                List<string> notifyTargetList = GetAllMemberID(teamData);
                                 notifyTargetList.Remove(packet.MemberID);
 
                                 for (int idx = 0; idx < notifyTargetList.Count(); idx++)
                                 {
                                     string targetID = notifyTargetList[idx];
 
-                                    List<UserAccount> accountList = dbConnect.GetSql().Queryable<UserAccount>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == targetID).ToList();
+                                    UserAccount account = dbConnect.GetSql().Queryable<UserAccount>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == targetID).Single();
 
-                                    if (accountList.Count() == 1)
+                                    if (account != null)
                                     {
                                         string sTitle = $"車隊公告";
 
                                         string sNotifyMsg = packet.Content;
 
-                                        ntMsg.NotifyMsgToDevice(accountList[0].NotifyToken, sTitle, sNotifyMsg);
+                                        ntMsg.NotifyMsgToDevice(account.NotifyToken, sTitle, sNotifyMsg);
                                     }
 
                                 }
@@ -1149,7 +1137,7 @@ namespace TeamService
                         else
                         {
                             // 有找到公告
-                            if (BulletinList.Count() == 1)
+                            if (bulletin != null)
                             {
                                 // 刪除公告
                                 if (packet.Action == -1)
@@ -1170,19 +1158,19 @@ namespace TeamService
                                 // 修改公告
                                 else if (packet.Action == 2)
                                 {
-                                    BulletinList[0].MemberID = packet.MemberID == null ? BulletinList[0].MemberID : packet.MemberID;
-                                    BulletinList[0].Content = packet.Content == null ? BulletinList[0].Content : packet.Content;
-                                    BulletinList[0].Day = packet.Day == 0 ? BulletinList[0].Day : packet.Day;
+                                    bulletin.MemberID = packet.MemberID == null ? bulletin.MemberID : packet.MemberID;
+                                    bulletin.Content = packet.Content == null ? bulletin.Content : packet.Content;
+                                    bulletin.Day = packet.Day == 0 ? bulletin.Day : packet.Day;
 
-                                    if (dbConnect.GetSql().Updateable<TeamBulletin>(BulletinList[0]).With(SqlSugar.SqlWith.RowLock).Where(it => it.BulletinID == packet.BulletinID).ExecuteCommand() > 0)
+                                    if (dbConnect.GetSql().Updateable<TeamBulletin>(bulletin).With(SqlSugar.SqlWith.RowLock).Where(it => it.BulletinID == packet.BulletinID).ExecuteCommand() > 0)
                                     {
                                         rData.Result = 1;
 
                                         rSendToNy.Action = 2;
-                                        rSendToNy.TeamID = BulletinList[0].TeamID;
-                                        rSendToNy.MemberID = BulletinList[0].MemberID;
-                                        rSendToNy.Content = BulletinList[0].Content;
-                                        rSendToNy.Day = BulletinList[0].Day;
+                                        rSendToNy.TeamID = bulletin.TeamID;
+                                        rSendToNy.MemberID = bulletin.MemberID;
+                                        rSendToNy.Content = bulletin.Content;
+                                        rSendToNy.Day = bulletin.Day;
 
                                         log.SaveLog($"[Info] Controller::OnUpdateBulletin, Update Team Bulletin Success, BulletinID:{rData.BulletinID}");
                                     }
@@ -1253,23 +1241,23 @@ namespace TeamService
 
             try
             {
-                List<TeamData> TeamList = new List<TeamData>();
-                List<TeamActivity> ActList = new List<TeamActivity>();
+                TeamData teamData = null;
+                TeamActivity teamAct = null;
 
                 // 新增活動
                 if (packet.Action == 1 )
                 {
-                    TeamList = dbConnect.GetSql().Queryable<TeamData>().With(SqlSugar.SqlWith.RowLock).Where(it => it.TeamID == packet.TeamID).ToList();
+                    teamData = dbConnect.GetSql().Queryable<TeamData>().With(SqlSugar.SqlWith.RowLock).Where(it => it.TeamID == packet.TeamID).Single();
                 }
                 // 修改活動 或 刪除活動
                 else if (packet.Action == 2 || packet.Action == -1)
                 {
-                    ActList = dbConnect.GetSql().Queryable<TeamActivity>().With(SqlSugar.SqlWith.RowLock).Where(it => it.ActID == packet.ActID).ToList();
+                    teamAct = dbConnect.GetSql().Queryable<TeamActivity>().With(SqlSugar.SqlWith.RowLock).Where(it => it.ActID == packet.ActID).Single();
 
                     // 有找到活動
-                    if (ActList.Count() == 1)
+                    if (teamAct != null)
                     {
-                        TeamList = dbConnect.GetSql().Queryable<TeamData>().With(SqlSugar.SqlWith.RowLock).Where(it => it.TeamID == packet.TeamID).ToList();
+                        teamData = dbConnect.GetSql().Queryable<TeamData>().With(SqlSugar.SqlWith.RowLock).Where(it => it.TeamID == packet.TeamID).Single();
                     }
                     else 
                     {
@@ -1280,18 +1268,18 @@ namespace TeamService
                 }
 
                 // 有找到車隊
-                if (TeamList.Count() == 1)
+                if (teamData != null)
                 {
                     // 取得副隊長列表
-                    JArray jsViceLeader = JArray.Parse(TeamList[0].TeamViceLeaderIDs);
+                    JArray jsViceLeader = JArray.Parse(teamData.TeamViceLeaderIDs);
                     List<string> viceLeaderList = jsViceLeader.ToObject<List<string>>();
 
                     // 取得隊員列表
-                    JArray jsMemberList = JArray.Parse(TeamList[0].TeamMemberIDs);
+                    JArray jsMemberList = JArray.Parse(teamData.TeamMemberIDs);
                     List<string> memberList = jsMemberList.ToObject<List<string>>();
 
                     // 檢查發活動的人是否為車隊隊員
-                    if (packet.MemberID == TeamList[0].Leader || viceLeaderList.Contains(packet.MemberID) || memberList.Contains(packet.MemberID))
+                    if (packet.MemberID == teamData.Leader || viceLeaderList.Contains(packet.MemberID) || memberList.Contains(packet.MemberID))
                     {
                         // 新增活動
                         if (packet.Action == 1)
@@ -1302,7 +1290,7 @@ namespace TeamService
 
                             string[] guidList = guidAll.Split('-');
 
-                            TeamActivity teamAct = new TeamActivity
+                            TeamActivity newTeamAct = new TeamActivity
                             {
                                 ActID = "DbAct-" + guidList[0],        // 取GUID前8碼,
                                 CreateDate = dateTime,
@@ -1318,15 +1306,15 @@ namespace TeamService
 
                             };
 
-                            if (dbConnect.GetSql().Insertable(teamAct).With(SqlSugar.SqlWith.TabLockX).ExecuteCommand() > 0)
+                            if (dbConnect.GetSql().Insertable(newTeamAct).With(SqlSugar.SqlWith.TabLockX).ExecuteCommand() > 0)
                             {
                                 rData.Result = 1;
 
-                                rData.ActID = teamAct.ActID;
+                                rData.ActID = newTeamAct.ActID;
 
                                 log.SaveLog($"[Info] Controller::OnUpdateActivity, Create Team Activity Success, ActID:{rData.ActID}");
 
-                                List<string> notifyTargetList = GetAllMemberID(TeamList[0]);
+                                List<string> notifyTargetList = GetAllMemberID(teamData);
                                 notifyTargetList.Remove(packet.MemberID);
 
                                 for (int idx = 0; idx < notifyTargetList.Count(); idx++)
@@ -1334,18 +1322,18 @@ namespace TeamService
                                     string targetID = notifyTargetList[idx];
 
                                     // 活動發起人
-                                    List<UserInfo> userInfoList = dbConnect.GetSql().Queryable<UserInfo>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).ToList();
+                                    UserInfo userInfo = dbConnect.GetSql().Queryable<UserInfo>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).Single();
                                     
                                     // 收到公告的人
-                                    List<UserAccount> accountList = dbConnect.GetSql().Queryable<UserAccount>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == targetID).ToList();
+                                    UserAccount account = dbConnect.GetSql().Queryable<UserAccount>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == targetID).Single();
 
-                                    if (userInfoList.Count() == 1 && accountList.Count() == 1)
+                                    if (userInfo != null && account != null)
                                     {
                                         string sTitle = $"車隊活動";
 
-                                        string sNotifyMsg = $"{userInfoList[0].NickName} 建立活動 {packet.Title}";
+                                        string sNotifyMsg = $"{userInfo.NickName} 建立活動 {packet.Title}";
 
-                                        ntMsg.NotifyMsgToDevice(accountList[0].NotifyToken, sTitle, sNotifyMsg);
+                                        ntMsg.NotifyMsgToDevice(account.NotifyToken, sTitle, sNotifyMsg);
                                     }
 
                                 }
@@ -1362,10 +1350,10 @@ namespace TeamService
                         else
                         {   
                             // 有找到活動
-                            if (ActList.Count() == 1)
+                            if (teamAct != null)
                             {
                                 // 為活動發起人
-                                if (ActList[0].MemberID == packet.MemberID)
+                                if (teamAct.MemberID == packet.MemberID)
                                 {
                                     // 刪除活動
                                     if (packet.Action == -1)
@@ -1387,33 +1375,33 @@ namespace TeamService
                                     else if (packet.Action == 2)
                                     {
 
-                                        ActList[0].MemberList = packet.MemberList == null ? ActList[0].MemberList : packet.MemberList;
-                                        ActList[0].ActDate = packet.ActDate == null ? ActList[0].ActDate : packet.ActDate;
-                                        ActList[0].Title = packet.Title == null ? ActList[0].Title : packet.Title;
-                                        ActList[0].MeetTime = packet.MeetTime == null ? ActList[0].MeetTime : packet.MeetTime;
-                                        ActList[0].TotalDistance = packet.TotalDistance == 0 ? ActList[0].TotalDistance : packet.TotalDistance;
-                                        ActList[0].MaxAltitude = packet.MaxAltitude == 0 ? ActList[0].MaxAltitude : packet.MaxAltitude;
-                                        ActList[0].Route = packet.Route == null ? ActList[0].Route : packet.Route;
+                                        teamAct.MemberList = packet.MemberList == null ? teamAct.MemberList : packet.MemberList;
+                                        teamAct.ActDate = packet.ActDate == null ? teamAct.ActDate : packet.ActDate;
+                                        teamAct.Title = packet.Title == null ? teamAct.Title : packet.Title;
+                                        teamAct.MeetTime = packet.MeetTime == null ? teamAct.MeetTime : packet.MeetTime;
+                                        teamAct.TotalDistance = packet.TotalDistance == 0 ? teamAct.TotalDistance : packet.TotalDistance;
+                                        teamAct.MaxAltitude = packet.MaxAltitude == 0 ? teamAct.MaxAltitude : packet.MaxAltitude;
+                                        teamAct.Route = packet.Route == null ? teamAct.Route : packet.Route;
 
-                                        if (dbConnect.GetSql().Updateable<TeamActivity>(TeamList[0]).With(SqlSugar.SqlWith.RowLock).Where(it => it.ActID == packet.ActID).ExecuteCommand() > 0)
+                                        if (dbConnect.GetSql().Updateable<TeamActivity>(teamData).With(SqlSugar.SqlWith.RowLock).Where(it => it.ActID == packet.ActID).ExecuteCommand() > 0)
                                         {
                                             rData.Result = 1;
 
                                             rSendToNy.Action = packet.Action;
-                                            rSendToNy.TeamID = ActList[0].TeamID;
-                                            rSendToNy.MemberID = ActList[0].MemberID;
-                                            rSendToNy.MemberList = ActList[0].MemberList;
-                                            rSendToNy.MemberList = ActList[0].MemberList;
-                                            rSendToNy.ActDate = ActList[0].ActDate;
-                                            rSendToNy.Title = ActList[0].Title;
-                                            rSendToNy.MeetTime = ActList[0].MeetTime;
-                                            rSendToNy.TotalDistance = ActList[0].TotalDistance;
-                                            rSendToNy.MaxAltitude = ActList[0].MaxAltitude;
-                                            rSendToNy.Route = ActList[0].Route;
+                                            rSendToNy.TeamID = teamAct.TeamID;
+                                            rSendToNy.MemberID = teamAct.MemberID;
+                                            rSendToNy.MemberList = teamAct.MemberList;
+                                            rSendToNy.MemberList = teamAct.MemberList;
+                                            rSendToNy.ActDate = teamAct.ActDate;
+                                            rSendToNy.Title = teamAct.Title;
+                                            rSendToNy.MeetTime = teamAct.MeetTime;
+                                            rSendToNy.TotalDistance = teamAct.TotalDistance;
+                                            rSendToNy.MaxAltitude = teamAct.MaxAltitude;
+                                            rSendToNy.Route = teamAct.Route;
 
                                             log.SaveLog($"[Info] Controller::OnUpdateActivity, Update Team Activity Success, ActID:{rData.ActID}");
 
-                                            List<string> notifyTargetList = GetAllMemberID(TeamList[0]);
+                                            List<string> notifyTargetList = GetAllMemberID(teamData);
                                             notifyTargetList.Remove(packet.MemberID);
 
                                             for (int idx = 0; idx < notifyTargetList.Count(); idx++)
@@ -1421,15 +1409,15 @@ namespace TeamService
                                                 string targetID = notifyTargetList[idx];
 
                                                 // 收到公告的人
-                                                List<UserAccount> accountList = dbConnect.GetSql().Queryable<UserAccount>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == targetID).ToList();
+                                                UserAccount account = dbConnect.GetSql().Queryable<UserAccount>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == targetID).Single();
 
-                                                if (accountList.Count() == 1)
+                                                if (account != null)
                                                 {
                                                     string sTitle = $"車隊活動";
 
-                                                    string sNotifyMsg = $"{ActList[0].Title} 已更新內容";
+                                                    string sNotifyMsg = $"{teamAct.Title} 已更新內容";
 
-                                                    ntMsg.NotifyMsgToDevice(accountList[0].NotifyToken, sTitle, sNotifyMsg);
+                                                    ntMsg.NotifyMsgToDevice(account.NotifyToken, sTitle, sNotifyMsg);
                                                 }
 
                                             }
@@ -1492,18 +1480,6 @@ namespace TeamService
                 rData.Result = 0;
             }
 
-            // 更新有成功, 送出推播
-            if (rData.Result == 1)
-            {
-                string sData = JsonConvert.SerializeObject(rSendToNy);
-
-                JObject jsSendToNy = new JObject();
-                jsSendToNy.Add("CmdID", (int)C2S_CmdID.emUpdateActivity);
-                jsSendToNy.Add("Data", JsonConvert.DeserializeObject<JObject>(sData));
-
-                //SendToNotifyService(jsSendToNy.ToString());
-            }
-
             JObject jsMain = new JObject();
             jsMain.Add("CmdID", (int)S2C_CmdID.emUpdateActivityResult);
             jsMain.Add("Data", JsonConvert.DeserializeObject<JObject>(JsonConvert.SerializeObject(rData)));
@@ -1520,29 +1496,29 @@ namespace TeamService
 
             try
             {
-                List<TeamData> TeamList = dbConnect.GetSql().Queryable<TeamData>().With(SqlSugar.SqlWith.RowLock).Where(it => it.TeamID == packet.TeamID).ToList();
+                TeamData teamData = dbConnect.GetSql().Queryable<TeamData>().With(SqlSugar.SqlWith.RowLock).Where(it => it.TeamID == packet.TeamID).Single();
 
                 // 有找到車隊
-                if (TeamList.Count() == 1)
+                if (teamData != null)
                 {
                     // 檢查解散車隊的人是否為隊長
-                    if (packet.MemberID == TeamList[0].Leader)
+                    if (packet.MemberID == teamData.Leader)
                     {
                         // 移入暫時區, 帶時間到期後刪除
                         TeamDataStorageCache stroge = new TeamDataStorageCache();
-                        stroge.TeamID = TeamList[0].TeamID;
-                        stroge.CreateDate = TeamList[0].CreateDate;
-                        stroge.Leader = TeamList[0].Leader;
-                        stroge.TeamViceLeaderIDs = TeamList[0].TeamViceLeaderIDs;
-                        stroge.TeamMemberIDs = TeamList[0].TeamMemberIDs;
-                        stroge.TeamName = TeamList[0].TeamName;
-                        stroge.TeamInfo = TeamList[0].TeamInfo;
-                        stroge.Avatar = TeamList[0].Avatar;
-                        stroge.FrontCover = TeamList[0].FrontCover;
-                        stroge.County = TeamList[0].County;
-                        stroge.SearchStatus = TeamList[0].SearchStatus;
-                        stroge.ExamineStatus = TeamList[0].ExamineStatus;
-                        stroge.ApplyJoinList = TeamList[0].ApplyJoinList;
+                        stroge.TeamID = teamData.TeamID;
+                        stroge.CreateDate = teamData.CreateDate;
+                        stroge.Leader = teamData.Leader;
+                        stroge.TeamViceLeaderIDs = teamData.TeamViceLeaderIDs;
+                        stroge.TeamMemberIDs = teamData.TeamMemberIDs;
+                        stroge.TeamName = teamData.TeamName;
+                        stroge.TeamInfo = teamData.TeamInfo;
+                        stroge.Avatar = teamData.Avatar;
+                        stroge.FrontCover = teamData.FrontCover;
+                        stroge.County = teamData.County;
+                        stroge.SearchStatus = teamData.SearchStatus;
+                        stroge.ExamineStatus = teamData.ExamineStatus;
+                        stroge.ApplyJoinList = teamData.ApplyJoinList;
                         stroge.StorageDate = DateTime.UtcNow.ToString("yyyy-MM-dd");
 
                         if (dbConnect.GetSql().Insertable(stroge).With(SqlSugar.SqlWith.TabLockX).ExecuteCommand() > 0)
@@ -1551,14 +1527,14 @@ namespace TeamService
                             if (dbConnect.GetSql().Deleteable<TeamData>().With(SqlSugar.SqlWith.TabLockX).Where(it => it.TeamID == packet.TeamID).ExecuteCommand() > 0)
                             {
                                 // 變更車隊成員的車隊列表
-                                JArray jsData = JArray.Parse(TeamList[0].TeamMemberIDs);
+                                JArray jsData = JArray.Parse(teamData.TeamMemberIDs);
 
                                 List<string> idList = jsData.ToObject<List<string>>();
 
                                 for (int idx = 0; idx < idList.Count(); idx++)
                                 {
                                     // 更新UserInfo的車隊資料
-                                    UpdateUserTeamList(idList[idx], TeamList[0].TeamID, -1);
+                                    UpdateUserTeamList(idList[idx], teamData.TeamID, -1);
                                 }
 
                                 rData.Result = 1;
@@ -1619,28 +1595,28 @@ namespace TeamService
 
             try
             {
-                List<TeamData> TeamList = dbConnect.GetSql().Queryable<TeamData>().With(SqlSugar.SqlWith.RowLock).Where(it => it.TeamID == packet.TeamID).ToList();
+                TeamData teamData = dbConnect.GetSql().Queryable<TeamData>().With(SqlSugar.SqlWith.RowLock).Where(it => it.TeamID == packet.TeamID).Single();
 
                 // 有找到車隊
-                if (TeamList.Count() == 1)
+                if (teamData != null)
                 {
-                    List<TeamActivity> ActList = dbConnect.GetSql().Queryable<TeamActivity>().Where(it => it.ActID == packet.ActID).ToList();
+                    TeamActivity teamAct = dbConnect.GetSql().Queryable<TeamActivity>().Where(it => it.ActID == packet.ActID).Single();
 
                     // 有該活動
-                    if (ActList.Count() == 1)
+                    if (teamAct != null)
                     {   
                         // 隊員列表
-                        JArray jsTeamMember = JArray.Parse(TeamList[0].TeamMemberIDs);
+                        JArray jsTeamMember = JArray.Parse(teamData.TeamMemberIDs);
                         List<string> memberList = jsTeamMember.ToObject<List<string>>();
 
                         // 副隊長列表
-                        JArray jsViceLeader = JArray.Parse(TeamList[0].TeamViceLeaderIDs);
+                        JArray jsViceLeader = JArray.Parse(teamData.TeamViceLeaderIDs);
                         List<string> viceLeaderList = jsViceLeader.ToObject<List<string>>();
 
                         // 加入或離開的人為該車隊的隊員
-                        if (memberList.Contains(packet.MemberID) || viceLeaderList.Contains(packet.MemberID) || TeamList[0].Leader == packet.MemberID)
+                        if (memberList.Contains(packet.MemberID) || viceLeaderList.Contains(packet.MemberID) || teamData.Leader == packet.MemberID)
                         {
-                            JArray jsActMember = JArray.Parse(ActList[0].MemberList);
+                            JArray jsActMember = JArray.Parse(teamAct.MemberList);
 
                             List<string> actMemberList = jsActMember.ToObject<List<string>>();
 
@@ -1698,15 +1674,15 @@ namespace TeamService
                                     log.SaveLog($"[Info] Controller::OnJoinOrLeaveTeamActivity, Upsate {packet.ActID} To Member List Success");
 
                                     // 若離開的人車隊發起人, 則解散活動
-                                    if (packet.Action == -1 && ActList[0].MemberID == packet.MemberID)
+                                    if (packet.Action == -1 && teamAct.MemberID == packet.MemberID)
                                     {
-                                        log.SaveLog($"[Info] Controller::OnJoinOrLeaveTeamActivity, Leave Member: {packet.MemberID} is Activity Member: {ActList[0].MemberID}");
+                                        log.SaveLog($"[Info] Controller::OnJoinOrLeaveTeamActivity, Leave Member: {packet.MemberID} is Activity Member: {teamAct.MemberID}");
 
                                         UpdateActivity updateAct = new UpdateActivity
                                         {
                                             Action = -1,
-                                            ActID = ActList[0].ActID,
-                                            TeamID = ActList[0].TeamID,
+                                            ActID = teamAct.ActID,
+                                            TeamID = teamAct.TeamID,
                                             MemberID = packet.MemberID
                                         };
 
@@ -1769,17 +1745,17 @@ namespace TeamService
 
             try
             {
-                List<TeamData> TeamList = dbConnect.GetSql().Queryable<TeamData>().With(SqlSugar.SqlWith.RowLock).Where(it => it.TeamID == packet.TeamID).ToList();
+                TeamData teamData = dbConnect.GetSql().Queryable<TeamData>().With(SqlSugar.SqlWith.RowLock).Where(it => it.TeamID == packet.TeamID).Single();
 
                 // 有找到車隊
-                if (TeamList.Count() == 1)
+                if (teamData != null)
                 {
                     // 加入或離開的玩家資訊
-                    List<UserInfo> userList = dbConnect.GetSql().Queryable<UserInfo>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).ToList();
+                    UserInfo userInfo = dbConnect.GetSql().Queryable<UserInfo>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).Single();
 
                     if (packet.Action == 1)
                     {
-                        JArray jsApplyList = JArray.Parse(TeamList[0].ApplyJoinList);
+                        JArray jsApplyList = JArray.Parse(teamData.ApplyJoinList);
                         List<string> ApplyList = jsApplyList.ToObject<List<string>>();
 
                         // 若包含在申請加入
@@ -1791,14 +1767,13 @@ namespace TeamService
                             {
                                 rData.Result = 1;
 
-                                string userNickName = userList.Count() == 1 ? userList[0].NickName : "未定義";
+                                string userNickName = userInfo != null ? userInfo.NickName : "未定義";
 
                                 string sTitle = $"系統公告";
 
-                                string sNotifyMsg = $"{userNickName} 加入 {TeamList[0].TeamName}";
+                                string sNotifyMsg = $"{userNickName} 加入 {teamData.TeamName}";
 
-                                ntMsg.NotifyMsgToDevice(TeamList[0].TeamID, sTitle, sNotifyMsg);
-
+                                ntMsg.NotifyMsgToDevice(teamData.TeamID, sTitle, sNotifyMsg);
 
                                 log.SaveLog($"[Info] Controller::OnJoinOrLeaveTeam, Remove Member:{packet.MemberID} From Team:{packet.TeamID}'s ApplyJoinList Success");
                             }
@@ -1819,15 +1794,15 @@ namespace TeamService
 
                         if (rData.Result == 1)
                         {
-                            JArray jsMemberList = JArray.Parse(TeamList[0].TeamMemberIDs);
+                            JArray jsMemberList = JArray.Parse(teamData.TeamMemberIDs);
                             List<string> MemberList = jsMemberList.ToObject<List<string>>();
 
                             // 副隊長列表
-                            JArray jsViceLeader = JArray.Parse(TeamList[0].TeamViceLeaderIDs);
+                            JArray jsViceLeader = JArray.Parse(teamData.TeamViceLeaderIDs);
                             List<string> viceLeaderList = jsViceLeader.ToObject<List<string>>();
 
                             // 車隊成員列表未包含要加入的會員
-                            if (!MemberList.Contains(packet.MemberID) && !viceLeaderList.Contains(packet.MemberID) && TeamList[0].Leader != packet.MemberID)
+                            if (!MemberList.Contains(packet.MemberID) && !viceLeaderList.Contains(packet.MemberID) && teamData.Leader != packet.MemberID)
                             {
                                 MemberList.Add(packet.MemberID);
 
@@ -1861,7 +1836,7 @@ namespace TeamService
                     }
                     else if (packet.Action == -1)
                     {
-                        JArray jsMemberList = JArray.Parse(TeamList[0].TeamMemberIDs);
+                        JArray jsMemberList = JArray.Parse(teamData.TeamMemberIDs);
                         List<string> MemberList = jsMemberList.ToObject<List<string>>();
 
                         // 車隊列表有該名會員
@@ -1875,13 +1850,13 @@ namespace TeamService
                             {
                                 rData.Result = 1;
 
-                                string userNickName = userList.Count() == 1 ? userList[0].NickName : "未定義";
+                                string userNickName = userInfo != null ? userInfo.NickName : "未定義";
 
                                 string sTitle = $"系統公告";
 
-                                string sNotifyMsg = $"{userNickName} 離開 {TeamList[0].TeamName}";
+                                string sNotifyMsg = $"{userNickName} 離開 {teamData.TeamName}";
 
-                                ntMsg.NotifyMsgToDevice(TeamList[0].TeamID, sTitle, sNotifyMsg);
+                                ntMsg.NotifyMsgToDevice(teamData.TeamID, sTitle, sNotifyMsg);
 
                                 log.SaveLog($"[Info] Controller::OnJoinOrLeaveTeam, Remove Member:{packet.MemberID} To Team:{packet.TeamID}'s TeamMemberIDs Success");
 
