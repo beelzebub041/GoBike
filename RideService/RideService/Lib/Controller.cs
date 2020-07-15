@@ -76,22 +76,10 @@ namespace RideService
 
                 redis = new RedisConnect(log);
 
-                if (dbConnect.Initialize())
+                if (dbConnect.Initialize() && dbConnect.Connect() && wsServer.Initialize() 
+                    && redis.Initialize() && ntMsg.Initialize())
                 {
-                    if (dbConnect.Connect())
-                    {
-                        if (wsServer.Initialize())
-                        {
-                            if (redis.Initialize())
-                            {
-                                if (ntMsg.Initialize())
-                                {
-                                    bReturn = true;
-                                }
-                            }
-                        }
-                    }
-
+                    bReturn = true;
                 }
 
                 if (!bReturn)
@@ -225,12 +213,12 @@ namespace RideService
 
             try 
             {
-                List<UserAccount> accountList = dbConnect.GetSql().Queryable<UserAccount>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).ToList();
+                UserAccount account = dbConnect.GetSql().Queryable<UserAccount>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).Single();
 
-                List<RideData> rideDataList = dbConnect.GetSql().Queryable<RideData>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).ToList();
+                RideData rideData = dbConnect.GetSql().Queryable<RideData>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).Single();
 
                 // 有找到帳號 且 有找到 騎乘資料
-                if (accountList.Count() == 1 && rideDataList.Count() == 1)
+                if (account != null && rideData != null)
                 {
                     string dateTime = DateTime.UtcNow.ToString("yyyy-MM-dd hh:mm:ss");
 
@@ -239,7 +227,7 @@ namespace RideService
                     string[] guidList = guidAll.Split('-');
 
                     // ======================= 新增騎乘紀錄 =======================
-                    RideRecord record = new RideRecord
+                    RideRecord newRecord = new RideRecord
                     {
                         RideID = "DbRr-" + guidList[0] + "-" + DateTime.UtcNow.ToString("MMdd-hhmmss"),
                         MemberID = packet.MemberID,
@@ -256,16 +244,16 @@ namespace RideService
                         SharedType = packet.SharedType
                     };
 
-                    if (dbConnect.GetSql().Insertable(record).With(SqlSugar.SqlWith.TabLockX).ExecuteCommand() > 0)
+                    if (dbConnect.GetSql().Insertable(newRecord).With(SqlSugar.SqlWith.TabLockX).ExecuteCommand() > 0)
                     {
-                        log.SaveLog($"[Info] Controller::OnCreateRideRecord Create {packet.MemberID}'s Ride Record:{record.RideID} Success");
+                        log.SaveLog($"[Info] Controller::OnCreateRideRecord Create {packet.MemberID}'s Ride Record:{newRecord.RideID} Success");
 
                         // ======================= 更新騎乘資料 =======================
-                        rideDataList[0].TotalDistance += packet.Distance;
-                        rideDataList[0].TotalAltitude += packet.Altitude;
-                        rideDataList[0].TotalRideTime += packet.Time;
+                        rideData.TotalDistance += packet.Distance;
+                        rideData.TotalAltitude += packet.Altitude;
+                        rideData.TotalRideTime += packet.Time;
 
-                        if (dbConnect.GetSql().Updateable<RideData>(rideDataList[0]).With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).ExecuteCommand() > 0)
+                        if (dbConnect.GetSql().Updateable<RideData>(rideData).With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).ExecuteCommand() > 0)
                         {
                             log.SaveLog($"[Info] Controller::OnCreateRideRecord Update MemberID:{packet.MemberID}'s Ride Data Success");
                         }
@@ -317,9 +305,9 @@ namespace RideService
                         }
 
                         rData.Result = 1;
-                        rData.TotalDistance = rideDataList[0].TotalDistance;
-                        rData.TotalAltitude = rideDataList[0].TotalAltitude;
-                        rData.TotalRideTime = rideDataList[0].TotalRideTime;
+                        rData.TotalDistance = rideData.TotalDistance;
+                        rData.TotalAltitude = rideData.TotalAltitude;
+                        rData.TotalRideTime = rideData.TotalRideTime;
                     }
                     else
                     {
@@ -355,11 +343,11 @@ namespace RideService
 
             try
             {
-                List<UserAccount> accountList = dbConnect.GetSql().Queryable<UserAccount>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).ToList();
-                List<UserInfo> userInfoList = dbConnect.GetSql().Queryable<UserInfo>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).ToList();
+                UserAccount account = dbConnect.GetSql().Queryable<UserAccount>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).Single();
+                UserInfo userInfo = dbConnect.GetSql().Queryable<UserInfo>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).Single();
 
                 // 有找到帳號
-                if (accountList.Count() == 1 && userInfoList.Count() == 1)
+                if (account != null && userInfo != null)
                 {
                     string sRideGroupKey = $"RideGroup_{packet.MemberID}";
 
@@ -404,22 +392,22 @@ namespace RideService
                                         log.SaveLog($"[Info] Controller::OnUpdateRideGroup Create Ride Group: {sRideGroupKey}'s Member:{InviteList[idx]} Fail");
                                     }
 
-                                    List<UserAccount> notifyAccounrList = dbConnect.GetSql().Queryable<UserAccount>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == InviteList[idx]).ToList();
-                                    List<UserInfo> notifyUserInfoList = dbConnect.GetSql().Queryable<UserInfo>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == InviteList[idx]).ToList();
+                                    UserAccount notifyAccount = dbConnect.GetSql().Queryable<UserAccount>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == InviteList[idx]).Single();
+                                    UserInfo notifyUserInfo = dbConnect.GetSql().Queryable<UserInfo>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == InviteList[idx]).Single();
 
                                     // 有找對會員
-                                    if (notifyAccounrList.Count() == 1 && notifyUserInfoList.Count() == 1)
+                                    if (notifyAccount != null && notifyUserInfo != null)
                                     {
                                         // 發送推播通知
                                         string sTitle = $"騎乘邀請";
 
-                                        string sNotifyMsg = $"{userInfoList[0].NickName} 邀請您組隊";
+                                        string sNotifyMsg = $"{notifyUserInfo.NickName} 邀請您組隊";
 
-                                        ntMsg.NotifyMsgToDevice(notifyAccounrList[0].NotifyToken, sTitle, sNotifyMsg);
+                                        ntMsg.NotifyMsgToDevice(notifyAccount.NotifyToken, sTitle, sNotifyMsg);
                                     }
                                     else
                                     {
-                                        log.SaveLog($"[Warning] Controller::OnUpdateRideGroup Can Not Find Notify Member: {accountList[0].MemberID}");
+                                        log.SaveLog($"[Warning] Controller::OnUpdateRideGroup Can Not Find Notify Member: {account.MemberID}");
                                     }
 
 
@@ -504,22 +492,22 @@ namespace RideService
         {
             ReplyRideGroupResult rData = new ReplyRideGroupResult();
 
-            List<UserAccount> leaderAccountList = new List<UserAccount>();
-            List<UserInfo> leaderUserInfoList = new List<UserInfo>();
+            UserAccount leaderAccount = null;
+            UserInfo leaderUserInfo = null;
 
             string replyMemberNickName = "";
 
             try
             {
-                List<UserAccount> accountList = dbConnect.GetSql().Queryable<UserAccount>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).ToList();
-                List<UserInfo> userInfoList = dbConnect.GetSql().Queryable<UserInfo>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).ToList();
+                UserAccount account = dbConnect.GetSql().Queryable<UserAccount>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).Single();
+                UserInfo userInfo = dbConnect.GetSql().Queryable<UserInfo>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).Single();
 
                 // 有找到帳號
-                if (accountList.Count() == 1 && userInfoList.Count() == 1)
+                if (account != null && userInfo != null)
                 {
                     string sMemberKey = $"GroupMember_{packet.MemberID}";
 
-                    replyMemberNickName = userInfoList[0].NickName;
+                    replyMemberNickName = userInfo.NickName;
 
                     // 該組隊成員存在
                     if (redis.GetRedis().KeyExists(sMemberKey))
@@ -538,8 +526,8 @@ namespace RideService
                                 {
                                     string GroupData = redis.GetRedis().StringGet(sRideGroupKey);
 
-                                    leaderAccountList = dbConnect.GetSql().Queryable<UserAccount>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).ToList();
-                                    leaderUserInfoList = dbConnect.GetSql().Queryable<UserInfo>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).ToList();
+                                    leaderAccount = dbConnect.GetSql().Queryable<UserAccount>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).Single();
+                                    leaderUserInfo = dbConnect.GetSql().Queryable<UserInfo>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).Single();
 
                                     JObject jsGroupData = JObject.Parse(GroupData);
 
@@ -658,14 +646,14 @@ namespace RideService
             {
                 string sAction = packet.Action == 1 ? "加入" : packet.Action == -1 ? "拒絕" : "Error";
 
-                if (leaderAccountList.Count() == 1 && leaderUserInfoList.Count() == 1)
+                if (leaderAccount != null && leaderUserInfo != null)
                 {
                     // 發送推播通知
                     string sTitle = $"組隊回覆";
 
                     string sNotifyMsg = $"{replyMemberNickName} 已{sAction}組隊";
 
-                    ntMsg.NotifyMsgToDevice(leaderAccountList[0].NotifyToken, sTitle, sNotifyMsg);
+                    ntMsg.NotifyMsgToDevice(leaderAccount.NotifyToken, sTitle, sNotifyMsg);
                 }
                 else
                 {
@@ -689,10 +677,10 @@ namespace RideService
 
             try
             {
-                List<UserAccount> accountList = dbConnect.GetSql().Queryable<UserAccount>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).ToList();
+                UserAccount account = dbConnect.GetSql().Queryable<UserAccount>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).Single();
 
                 // 有找到帳號
-                if (accountList.Count() == 1)
+                if (account != null)
                 {
                     string sMemberKey = $"GroupMember_{packet.MemberID}";
 
@@ -797,11 +785,11 @@ namespace RideService
 
             try
             {
-                List<UserAccount> accountList = dbConnect.GetSql().Queryable<UserAccount>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).ToList();
-                List<UserInfo> userInfoList = dbConnect.GetSql().Queryable<UserInfo>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).ToList();
+                UserAccount account = dbConnect.GetSql().Queryable<UserAccount>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).Single();
+                UserInfo userInfo = dbConnect.GetSql().Queryable<UserInfo>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).Single();
 
                 // 有找到帳號
-                if (accountList.Count() == 1 && userInfoList.Count() == 1)
+                if (account != null && userInfo != null)
                 {
                     string sMemberKey = $"GroupMember_{packet.MemberID}";
 
@@ -830,10 +818,10 @@ namespace RideService
                                 {
                                     if (MemberList[idx] != packet.MemberID)
                                     {
-                                        List<UserAccount> notifyAccountList = dbConnect.GetSql().Queryable<UserAccount>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == MemberList[idx]).ToList();
-                                        List<UserInfo> notifyUserInfoList = dbConnect.GetSql().Queryable<UserInfo>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == MemberList[idx]).ToList();
+                                        UserAccount notifyAccount = dbConnect.GetSql().Queryable<UserAccount>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == MemberList[idx]).Single();
+                                        UserInfo notifyUserInfo = dbConnect.GetSql().Queryable<UserInfo>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == MemberList[idx]).Single();
 
-                                        if (notifyAccountList.Count() == 1 && notifyUserInfoList.Count() == 1)
+                                        if (notifyAccount != null && notifyUserInfo != null)
                                         {
                                             rData.Result = 1;
 
@@ -844,9 +832,9 @@ namespace RideService
                                             // 發送推播通知
                                             string sTitle = $"緊急通知";
 
-                                            string sNotifyMsg = $"{userInfoList[0].NickName} {sAction}緊急狀況";
+                                            string sNotifyMsg = $"{userInfo.NickName} {sAction} 緊急狀況";
 
-                                            ntMsg.NotifyMsgToDevice(notifyAccountList[0].NotifyToken, sTitle, sNotifyMsg);
+                                            ntMsg.NotifyMsgToDevice(notifyAccount.NotifyToken, sTitle, sNotifyMsg);
 
                                             // 推播通知
                                             if (packet.Action == 0)
