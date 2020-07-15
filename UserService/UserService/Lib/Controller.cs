@@ -32,7 +32,7 @@ namespace UserService
 
         private object msgLock = new object();
 
-        private string ControllerVersion = "User024";
+        private string version = "User025";
 
 
         public Controller(Form1 fm1)
@@ -56,25 +56,17 @@ namespace UserService
             {
                 log = new Logger(fm1);
 
-                log.SaveLog($"Controller Version: {ControllerVersion}");
+                log.SaveLog($"User Service Version: {version}");
 
                 wsServer = new Server(log.SaveLog, MessageProcess);
 
                 dbConnect = new DataBaseConnect(log);
 
-                if (dbConnect.Initialize())
+                if (dbConnect.Initialize() && dbConnect.Connect() && wsServer.Initialize())
                 {
-                    if (dbConnect.Connect())
-                    {
-                        if (wsServer.Initialize())
-                        {
-                            bReturn = true;
-                        }
-                    }
-
+                    bReturn = true;
                 }
-
-                if (!bReturn)
+                else
                 {
                     log.SaveLog("[Error] Controller::Initialize, Initialize Fail");
                 }
@@ -223,10 +215,10 @@ namespace UserService
             {
                 try
                 {
-                    List<UserAccount> accountList = dbConnect.GetSql().Queryable<UserAccount>().With(SqlSugar.SqlWith.RowLock).Where(it => it.Email == packet.Email).ToList();
+                    UserAccount account = dbConnect.GetSql().Queryable<UserAccount>().With(SqlSugar.SqlWith.RowLock).Where(it => it.Email == packet.Email).Single();
 
                     // 未包含該Email
-                    if (accountList.Count() == 0)
+                    if (account == null)
                     {
                         string dateTime = DateTime.UtcNow.ToString("yyyy-MM-dd hh:mm:ss");
 
@@ -235,7 +227,7 @@ namespace UserService
                         string[] guidList = guidAll.Split('-');
 
                         // 建立新帳號
-                        UserAccount account = new UserAccount
+                        UserAccount newAccount = new UserAccount
                         {
                             MemberID = "Dblha-" + guidList[0],        // 取GUID前8碼
                             Email = packet.Email,
@@ -250,8 +242,8 @@ namespace UserService
                         // 新增使用者資訊
                         UserInfo info = new UserInfo
                         {
-                            MemberID = account.MemberID,
-                            NickName = account.MemberID,
+                            MemberID = newAccount.MemberID,
+                            NickName = "",
                             Birthday = "",
                             BodyHeight = 0,
                             BodyWeight = 0,
@@ -269,26 +261,35 @@ namespace UserService
                         // 新增騎乘資料
                         RideData data = new RideData
                         {
-                            MemberID = account.MemberID,
+                            MemberID = newAccount.MemberID,
                             TotalDistance = 0,
                             TotalAltitude = 0,
                             TotalRideTime = 0,
                         };
 
-                        // 資料有寫入資料庫
-                        if (dbConnect.GetSql().Insertable(account).With(SqlSugar.SqlWith.TabLockX).ExecuteCommand() > 0 &&
-                            dbConnect.GetSql().Insertable(info).With(SqlSugar.SqlWith.TabLockX).ExecuteCommand() > 0 &&
-                            dbConnect.GetSql().Insertable(data).With(SqlSugar.SqlWith.TabLockX).ExecuteCommand() > 0)
+                        // 寫入資料庫
+                        if (dbConnect.GetSql().Insertable(newAccount).With(SqlSugar.SqlWith.TabLockX).ExecuteCommand() > 0)
                         {
-                            rData.Result = 1;
+                            
+                            if (dbConnect.GetSql().Insertable(info).With(SqlSugar.SqlWith.TabLockX).ExecuteCommand() > 0 &&
+                                dbConnect.GetSql().Insertable(data).With(SqlSugar.SqlWith.TabLockX).ExecuteCommand() > 0)
+                            {
+                                rData.Result = 1;
 
-                            log.SaveLog("[Info] Controller::OnCreateNewAccount Create New Account Success");
+                                log.SaveLog($"[Info] Controller::OnCreateNewAccount Create New Account Success");
+                            }
+                            else
+                            {
+                                rData.Result = 0;
+
+                                log.SaveLog($"[Warning] Controller::OnCreateNewAccount Can Not Inseart User Info Or Ride Data");
+                            }
                         }
                         else
                         {
                             rData.Result = 0;
 
-                            log.SaveLog("[Warning] Controller::OnCreateNewAccount Email Repeat:");
+                            log.SaveLog($"[Warning] Controller::OnCreateNewAccount Email: {packet.Email} Repeat");
                         }
 
                     }
@@ -296,7 +297,7 @@ namespace UserService
                     {
                         rData.Result = 2;
 
-                        log.SaveLog("[Info] Controller::OnCreateNewAccount Email Repeat:");
+                        log.SaveLog($"[Info] Controller::OnCreateNewAccount Email Repeat:");
 
                     }
 
@@ -305,7 +306,7 @@ namespace UserService
                 {
                     rData.Result = 0;
 
-                    log.SaveLog("[Error] Controller::OnCreateNewAccount Create Error Msg:" + ex.Message);
+                    log.SaveLog($"[Error] Controller::OnCreateNewAccount Create Error Msg:{ex.Message}");
                 }
 
             }
@@ -313,7 +314,7 @@ namespace UserService
             {
                 rData.Result = 3;
 
-                log.SaveLog("[Info] Controller::OnCreateNewAccount Check Password Error:");
+                log.SaveLog($"[Info] Controller::OnCreateNewAccount Check Password Error");
 
             }
 
@@ -334,20 +335,20 @@ namespace UserService
 
             try
             {
-                List<UserAccount> accountList = dbConnect.GetSql().Queryable<UserAccount>().Where(it => it.Email == packet.Email && it.Password == packet.Password).ToList();
+                UserAccount account = dbConnect.GetSql().Queryable<UserAccount>().Where(it => it.Email == packet.Email && it.Password == packet.Password).Single();
 
                 // 有找到帳號
-                if (accountList.Count() == 1)
+                if (account != null)
                 {
-                    if (accountList[0].Password == packet.Password)
+                    if (account.Password == packet.Password)
                     {
-                        List<UserInfo> infoList = dbConnect.GetSql().Queryable<UserInfo>().Where(it => it.MemberID == accountList[0].MemberID).ToList();
+                        List<UserInfo> infoList = dbConnect.GetSql().Queryable<UserInfo>().Where(it => it.MemberID == account.MemberID).ToList();
 
                         // 有找到會員
                         if (infoList.Count() == 1)
                         {
                             rData.Result = 1;
-                            rData.MemberID = accountList[0].MemberID;
+                            rData.MemberID = account.MemberID;
                         }
                         else
                         {
@@ -391,24 +392,24 @@ namespace UserService
 
             try
             {
-                List<UserInfo> infoList = dbConnect.GetSql().Queryable<UserInfo>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).ToList();
+                UserInfo userInfo = dbConnect.GetSql().Queryable<UserInfo>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).Single();
 
                 // 有找到資料
-                if (infoList.Count() == 1)
+                if (userInfo != null)
                 {
-                    infoList[0].NickName = packet.UpdateData.NickName == null ? infoList[0].NickName : packet.UpdateData.NickName;
-                    infoList[0].Birthday = packet.UpdateData.Birthday == null ? infoList[0].Birthday : packet.UpdateData.Birthday;
-                    infoList[0].BodyHeight = packet.UpdateData.BodyHeight == 0 ? infoList[0].BodyHeight : packet.UpdateData.BodyHeight;
-                    infoList[0].BodyWeight = packet.UpdateData.BodyWeight == 0 ? infoList[0].BodyWeight : packet.UpdateData.BodyWeight;
-                    infoList[0].FrontCover = packet.UpdateData.FrontCover == null ? infoList[0].FrontCover : packet.UpdateData.FrontCover;
-                    infoList[0].Avatar = packet.UpdateData.Avatar == null ? infoList[0].Avatar : packet.UpdateData.Avatar;
-                    infoList[0].Photo = packet.UpdateData.Photo == null ? infoList[0].Photo : packet.UpdateData.Photo;
-                    infoList[0].Mobile = packet.UpdateData.Mobile == null ? infoList[0].Mobile : packet.UpdateData.Mobile;
-                    infoList[0].Gender = packet.UpdateData.Gender == 0 ? infoList[0].Gender : packet.UpdateData.Gender;
-                    infoList[0].County = packet.UpdateData.Country == 0 ? infoList[0].County : packet.UpdateData.Country;
-                    infoList[0].SpecificationModel = packet.UpdateData.SpecificationModel == "" ? infoList[0].SpecificationModel : packet.UpdateData.SpecificationModel;
+                    userInfo.NickName = packet.UpdateData.NickName == null ? userInfo.NickName : packet.UpdateData.NickName;
+                    userInfo.Birthday = packet.UpdateData.Birthday == null ? userInfo.Birthday : packet.UpdateData.Birthday;
+                    userInfo.BodyHeight = packet.UpdateData.BodyHeight == 0 ? userInfo.BodyHeight : packet.UpdateData.BodyHeight;
+                    userInfo.BodyWeight = packet.UpdateData.BodyWeight == 0 ? userInfo.BodyWeight : packet.UpdateData.BodyWeight;
+                    userInfo.FrontCover = packet.UpdateData.FrontCover == null ? userInfo.FrontCover : packet.UpdateData.FrontCover;
+                    userInfo.Avatar = packet.UpdateData.Avatar == null ? userInfo.Avatar : packet.UpdateData.Avatar;
+                    userInfo.Photo = packet.UpdateData.Photo == null ? userInfo.Photo : packet.UpdateData.Photo;
+                    userInfo.Mobile = packet.UpdateData.Mobile == null ? userInfo.Mobile : packet.UpdateData.Mobile;
+                    userInfo.Gender = packet.UpdateData.Gender == 0 ? userInfo.Gender : packet.UpdateData.Gender;
+                    userInfo.County = packet.UpdateData.Country == 0 ? userInfo.County : packet.UpdateData.Country;
+                    userInfo.SpecificationModel = packet.UpdateData.SpecificationModel == "" ? userInfo.SpecificationModel : packet.UpdateData.SpecificationModel;
 
-                    if (dbConnect.GetSql().Updateable<UserInfo>(infoList[0]).With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).ExecuteCommand() > 0)
+                    if (dbConnect.GetSql().Updateable<UserInfo>(userInfo).With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).ExecuteCommand() > 0)
                     {
                         rData.Result = 1;
                         
@@ -455,10 +456,10 @@ namespace UserService
 
             try
             {
-                List<UserAccount> accountList = dbConnect.GetSql().Queryable<UserAccount>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).ToList();
+                UserAccount account = dbConnect.GetSql().Queryable<UserAccount>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).Single();
 
                 // 有找到帳號
-                if (accountList.Count() == 1)
+                if (account != null)
                 {
                     bool canUpdate = false;
 
@@ -467,7 +468,7 @@ namespace UserService
                     if (packet.Action == 1)
                     {   
                         // 舊密碼相同
-                        if (accountList[0].Password == packet.Password)
+                        if (account.Password == packet.Password)
                         {
                             canUpdate = true;
                         }
@@ -538,12 +539,12 @@ namespace UserService
 
             try
             {
-                List<UserInfo> userList = dbConnect.GetSql().Queryable<UserInfo>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).ToList();
+                UserInfo userInfo = dbConnect.GetSql().Queryable<UserInfo>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).Single();
 
                 // 有找到會員
-                if (userList.Count() == 1)
+                if (userInfo != null)
                 {
-                    JArray jaData = JArray.Parse(userList[0].FriendList);
+                    JArray jaData = JArray.Parse(userInfo.FriendList);
 
                     List<string> idList = jaData.ToObject<List<string>>();
 
@@ -629,12 +630,12 @@ namespace UserService
 
             try
             {
-                List<UserInfo> userList = dbConnect.GetSql().Queryable<UserInfo>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).ToList();
+                UserInfo userInfo = dbConnect.GetSql().Queryable<UserInfo>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).Single();
 
                 // 有找到會員
-                if (userList.Count() == 1)
+                if (userInfo != null)
                 {
-                    JArray jsData = JArray.Parse(userList[0].BlackList);
+                    JArray jsData = JArray.Parse(userInfo.BlackList);
 
                     List<string> idList = jsData.ToObject<List<string>>();
 
@@ -648,7 +649,7 @@ namespace UserService
                             rData.Result = 1;
 
                             // 檢查是否有在好友名單中
-                            JArray jsFriendData = JArray.Parse(userList[0].FriendList);
+                            JArray jsFriendData = JArray.Parse(userInfo.FriendList);
 
                             List<string> friendList = jsFriendData.ToObject<List<string>>();
 
@@ -740,10 +741,10 @@ namespace UserService
 
             try
             {
-                List<UserAccount> infoList = dbConnect.GetSql().Queryable<UserAccount>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).ToList();
+                UserAccount account = dbConnect.GetSql().Queryable<UserAccount>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).Single();
 
                 // 有找到資料
-                if (infoList.Count() == 1)
+                if (account != null)
                 {
                     if (dbConnect.GetSql().Updateable<UserAccount>().SetColumns(it => new UserAccount() { NotifyToken = packet.NotifyToken }).With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).ExecuteCommand() > 0)
                     {
