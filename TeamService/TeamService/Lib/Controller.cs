@@ -35,7 +35,7 @@ namespace TeamService
 
         private object msgLock = new object();
 
-        private string version = "Team027";
+        private string version = "Team028";
 
         public Controller(Form1 fm1)
         {
@@ -189,6 +189,13 @@ namespace TeamService
                                         JoinOrLeaveTeam joinOrLeaveMsg = JsonConvert.DeserializeObject<JoinOrLeaveTeam>(packetData);
 
                                         sReturn = OnJoinOrLeaveTeam(joinOrLeaveMsg);
+
+                                        break;
+
+                                    case (int)C2S_CmdID.emKickTeamMember:
+                                        KickTeamMember kickMsg = JsonConvert.DeserializeObject<KickTeamMember>(packetData);
+
+                                        sReturn = OnKickTeamMember(kickMsg);
 
                                         break;
 
@@ -1949,6 +1956,123 @@ namespace TeamService
 
             return jsMain.ToString();
         }
+
+        /**
+         * 踢離車隊成員
+         */
+        private string OnKickTeamMember(KickTeamMember packet)
+        {
+            KickTeamMemberResult rData = new KickTeamMemberResult();
+
+            try
+            {
+                TeamData teamData = dbConnect.GetSql().Queryable<TeamData>().With(SqlSugar.SqlWith.RowLock).Where(it => it.TeamID == packet.TeamID).Single();
+
+                // 有找到車隊
+                if (teamData != null)
+                {
+                    JArray jsData = JArray.Parse(packet.KickIdList);
+                    List<string> idList = jsData.ToObject<List<string>>();
+
+                    JArray jsViceLeaderList = JArray.Parse(teamData.TeamViceLeaderIDs);
+                    List<string> viceLeaderList = jsViceLeaderList.ToObject<List<string>>();
+
+                    JArray jsMemberList = JArray.Parse(teamData.TeamMemberIDs);
+                    List<string> memberList = jsMemberList.ToObject<List<string>>();
+
+                    // 踢人的人為隊長
+                    if (packet.MemberID == teamData.Leader)
+                    {
+                        bool checkSuccess = true;
+
+                        // 先做列表檢查
+                        for (int idx = 0; idx < idList.Count(); idx++)
+                        {
+                            // 被踢成員若為隊長 或 自己踢自己 或被踢的人非車隊成員
+                            if (idList[idx] == teamData.Leader
+                                || idList[idx] == packet.MemberID
+                                || (!viceLeaderList.Contains(packet.MemberID) && !memberList.Contains(packet.MemberID) && idList[idx] != teamData.Leader))
+                            {
+                                checkSuccess = false;
+
+                                log.SaveLog($"[Warning] Controller::OnKickTeamMember, Kick Member:{idList[idx]} Fail");
+
+                                break;
+                            }
+                        }
+
+                        // 檢查成功
+                        if (checkSuccess)
+                        {
+                            for (int idx = 0; idx < idList.Count(); idx++)
+                            {
+                                if (viceLeaderList.Contains(idList[idx]))
+                                {
+                                    // 從副隊長列表中移除
+                                    UpdateViceLeaderList newViceInfo = new UpdateViceLeaderList
+                                    {
+                                        TeamID = packet.TeamID,
+                                        Action = -1,
+                                        MemberID = packet.MemberID
+                                    };
+
+                                    OnUpdateViceLeaderList(newViceInfo);
+                                }
+                                else if (memberList.Contains(idList[idx]))
+                                {
+                                    // 從車隊隊員列表中移除
+                                    UpdateTeamMemberList newMemberInfo = new UpdateTeamMemberList
+                                    {
+                                        TeamID = packet.TeamID,
+                                        Action = -1,
+                                        MemberID = idList[idx]
+                                    };
+
+                                    OnUpdateTeamMemberList(newMemberInfo);
+                                }
+                                else
+                                {
+                                    log.SaveLog($"[Warning] Controller::OnKickTeamMember, Can Not Find Member:{idList[idx]}");
+                                }
+                            }
+                        }
+                        else
+                        {
+                            rData.Result = 0;
+
+                            log.SaveLog($"[Warning] Controller::OnKickTeamMember, Check Kick List Fail");
+                        }
+
+                    }
+                    else
+                    {
+                        rData.Result = 2;
+
+                        log.SaveLog($"[Warning] Controller::OnKickTeamMember, Member:{packet.MemberID} Not Leader Or Vice Leader");
+
+                    }
+                }
+                else
+                {
+                    rData.Result = 0;
+
+                    log.SaveLog($"[Warning] Controller::OnKickTeamMember, Can Not Find Team:{packet.TeamID}");
+                }
+            }
+            catch (Exception ex)
+            {
+                log.SaveLog("[Error] Controller::OnKickTeamMember Catch Error, Msg:" + ex.Message);
+
+                rData.Result = 0;
+            }
+
+            JObject jsMain = new JObject();
+            jsMain.Add("CmdID", (int)S2C_CmdID.emKickTeamMemberResult);
+            jsMain.Add("Data", JsonConvert.DeserializeObject<JObject>(JsonConvert.SerializeObject(rData)));
+
+            return jsMain.ToString();
+        }
+
     }
 
 }

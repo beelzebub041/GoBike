@@ -14,6 +14,7 @@ namespace TeamPacket.ServerToClient
         emDeleteTeamResult,
         emJoinOrLeaveTeamActivityResult,
         emJoinOrLeaveTeamResult,
+        emKickTeamMemberResult,
 
     }
 
@@ -209,6 +210,18 @@ namespace TeamPacket.ServerToClient
 
     }
 
+    // 踢離車隊成員結果
+    class KickTeamMemberResult
+    {
+
+        /*
+        * 0: 失敗
+        * 1: 成功
+        * 2: 權限不足
+        */
+        public int Result { get; set; }
+
+    }
 
 }
 
@@ -227,6 +240,7 @@ namespace TeamPacket.ClientToServer
         emDeleteTeam,
         emJoinOrLeaveTeamActivity,
         emJoinOrLeaveTeam,
+        emKickTeamMember,
 
     }
 
@@ -515,6 +529,21 @@ namespace TeamPacket.ClientToServer
 
         // 加入或離開的會員的MemberID
         public string MemberID { get; set; }
+    }
+
+    /*
+    * 踢離車隊成員
+    */
+    class KickTeamMember
+    {
+        // 車隊ID
+        public string TeamID { get; set; }
+
+        // 踢人的會員的MemberID
+        public string MemberID { get; set; }
+
+        // 被踢的會員的MemberID 列表
+        public string KickIdList { get; set; }
     }
 
 }

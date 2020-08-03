@@ -116,10 +116,6 @@ namespace Tools.NotifyMessage
             {
                 try
                 {
-                    ///string deviceId = "/topics/weather";
-
-                    //string deviceId = "fCcGh_PCRP-jXBFLtOTY8x:APA91bFwTIbqiuLAWaXhdD98pu5cKGC0ZPSeyn9K5-4Ptp2dBIGXLj5G7pn281Vio0Q-E2pgeMqRkx8NHab3g2YQ_s-xgmhHcuW7bpCRffuBJrl1nWK7zMF37MqP3HMetgizWu15ybWr";
-
                     WebRequest tRequest = WebRequest.Create("https://fcm.googleapis.com/fcm/send");
                     tRequest.Method = "post";
                     tRequest.ContentType = "application/json";
