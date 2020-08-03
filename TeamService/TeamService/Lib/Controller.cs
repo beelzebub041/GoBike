@@ -1767,14 +1767,6 @@ namespace TeamService
                             {
                                 rData.Result = 1;
 
-                                string userNickName = userInfo != null ? userInfo.NickName : "未定義";
-
-                                string sTitle = $"系統公告";
-
-                                string sNotifyMsg = $"{userNickName} 加入 {teamData.TeamName}";
-
-                                ntMsg.NotifyMsgToDevice(teamData.TeamID, sTitle, sNotifyMsg);
-
                                 log.SaveLog($"[Info] Controller::OnJoinOrLeaveTeam, Remove Member:{packet.MemberID} From Team:{packet.TeamID}'s ApplyJoinList Success");
                             }
                             else
@@ -1817,6 +1809,36 @@ namespace TeamService
                                     // 更新新加入會員的車隊列表
                                     UpdateUserTeamList(packet.MemberID, packet.TeamID, 1);
 
+                                    List<string> notifyTargetList = GetAllMemberID(teamData);
+                                    notifyTargetList.Remove(packet.MemberID);
+
+                                    string userNickName = userInfo != null ? userInfo.NickName : "未定義";
+
+                                    for (int idx = 0; idx < notifyTargetList.Count(); idx++)
+                                    {
+                                        string targetID = notifyTargetList[idx];
+
+                                        // 收到公告的人
+                                        UserAccount account = dbConnect.GetSql().Queryable<UserAccount>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == targetID).Single();
+
+                                        if (account != null)
+                                        {
+                                            string sTitle = $"車隊公告";
+
+                                            string sNotifyMsg = $"{userNickName} 加入 {teamData.TeamName}";
+
+                                            if (targetID == packet.MemberID)
+                                            {
+                                                sTitle = $"系統公告";
+
+                                                sNotifyMsg = $"您已加入車隊: {teamData.TeamName}";
+                                            }
+
+                                            ntMsg.NotifyMsgToDevice(account.NotifyToken, sTitle, sNotifyMsg);
+                                        }
+
+                                    }
+
                                 }
                                 else
                                 {
@@ -1850,18 +1872,40 @@ namespace TeamService
                             {
                                 rData.Result = 1;
 
-                                string userNickName = userInfo != null ? userInfo.NickName : "未定義";
-
-                                string sTitle = $"系統公告";
-
-                                string sNotifyMsg = $"{userNickName} 離開 {teamData.TeamName}";
-
-                                ntMsg.NotifyMsgToDevice(teamData.TeamID, sTitle, sNotifyMsg);
-
                                 log.SaveLog($"[Info] Controller::OnJoinOrLeaveTeam, Remove Member:{packet.MemberID} To Team:{packet.TeamID}'s TeamMemberIDs Success");
 
                                 // 更新新加入會員的車隊列表
                                 UpdateUserTeamList(packet.MemberID, packet.TeamID, -1);
+
+                                List<string> notifyTargetList = GetAllMemberID(teamData);
+                                notifyTargetList.Add(packet.MemberID);
+
+                                string userNickName = userInfo != null ? userInfo.NickName : "未定義";
+
+                                for (int idx = 0; idx < notifyTargetList.Count(); idx++)
+                                {
+                                    string targetID = notifyTargetList[idx];
+
+                                    // 收到公告的人
+                                    UserAccount account = dbConnect.GetSql().Queryable<UserAccount>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == targetID).Single();
+
+                                    if (account != null)
+                                    {
+                                        string sTitle = $"車隊公告";
+
+                                        string sNotifyMsg = $"{userNickName} 離開 {teamData.TeamName}";
+
+                                        if (targetID == packet.MemberID)
+                                        {
+                                            sTitle = $"系統公告";
+
+                                            sNotifyMsg = $"您已離開車隊: {teamData.TeamName}";
+                                        }
+
+                                        ntMsg.NotifyMsgToDevice(account.NotifyToken, sTitle, sNotifyMsg);
+                                    }
+
+                                }
 
                             }
                             else
