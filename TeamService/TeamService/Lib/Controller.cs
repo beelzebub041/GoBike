@@ -35,7 +35,7 @@ namespace TeamService
 
         private object msgLock = new object();
 
-        private string version = "Team026";
+        private string version = "Team027";
 
         public Controller(Form1 fm1)
         {
