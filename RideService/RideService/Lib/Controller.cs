@@ -12,9 +12,11 @@ using Newtonsoft.Json.Linq;
 using Tools.Logger;
 using Tools.WeekProcess;
 using Tools.NotifyMessage;
+using Tools.RedisHashTransfer;
 
 using DataBaseDef;
 using Connect;
+using StackExchange.Redis;
 
 using RidePacket.ClientToServer;
 using RidePacket.ServerToClient;
@@ -36,11 +38,13 @@ namespace RideService
 
         RedisConnect redis = null;
 
+        RedisHashTransfer hashTransfer = null;
+
         private Server wsServer = null;                 // Web Socket Server
 
         private object msgLock = new object();
 
-        private string version = "Ride008";
+        private string version = "Ride010";
 
 
         public Controller(Form1 fm1)
@@ -76,9 +80,13 @@ namespace RideService
 
                 redis = new RedisConnect(log);
 
+                hashTransfer = new RedisHashTransfer();
+
                 if (dbConnect.Initialize() && dbConnect.Connect() && wsServer.Initialize() 
                     && redis.Initialize() && ntMsg.Initialize())
                 {
+                    redis.Connect();
+
                     bReturn = true;
                 }
 
@@ -248,6 +256,42 @@ namespace RideService
                     {
                         log.SaveLog($"[Info] Controller::OnCreateRideRecord Create {packet.MemberID}'s Ride Record:{newRecord.RideID} Success");
 
+                        redis.GetRedis(8).HashSet($"RideRecord_" + newRecord.RideID, hashTransfer.TransToHashEntryArray(newRecord));
+
+
+                        // ======================= 更新Redis 會員的騎乘ID列表 =======================
+
+                        if (redis.GetRedis(8).KeyExists($"RideIdList_" + packet.MemberID))
+                        {
+                            HashEntry[] rideIdList = redis.GetRedis(8).HashGetAll($"RideIdList_" + packet.MemberID);
+
+                            int curIdx = 1;
+
+                            if (redis.GetRedis(8).HashExists($"RideIdList_" + packet.MemberID, "CurIdx"))
+                            {
+                                curIdx = Convert.ToInt32(redis.GetRedis(8).HashGet($"RideIdList_" + packet.MemberID, "CurIdx"));
+                                curIdx++;
+
+                                redis.GetRedis(8).HashSet($"RideIdList_" + packet.MemberID, "CurIdx", curIdx);
+                            }
+                            else
+                            {
+
+                            }
+
+                            rideIdList.SetValue(new HashEntry(curIdx.ToString(), newRecord.RideID), 0);
+
+                            redis.GetRedis(8).HashSet($"RideIdList_" + packet.MemberID, rideIdList);
+                        }
+                        else
+                        {
+                            HashEntry[] newRideIdList = new HashEntry[2];
+                            newRideIdList.SetValue(new HashEntry("CurIdx", 1), 0);
+                            newRideIdList.SetValue(new HashEntry("1", newRecord.RideID), 1);
+
+                            redis.GetRedis(8).HashSet($"RideIdList_" + packet.MemberID, newRideIdList);
+                        }
+
                         // ======================= 更新騎乘資料 =======================
                         rideData.TotalDistance += packet.Distance;
                         rideData.TotalAltitude += packet.Altitude;
@@ -255,6 +299,8 @@ namespace RideService
 
                         if (dbConnect.GetSql().Updateable<RideData>(rideData).With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).ExecuteCommand() > 0)
                         {
+                            redis.GetRedis(8).HashSet($"RideData_"+ packet.MemberID, hashTransfer.TransToHashEntryArray(rideData));
+                            
                             log.SaveLog($"[Info] Controller::OnCreateRideRecord Update MemberID:{packet.MemberID}'s Ride Data Success");
                         }
                         else
@@ -266,15 +312,17 @@ namespace RideService
                         string firsDay = weekProcess.GetWeekFirstDay(DateTime.UtcNow);
                         string lastDay = weekProcess.GetWeekLastDay(DateTime.UtcNow);
 
-                        List<WeekRideData> wRideDataList = dbConnect.GetSql().Queryable<WeekRideData>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID && it.WeekFirstDay == firsDay && it.WeekLastDay == lastDay).ToList();
+                        WeekRideData curWeekRideData = dbConnect.GetSql().Queryable<WeekRideData>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID && it.WeekFirstDay == firsDay && it.WeekLastDay == lastDay).Single();
 
                         // 有找到資料
-                        if (wRideDataList.Count() == 1)
+                        if (curWeekRideData != null)
                         {
-                            wRideDataList[0].WeekDistance += packet.Distance;
+                            curWeekRideData.WeekDistance += packet.Distance;
 
-                            if (dbConnect.GetSql().Updateable<WeekRideData>(wRideDataList[0]).With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID && it.WeekFirstDay == firsDay && it.WeekLastDay == lastDay).ExecuteCommand() > 0)
+                            if (dbConnect.GetSql().Updateable<WeekRideData>(curWeekRideData).With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID && it.WeekFirstDay == firsDay && it.WeekLastDay == lastDay).ExecuteCommand() > 0)
                             {
+                                redis.GetRedis(8).HashSet($"CurWeekRideData_" + packet.MemberID, hashTransfer.TransToHashEntryArray(curWeekRideData));
+
                                 log.SaveLog($"[Info] Controller::ODnCreateRideRecord Update MemberID:{packet.MemberID}'s Week({firsDay} To {lastDay}) Ride Data Success");
                             }
                             else
@@ -295,6 +343,12 @@ namespace RideService
 
                             if (dbConnect.GetSql().Insertable(updateWeek).With(SqlSugar.SqlWith.TabLockX).ExecuteCommand() > 0)
                             {
+                                var lastWeekRideData = redis.GetRedis(8).HashGetAll($"LastWeekRideData_" + packet.MemberID);
+
+                                redis.GetRedis(8).HashSet($"LastWeekRideData_" + packet.MemberID, lastWeekRideData);
+
+                                redis.GetRedis(8).HashSet($"CurWeekRideData_" + packet.MemberID, hashTransfer.TransToHashEntryArray(curWeekRideData));
+
                                 log.SaveLog($"[Info] Controller::ODnCreateRideRecord Create MemberID:{packet.MemberID}'s Week({firsDay} To {lastDay}) Ride Data Success");
 
                             }
@@ -354,7 +408,7 @@ namespace RideService
                     if (packet.Action == 1)
                     {
                         // 該組隊不存在
-                        if (!redis.GetRedis().KeyExists(sRideGroupKey))
+                        if (!redis.GetRedis(0).KeyExists(sRideGroupKey))
                         {
                             JArray jsInviteList = JArray.Parse(packet.InviteList);
                             List<string> InviteList = jsInviteList.ToObject<List<string>>();
@@ -367,7 +421,7 @@ namespace RideService
                             jsGroupData.Add("InviteList", jsInviteList);
                             jsGroupData.Add("MemberList", JArray.FromObject(MemberList).ToString());
 
-                            if (redis.GetRedis().StringSet(sRideGroupKey, jsGroupData.ToString())) {
+                            if (redis.GetRedis(0).StringSet(sRideGroupKey, jsGroupData.ToString())) {
 
                                 rData.Result = 1;
 
@@ -383,7 +437,7 @@ namespace RideService
                                     jsMemberData.Add("CoordinateY", "");
 
                                     // 建立成員的Redis資料
-                                    if (redis.GetRedis().StringSet(sMemberKey, jsMemberData.ToString()))
+                                    if (redis.GetRedis(0).StringSet(sMemberKey, jsMemberData.ToString()))
                                     {
                                         log.SaveLog($"[Info] Controller::OnUpdateRideGroup Create Ride Group: {sRideGroupKey}'s Member:{InviteList[idx]} Success");
                                     }
@@ -432,10 +486,10 @@ namespace RideService
                     else if (packet.Action == -1)
                     {
                         // 該組隊存在
-                        if (redis.GetRedis().KeyExists(sRideGroupKey))
+                        if (redis.GetRedis(0).KeyExists(sRideGroupKey))
                         {
                             // 刪除Redis資料
-                            if(redis.GetRedis().KeyDelete(sRideGroupKey))
+                            if(redis.GetRedis(0).KeyDelete(sRideGroupKey))
                             {
                                 rData.Result = 1;
 
@@ -510,11 +564,11 @@ namespace RideService
                     replyMemberNickName = userInfo.NickName;
 
                     // 該組隊成員存在
-                    if (redis.GetRedis().KeyExists(sMemberKey))
+                    if (redis.GetRedis(0).KeyExists(sMemberKey))
                     {
                         if (packet.Action == 1)
                         {
-                            string MemberData = redis.GetRedis().StringGet(sMemberKey);
+                            string MemberData = redis.GetRedis(0).StringGet(sMemberKey);
 
                             JObject jsMemberData = JObject.Parse(MemberData);
 
@@ -522,9 +576,9 @@ namespace RideService
                             {
                                 string sRideGroupKey = jsMemberData["RideGroupKey"].ToString();
 
-                                if (redis.GetRedis().KeyExists(sRideGroupKey))
+                                if (redis.GetRedis(0).KeyExists(sRideGroupKey))
                                 {
-                                    string GroupData = redis.GetRedis().StringGet(sRideGroupKey);
+                                    string GroupData = redis.GetRedis(0).StringGet(sRideGroupKey);
 
                                     leaderAccount = dbConnect.GetSql().Queryable<UserAccount>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).Single();
                                     leaderUserInfo = dbConnect.GetSql().Queryable<UserInfo>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).Single();
@@ -550,7 +604,7 @@ namespace RideService
 
                                             GroupData = jsGroupData.ToString();
 
-                                            if (redis.GetRedis().StringSet(sRideGroupKey, GroupData))
+                                            if (redis.GetRedis(0).StringSet(sRideGroupKey, GroupData))
                                             {
                                                 rData.Result = 1;
 
@@ -599,7 +653,7 @@ namespace RideService
                         else if (packet.Action == -1)
                         {
                             // 刪除Redis資料
-                            if (redis.GetRedis().KeyDelete(sMemberKey))
+                            if (redis.GetRedis(0).KeyDelete(sMemberKey))
                             {
                                 rData.Result = 1;
 
@@ -685,24 +739,24 @@ namespace RideService
                     string sMemberKey = $"GroupMember_{packet.MemberID}";
 
                     // 該組隊成員存在
-                    if (redis.GetRedis().KeyExists(sMemberKey))
+                    if (redis.GetRedis(0).KeyExists(sMemberKey))
                     {
-                        string MemberData = redis.GetRedis().StringGet(sMemberKey);
+                        string MemberData = redis.GetRedis(0).StringGet(sMemberKey);
 
                         JObject jsMemberData = JObject.Parse(MemberData);
 
-                        if (redis.GetRedis().KeyExists(jsMemberData["RideGroupKey"].ToString()))
+                        if (redis.GetRedis(0).KeyExists(jsMemberData["RideGroupKey"].ToString()))
                         {
                             jsMemberData["CoordinateX"] = packet.CoordinateX;
                             jsMemberData["CoordinateY"] = packet.CoordinateY;
 
-                            if (redis.GetRedis().StringSet(sMemberKey, jsMemberData.ToString()))
+                            if (redis.GetRedis(0).StringSet(sMemberKey, jsMemberData.ToString()))
                             {
                                 rData.Result = 1;
 
                                 log.SaveLog($"[Info] Controller::OnUpdateCoordinate, Update Member:{packet.MemberID}'s Coordinate: {packet.CoordinateX}, {packet.CoordinateY} Success");
 
-                                string sGroupData = redis.GetRedis().StringGet("RideGroupKey");
+                                string sGroupData = redis.GetRedis(0).StringGet("RideGroupKey");
 
                                 JObject jsGroupData = JObject.Parse(sGroupData);
 
@@ -794,9 +848,9 @@ namespace RideService
                     string sMemberKey = $"GroupMember_{packet.MemberID}";
 
                     // 該組隊成員存在
-                    if (redis.GetRedis().KeyExists(sMemberKey))
+                    if (redis.GetRedis(0).KeyExists(sMemberKey))
                     {
-                        string MemberData = redis.GetRedis().StringGet(sMemberKey);
+                        string MemberData = redis.GetRedis(0).StringGet(sMemberKey);
 
                         JObject jsMemberData = JObject.Parse(MemberData);
 
@@ -805,9 +859,9 @@ namespace RideService
                             string sRideGroupKey = jsMemberData["RideGroupKey"].ToString();
 
                             // 該組隊騎乘存在
-                            if (redis.GetRedis().KeyExists(sRideGroupKey))
+                            if (redis.GetRedis(0).KeyExists(sRideGroupKey))
                             {
-                                string GroupData = redis.GetRedis().StringGet(sRideGroupKey);
+                                string GroupData = redis.GetRedis(0).StringGet(sRideGroupKey);
 
                                 JObject jsGroupData = JObject.Parse(GroupData);
 
