@@ -6,10 +6,13 @@ using System.Threading.Tasks;
 
 using System.Windows.Forms;
 
+using StackExchange.Redis;
+
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
 using Tools.Logger;
+using Tools.RedisHashTransfer;
 
 using DataBaseDef;
 using Connect;
@@ -30,9 +33,13 @@ namespace UserService
 
         private Server wsServer = null;                 // Web Socket Server
 
+        RedisConnect redis = null;
+
+        RedisHashTransfer hashTransfer = null;
+
         private object msgLock = new object();
 
-        private string version = "User025";
+        private string version = "User027";
 
 
         public Controller(Form1 fm1)
@@ -62,8 +69,14 @@ namespace UserService
 
                 dbConnect = new DataBaseConnect(log);
 
-                if (dbConnect.Initialize() && dbConnect.Connect() && wsServer.Initialize())
+                redis = new RedisConnect(log);
+
+                hashTransfer = new RedisHashTransfer();
+
+                if (dbConnect.Initialize() && dbConnect.Connect() && wsServer.Initialize() && redis.Initialize())
                 {
+                    redis.Connect();
+
                     bReturn = true;
                 }
                 else
@@ -232,8 +245,8 @@ namespace UserService
                             MemberID = "Dblha-" + guidList[0],        // 取GUID前8碼
                             Email = packet.Email,
                             Password = packet.Password,
-                            FBToken = packet.FBToken,
-                            GoogleToken = packet.GoogleToken,
+                            FBToken = packet.FBToken != null ? packet.FBToken : "",
+                            GoogleToken = packet.GoogleToken != null ? packet.GoogleToken : "",
                             NotifyToken = "",
                             RegisterSource = packet.RegisterSource,
                             RegisterDate = dateTime,
@@ -275,6 +288,10 @@ namespace UserService
                                 dbConnect.GetSql().Insertable(data).With(SqlSugar.SqlWith.TabLockX).ExecuteCommand() > 0)
                             {
                                 rData.Result = 1;
+
+                                redis.GetRedis((int)Connect.RedisDB.emRedisDB_User).HashSet($"UserAccount_" + newAccount.Email, hashTransfer.TransToHashEntryArray(newAccount));
+                                redis.GetRedis((int)Connect.RedisDB.emRedisDB_User).HashSet($"UserInfo_" + info.MemberID, hashTransfer.TransToHashEntryArray(info));
+                                redis.GetRedis((int)Connect.RedisDB.emRedisDB_Ride).HashSet($"RideData_" + data.MemberID, hashTransfer.TransToHashEntryArray(data));
 
                                 log.SaveLog($"[Info] Controller::OnCreateNewAccount Create New Account Success");
                             }
@@ -407,12 +424,14 @@ namespace UserService
                     userInfo.Mobile = packet.UpdateData.Mobile == null ? userInfo.Mobile : packet.UpdateData.Mobile;
                     userInfo.Gender = packet.UpdateData.Gender == 0 ? userInfo.Gender : packet.UpdateData.Gender;
                     userInfo.County = packet.UpdateData.Country == 0 ? userInfo.County : packet.UpdateData.Country;
-                    userInfo.SpecificationModel = packet.UpdateData.SpecificationModel == "" ? userInfo.SpecificationModel : packet.UpdateData.SpecificationModel;
+                    userInfo.SpecificationModel = packet.UpdateData.SpecificationModel == null ? userInfo.SpecificationModel : packet.UpdateData.SpecificationModel;
 
                     if (dbConnect.GetSql().Updateable<UserInfo>(userInfo).With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).ExecuteCommand() > 0)
                     {
                         rData.Result = 1;
-                        
+
+                        redis.GetRedis((int)Connect.RedisDB.emRedisDB_User).HashSet($"UserInfo_" + userInfo.MemberID, hashTransfer.TransToHashEntryArray(userInfo));
+
                         log.SaveLog($"[Info] Controller::OnUpdateUserInfo Update User: {packet.MemberID} Info Success");
 
                     }
@@ -490,6 +509,9 @@ namespace UserService
                         if (dbConnect.GetSql().Updateable<UserAccount>().SetColumns(it => new UserAccount() { Password = packet.NewPassword }).With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).ExecuteCommand() > 0)
                         {
                             rData.Result = 1;
+
+                            account.Password = packet.NewPassword;
+                            redis.GetRedis((int)Connect.RedisDB.emRedisDB_User).HashSet($"UserAccount_" + account.Email, hashTransfer.TransToHashEntryArray(account));
 
                             log.SaveLog($"[Warning] Controller::OnUpdateUserInfo Member:{packet.MemberID} Update Password Success ");
                         }
@@ -586,6 +608,9 @@ namespace UserService
                         if (dbConnect.GetSql().Updateable<UserInfo>().SetColumns(it => new UserInfo() { FriendList = jsNew.ToString() }).With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).ExecuteCommand() > 0)
                         {
                             rData.Result = 1;
+
+                            userInfo.FriendList = jsNew.ToString();
+                            redis.GetRedis((int)Connect.RedisDB.emRedisDB_User).HashSet($"UserInfo_" + userInfo.MemberID, hashTransfer.TransToHashEntryArray(userInfo));
 
                             log.SaveLog($"[Error] Controller::OnUpdateFriendList Member: {packet.MemberID} Update FriendList Success");
 
@@ -700,6 +725,9 @@ namespace UserService
                         {
                             rData.Result = 1;
 
+                            userInfo.BlackList = jsNew.ToString();
+                            redis.GetRedis((int)Connect.RedisDB.emRedisDB_User).HashSet($"UserInfo_" + userInfo.MemberID, hashTransfer.TransToHashEntryArray(userInfo));
+
                             log.SaveLog($"[Error] Controller::OnUpdateBlackList Member: {packet.MemberID} Update BlackList Success");
                         }
                         else
@@ -749,6 +777,9 @@ namespace UserService
                     if (dbConnect.GetSql().Updateable<UserAccount>().SetColumns(it => new UserAccount() { NotifyToken = packet.NotifyToken }).With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).ExecuteCommand() > 0)
                     {
                         rData.Result = 1;
+
+                        account.NotifyToken = packet.NotifyToken;
+                        redis.GetRedis((int)Connect.RedisDB.emRedisDB_User).HashSet($"UserAccount_" + account.MemberID, hashTransfer.TransToHashEntryArray(account));
 
                         log.SaveLog($"[Info] Controller::OnUpdateNotifyToken Update User: {packet.MemberID} Info Success");
 
