@@ -13,6 +13,26 @@ using Tools.Logger;
 
 namespace Connect
 {
+    public enum RedisDB : int
+    {
+        emRedisDB_RideGroup = 0,
+        emRedisDB_1,
+        emRedisDB_2,
+        emRedisDB_3,
+        emRedisDB_4,
+        emRedisDB_5,
+        emRedisDB_6,
+        emRedisDB_User,
+        emRedisDB_Ride,
+        emRedisDB_Team,
+        emRedisDB_10,
+        emRedisDB_11,
+        emRedisDB_12,
+        emRedisDB_13,
+        emRedisDB_14,
+        emRedisDB_15,
+    }
+    
     class RedisConnect
     {
         [DllImport("kernel32")]

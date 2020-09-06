@@ -256,23 +256,22 @@ namespace RideService
                     {
                         log.SaveLog($"[Info] Controller::OnCreateRideRecord Create {packet.MemberID}'s Ride Record:{newRecord.RideID} Success");
 
-                        redis.GetRedis(8).HashSet($"RideRecord_" + newRecord.RideID, hashTransfer.TransToHashEntryArray(newRecord));
-
+                        redis.GetRedis((int)Connect.RedisDB.emRedisDB_Ride).HashSet($"RideRecord_" + newRecord.RideID, hashTransfer.TransToHashEntryArray(newRecord));
 
                         // ======================= 更新Redis 會員的騎乘ID列表 =======================
 
-                        if (redis.GetRedis(8).KeyExists($"RideIdList_" + packet.MemberID))
+                        if (redis.GetRedis((int)Connect.RedisDB.emRedisDB_Ride).KeyExists($"RideIdList_" + packet.MemberID))
                         {
-                            HashEntry[] rideIdList = redis.GetRedis(8).HashGetAll($"RideIdList_" + packet.MemberID);
+                            HashEntry[] rideIdList = redis.GetRedis((int)Connect.RedisDB.emRedisDB_Ride).HashGetAll($"RideIdList_" + packet.MemberID);
 
                             int curIdx = 1;
 
-                            if (redis.GetRedis(8).HashExists($"RideIdList_" + packet.MemberID, "CurIdx"))
+                            if (redis.GetRedis((int)Connect.RedisDB.emRedisDB_Ride).HashExists($"RideIdList_" + packet.MemberID, "CurIdx"))
                             {
-                                curIdx = Convert.ToInt32(redis.GetRedis(8).HashGet($"RideIdList_" + packet.MemberID, "CurIdx"));
+                                curIdx = Convert.ToInt32(redis.GetRedis((int)Connect.RedisDB.emRedisDB_Ride).HashGet($"RideIdList_" + packet.MemberID, "CurIdx"));
                                 curIdx++;
 
-                                redis.GetRedis(8).HashSet($"RideIdList_" + packet.MemberID, "CurIdx", curIdx);
+                                redis.GetRedis((int)Connect.RedisDB.emRedisDB_Ride).HashSet($"RideIdList_" + packet.MemberID, "CurIdx", curIdx);
                             }
                             else
                             {
@@ -281,7 +280,7 @@ namespace RideService
 
                             rideIdList.SetValue(new HashEntry(curIdx.ToString(), newRecord.RideID), 0);
 
-                            redis.GetRedis(8).HashSet($"RideIdList_" + packet.MemberID, rideIdList);
+                            redis.GetRedis((int)Connect.RedisDB.emRedisDB_Ride).HashSet($"RideIdList_" + packet.MemberID, rideIdList);
                         }
                         else
                         {
@@ -289,7 +288,7 @@ namespace RideService
                             newRideIdList.SetValue(new HashEntry("CurIdx", 1), 0);
                             newRideIdList.SetValue(new HashEntry("1", newRecord.RideID), 1);
 
-                            redis.GetRedis(8).HashSet($"RideIdList_" + packet.MemberID, newRideIdList);
+                            redis.GetRedis((int)Connect.RedisDB.emRedisDB_Ride).HashSet($"RideIdList_" + packet.MemberID, newRideIdList);
                         }
 
                         // ======================= 更新騎乘資料 =======================
@@ -299,7 +298,7 @@ namespace RideService
 
                         if (dbConnect.GetSql().Updateable<RideData>(rideData).With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).ExecuteCommand() > 0)
                         {
-                            redis.GetRedis(8).HashSet($"RideData_"+ packet.MemberID, hashTransfer.TransToHashEntryArray(rideData));
+                            redis.GetRedis((int)Connect.RedisDB.emRedisDB_Ride).HashSet($"RideData_"+ packet.MemberID, hashTransfer.TransToHashEntryArray(rideData));
                             
                             log.SaveLog($"[Info] Controller::OnCreateRideRecord Update MemberID:{packet.MemberID}'s Ride Data Success");
                         }
@@ -321,7 +320,7 @@ namespace RideService
 
                             if (dbConnect.GetSql().Updateable<WeekRideData>(curWeekRideData).With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID && it.WeekFirstDay == firsDay && it.WeekLastDay == lastDay).ExecuteCommand() > 0)
                             {
-                                redis.GetRedis(8).HashSet($"CurWeekRideData_" + packet.MemberID, hashTransfer.TransToHashEntryArray(curWeekRideData));
+                                redis.GetRedis((int)Connect.RedisDB.emRedisDB_Ride).HashSet($"CurWeekRideData_" + packet.MemberID, hashTransfer.TransToHashEntryArray(curWeekRideData));
 
                                 log.SaveLog($"[Info] Controller::ODnCreateRideRecord Update MemberID:{packet.MemberID}'s Week({firsDay} To {lastDay}) Ride Data Success");
                             }
@@ -343,11 +342,11 @@ namespace RideService
 
                             if (dbConnect.GetSql().Insertable(updateWeek).With(SqlSugar.SqlWith.TabLockX).ExecuteCommand() > 0)
                             {
-                                var lastWeekRideData = redis.GetRedis(8).HashGetAll($"LastWeekRideData_" + packet.MemberID);
+                                var lastWeekRideData = redis.GetRedis((int)Connect.RedisDB.emRedisDB_Ride).HashGetAll($"LastWeekRideData_" + packet.MemberID);
 
-                                redis.GetRedis(8).HashSet($"LastWeekRideData_" + packet.MemberID, lastWeekRideData);
+                                redis.GetRedis((int)Connect.RedisDB.emRedisDB_Ride).HashSet($"LastWeekRideData_" + packet.MemberID, lastWeekRideData);
 
-                                redis.GetRedis(8).HashSet($"CurWeekRideData_" + packet.MemberID, hashTransfer.TransToHashEntryArray(curWeekRideData));
+                                redis.GetRedis((int)Connect.RedisDB.emRedisDB_Ride).HashSet($"CurWeekRideData_" + packet.MemberID, hashTransfer.TransToHashEntryArray(curWeekRideData));
 
                                 log.SaveLog($"[Info] Controller::ODnCreateRideRecord Create MemberID:{packet.MemberID}'s Week({firsDay} To {lastDay}) Ride Data Success");
 
