@@ -44,7 +44,7 @@ namespace RideService
 
         private object msgLock = new object();
 
-        private string version = "Ride010";
+        private string version = "Ride011";
 
 
         public Controller(Form1 fm1)
@@ -258,38 +258,7 @@ namespace RideService
 
                         redis.GetRedis((int)Connect.RedisDB.emRedisDB_Ride).HashSet($"RideRecord_" + newRecord.RideID, hashTransfer.TransToHashEntryArray(newRecord));
 
-                        // ======================= 更新Redis 會員的騎乘ID列表 =======================
-
-                        if (redis.GetRedis((int)Connect.RedisDB.emRedisDB_Ride).KeyExists($"RideIdList_" + packet.MemberID))
-                        {
-                            HashEntry[] rideIdList = redis.GetRedis((int)Connect.RedisDB.emRedisDB_Ride).HashGetAll($"RideIdList_" + packet.MemberID);
-
-                            int curIdx = 1;
-
-                            if (redis.GetRedis((int)Connect.RedisDB.emRedisDB_Ride).HashExists($"RideIdList_" + packet.MemberID, "CurIdx"))
-                            {
-                                curIdx = Convert.ToInt32(redis.GetRedis((int)Connect.RedisDB.emRedisDB_Ride).HashGet($"RideIdList_" + packet.MemberID, "CurIdx"));
-                                curIdx++;
-
-                                redis.GetRedis((int)Connect.RedisDB.emRedisDB_Ride).HashSet($"RideIdList_" + packet.MemberID, "CurIdx", curIdx);
-                            }
-                            else
-                            {
-
-                            }
-
-                            rideIdList.SetValue(new HashEntry(curIdx.ToString(), newRecord.RideID), 0);
-
-                            redis.GetRedis((int)Connect.RedisDB.emRedisDB_Ride).HashSet($"RideIdList_" + packet.MemberID, rideIdList);
-                        }
-                        else
-                        {
-                            HashEntry[] newRideIdList = new HashEntry[2];
-                            newRideIdList.SetValue(new HashEntry("CurIdx", 1), 0);
-                            newRideIdList.SetValue(new HashEntry("1", newRecord.RideID), 1);
-
-                            redis.GetRedis((int)Connect.RedisDB.emRedisDB_Ride).HashSet($"RideIdList_" + packet.MemberID, newRideIdList);
-                        }
+                        redis.GetRedis((int)Connect.RedisDB.emRedisDB_Ride).HashSet($"RideIdList_" + packet.MemberID, newRecord.RideID, newRecord.RideID);
 
                         // ======================= 更新騎乘資料 =======================
                         rideData.TotalDistance += packet.Distance;
