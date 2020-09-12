@@ -6,11 +6,14 @@ using System.Threading.Tasks;
 
 using System.Windows.Forms;
 
+using StackExchange.Redis;
+
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
 using Tools.Logger;
 using Tools.NotifyMessage;
+using Tools.RedisHashTransfer;
 
 using DataBaseDef;
 using Connect;
@@ -33,9 +36,13 @@ namespace TeamService
 
         private Server wsServer = null;                 // Web Socket Server
 
+        RedisConnect redis = null;
+
+        RedisHashTransfer hashTransfer = null;
+
         private object msgLock = new object();
 
-        private string version = "Team028";
+        private string version = "Team031";
 
         public Controller(Form1 fm1)
         {
@@ -71,8 +78,14 @@ namespace TeamService
 
                 ntMsg = new NotifyMessage(log);
 
-                if (dbConnect.Initialize() && dbConnect.Connect() && wsServer.Initialize() && ntMsg.Initialize())
+                redis = new RedisConnect(log);
+
+                hashTransfer = new RedisHashTransfer();
+
+                if (dbConnect.Initialize() && dbConnect.Connect() && wsServer.Initialize() && ntMsg.Initialize() && redis.Initialize())
                 {
+                    redis.Connect();
+
                     bReturn = true;
                 }
                 else
@@ -330,6 +343,9 @@ namespace TeamService
 
                     if (dbConnect.GetSql().Updateable<UserInfo>().SetColumns(it => new UserInfo() { TeamList = jsNew.ToString() }).With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == memberID).ExecuteCommand() > 0)
                     {
+                        userInfo.TeamList = jsNew.ToString();
+                        redis.GetRedis((int)Connect.RedisDB.emRedisDB_User).HashSet($"UserInfo_" + userInfo.MemberID, hashTransfer.TransToHashEntryArray(userInfo));
+
                         log.SaveLog($"[Warning] Controller::UpdateUserTeamList, Update User:{memberID} Team List Success");
                     }
                     else
@@ -393,6 +409,8 @@ namespace TeamService
                             rData.Result = 1;
 
                             rData.TeamID = newTeamData.TeamID;
+
+                            redis.GetRedis((int)Connect.RedisDB.emRedisDB_Team).HashSet($"TeamData_" + newTeamData.TeamID, hashTransfer.TransToHashEntryArray(newTeamData));
 
                             log.SaveLog($"[Info] Controller::OnCreateNewTeam, Create Team Success, TeamID:{rData.TeamID}");
 
@@ -472,6 +490,8 @@ namespace TeamService
                         {
                             rData.Result = 1;
 
+                            redis.GetRedis((int)Connect.RedisDB.emRedisDB_Team).HashSet($"TeamData_" + teamData.TeamID, hashTransfer.TransToHashEntryArray(teamData));
+
                         }
                         else
                         {
@@ -544,6 +564,8 @@ namespace TeamService
                                 {
                                     rData.Result = 1;
 
+                                    redis.GetRedis((int)Connect.RedisDB.emRedisDB_Team).HashSet($"TeamData_" + teamData.TeamID, hashTransfer.TransToHashEntryArray(teamData));
+
                                     log.SaveLog($"[Info] Controller::OnChangeLander, Change New Leader:{packet.MemberID} Success");
 
                                     // 舊隊長加入車隊隊員列表
@@ -602,7 +624,7 @@ namespace TeamService
 
                                             string sNotifyMsg = $"{teamData.TeamName} 隊長由 {oldLeaderInfo.NickName} 更換為 {newLeaderInfo.NickName} ";
 
-                                            ntMsg.NotifyMsgToDevice(account.NotifyToken, sTitle, sNotifyMsg);
+                                            ntMsg.NotifyMsgToDevice(targetID, account.NotifyToken, sTitle, sNotifyMsg);
                                         }
 
                                     }
@@ -734,6 +756,9 @@ namespace TeamService
                                 if (dbConnect.GetSql().Updateable<TeamData>().SetColumns(it => new TeamData() { TeamViceLeaderIDs = jsNew.ToString() }).With(SqlSugar.SqlWith.RowLock).Where(it => it.TeamID == packet.TeamID).ExecuteCommand() > 0)
                                 {
                                     rData.Result = 1;
+
+                                    teamData.TeamViceLeaderIDs = jsNew.ToString();
+                                    redis.GetRedis((int)Connect.RedisDB.emRedisDB_Team).HashSet($"TeamData_" + teamData.TeamID, hashTransfer.TransToHashEntryArray(teamData));
 
                                     log.SaveLog($"[Info] Controller::OnUpdateViceLeaderList, Update Vice Leader:{packet.TeamID} Success");
 
@@ -879,6 +904,9 @@ namespace TeamService
                         {
                             rData.Result = 1;
 
+                            teamData.TeamMemberIDs = jsNew.ToString();
+                            redis.GetRedis((int)Connect.RedisDB.emRedisDB_Team).HashSet($"TeamData_" + teamData.TeamID, hashTransfer.TransToHashEntryArray(teamData));
+
                             log.SaveLog($"[Info] Controller::OnUpdateTeamMemberList, Update Team Member:{packet.MemberID} Success");
 
                             UpdateUserTeamList(packet.MemberID, packet.TeamID, packet.Action);
@@ -980,6 +1008,9 @@ namespace TeamService
                         {
                             rData.Result = 1;
 
+                            teamData.ApplyJoinList = jsNew.ToString();
+                            redis.GetRedis((int)Connect.RedisDB.emRedisDB_Team).HashSet($"TeamData_" + teamData.TeamID, hashTransfer.TransToHashEntryArray(teamData));
+
                             JArray jsViceLeader = JArray.Parse(teamData.TeamViceLeaderIDs);
 
                             List<string> notifyTargrtList = jsViceLeader.ToObject<List<string>>();
@@ -998,7 +1029,7 @@ namespace TeamService
 
                                     string sNotifyMsg = $"{userInfo.NickName} 申請加入 {teamData.TeamName}";
 
-                                    ntMsg.NotifyMsgToDevice(account.NotifyToken, sTitle, sNotifyMsg);
+                                    ntMsg.NotifyMsgToDevice(targetID, account.NotifyToken, sTitle, sNotifyMsg);
                                 }
 
                             }
@@ -1108,6 +1139,10 @@ namespace TeamService
                             {
                                 rData.Result = 1;
 
+                                redis.GetRedis((int)Connect.RedisDB.emRedisDB_Team).HashSet($"TeamBulletin_" + newBulletin.BulletinID, hashTransfer.TransToHashEntryArray(newBulletin));
+
+                                redis.GetRedis((int)Connect.RedisDB.emRedisDB_Team).HashSet($"BulletinIdList_" + packet.TeamID, newBulletin.BulletinID, newBulletin.BulletinID);
+
                                 rData.BulletinID = newBulletin.BulletinID;
 
                                 log.SaveLog($"[Info] Controller::OnUpdateBulletin, Create Team Bulletin Success, BulletinID:{rData.BulletinID}");
@@ -1127,7 +1162,7 @@ namespace TeamService
 
                                         string sNotifyMsg = packet.Content;
 
-                                        ntMsg.NotifyMsgToDevice(account.NotifyToken, sTitle, sNotifyMsg);
+                                        ntMsg.NotifyMsgToDevice(targetID, account.NotifyToken, sTitle, sNotifyMsg);
                                     }
 
                                 }
@@ -1153,6 +1188,13 @@ namespace TeamService
                                     {
                                         rData.Result = 1;
 
+                                        if (redis.GetRedis((int)Connect.RedisDB.emRedisDB_Team).KeyExists($"TeamBulletin_" + packet.BulletinID))
+                                        {
+                                            redis.GetRedis((int)Connect.RedisDB.emRedisDB_Team).KeyDelete($"TeamBulletin_" + packet.BulletinID);
+
+                                            redis.GetRedis((int)Connect.RedisDB.emRedisDB_Team).HashDelete($"BulletinIdList_" + packet.TeamID, packet.BulletinID);
+                                        }
+
                                         log.SaveLog($"[Info] Controller::OnUpdateBulletin, Remove Team Bulletin Success, BulletinID:{rData.BulletinID}");
                                     }
                                     else
@@ -1172,6 +1214,8 @@ namespace TeamService
                                     if (dbConnect.GetSql().Updateable<TeamBulletin>(bulletin).With(SqlSugar.SqlWith.RowLock).Where(it => it.BulletinID == packet.BulletinID).ExecuteCommand() > 0)
                                     {
                                         rData.Result = 1;
+
+                                        redis.GetRedis((int)Connect.RedisDB.emRedisDB_Team).HashSet($"TeamBulletin_" + bulletin.BulletinID, hashTransfer.TransToHashEntryArray(bulletin));
 
                                         rSendToNy.Action = 2;
                                         rSendToNy.TeamID = bulletin.TeamID;
@@ -1303,7 +1347,7 @@ namespace TeamService
                                 CreateDate = dateTime,
                                 TeamID = packet.TeamID,
                                 MemberID = packet.MemberID,
-                                MemberList = packet.MemberList,
+                                MemberList = packet.MemberList == null ? "[]" : packet.MemberList,
                                 ActDate = packet.ActDate,
                                 Title = packet.Title,
                                 MeetTime = packet.MeetTime,
@@ -1316,6 +1360,10 @@ namespace TeamService
                             if (dbConnect.GetSql().Insertable(newTeamAct).With(SqlSugar.SqlWith.TabLockX).ExecuteCommand() > 0)
                             {
                                 rData.Result = 1;
+
+                                redis.GetRedis((int)Connect.RedisDB.emRedisDB_Team).HashSet($"TeamActivity_" + newTeamAct.ActID, hashTransfer.TransToHashEntryArray(newTeamAct));
+
+                                redis.GetRedis((int)Connect.RedisDB.emRedisDB_Team).HashSet($"ActIdList_" + packet.TeamID, newTeamAct.ActID, newTeamAct.ActID);
 
                                 rData.ActID = newTeamAct.ActID;
 
@@ -1340,7 +1388,7 @@ namespace TeamService
 
                                         string sNotifyMsg = $"{userInfo.NickName} 建立活動 {packet.Title}";
 
-                                        ntMsg.NotifyMsgToDevice(account.NotifyToken, sTitle, sNotifyMsg);
+                                        ntMsg.NotifyMsgToDevice(targetID, account.NotifyToken, sTitle, sNotifyMsg);
                                     }
 
                                 }
@@ -1369,6 +1417,14 @@ namespace TeamService
                                         {
                                             rData.Result = 1;
 
+                                            if (redis.GetRedis((int)Connect.RedisDB.emRedisDB_Team).KeyExists($"TeamActivity_" + packet.ActID))
+                                            {
+                                                redis.GetRedis((int)Connect.RedisDB.emRedisDB_Team).KeyDelete($"TeamActivity_" + packet.ActID);
+
+                                                redis.GetRedis((int)Connect.RedisDB.emRedisDB_Team).HashDelete($"ActIdList_" + packet.TeamID, packet.ActID);
+
+                                            }
+
                                             log.SaveLog($"[Info] Controller::OnUpdateActivity, Remove Team Activity Success, BulletinID:{rData.ActID}");
                                         }
                                         else
@@ -1393,6 +1449,8 @@ namespace TeamService
                                         if (dbConnect.GetSql().Updateable<TeamActivity>(teamData).With(SqlSugar.SqlWith.RowLock).Where(it => it.ActID == packet.ActID).ExecuteCommand() > 0)
                                         {
                                             rData.Result = 1;
+
+                                            redis.GetRedis((int)Connect.RedisDB.emRedisDB_Team).HashSet($"TeamActivity_" + teamAct.ActID, hashTransfer.TransToHashEntryArray(teamAct));
 
                                             rSendToNy.Action = packet.Action;
                                             rSendToNy.TeamID = teamAct.TeamID;
@@ -1424,7 +1482,7 @@ namespace TeamService
 
                                                     string sNotifyMsg = $"{teamAct.Title} 已更新內容";
 
-                                                    ntMsg.NotifyMsgToDevice(account.NotifyToken, sTitle, sNotifyMsg);
+                                                    ntMsg.NotifyMsgToDevice(targetID, account.NotifyToken, sTitle, sNotifyMsg);
                                                 }
 
                                             }
@@ -1533,6 +1591,8 @@ namespace TeamService
                             // 刪除車隊
                             if (dbConnect.GetSql().Deleteable<TeamData>().With(SqlSugar.SqlWith.TabLockX).Where(it => it.TeamID == packet.TeamID).ExecuteCommand() > 0)
                             {
+                                redis.GetRedis((int)Connect.RedisDB.emRedisDB_Team).KeyDelete($"TeamData_" + packet.TeamID);
+
                                 // 變更車隊成員的車隊列表
                                 JArray jsData = JArray.Parse(teamData.TeamMemberIDs);
 
@@ -1678,6 +1738,9 @@ namespace TeamService
                                 {
                                     rData.Result = 1;
 
+                                    teamAct.MemberList = jsNew.ToString();
+                                    redis.GetRedis((int)Connect.RedisDB.emRedisDB_Team).HashSet($"TeamActivity_" + teamAct.ActID, hashTransfer.TransToHashEntryArray(teamAct));
+
                                     log.SaveLog($"[Info] Controller::OnJoinOrLeaveTeamActivity, Upsate {packet.ActID} To Member List Success");
 
                                     // 若離開的人車隊發起人, 則解散活動
@@ -1774,6 +1837,9 @@ namespace TeamService
                             {
                                 rData.Result = 1;
 
+                                teamData.ApplyJoinList = JArray.FromObject(ApplyList).ToString();
+                                redis.GetRedis((int)Connect.RedisDB.emRedisDB_Team).HashSet($"TeamData_" + teamData.TeamID, hashTransfer.TransToHashEntryArray(teamData));
+
                                 log.SaveLog($"[Info] Controller::OnJoinOrLeaveTeam, Remove Member:{packet.MemberID} From Team:{packet.TeamID}'s ApplyJoinList Success");
                             }
                             else
@@ -1811,6 +1877,9 @@ namespace TeamService
                                 {
                                     rData.Result = 1;
 
+                                    teamData.TeamMemberIDs = jsNew.ToString();
+                                    redis.GetRedis((int)Connect.RedisDB.emRedisDB_Team).HashSet($"TeamData_" + teamData.TeamID, hashTransfer.TransToHashEntryArray(teamData));
+
                                     log.SaveLog($"[Info] Controller::OnJoinOrLeaveTeam, Join Member:{packet.MemberID} To Team:{packet.TeamID}'s TeamMemberIDs Success");
 
                                     // 更新新加入會員的車隊列表
@@ -1841,7 +1910,7 @@ namespace TeamService
                                                 sNotifyMsg = $"您已加入車隊: {teamData.TeamName}";
                                             }
 
-                                            ntMsg.NotifyMsgToDevice(account.NotifyToken, sTitle, sNotifyMsg);
+                                            ntMsg.NotifyMsgToDevice(targetID, account.NotifyToken, sTitle, sNotifyMsg);
                                         }
 
                                     }
@@ -1879,6 +1948,9 @@ namespace TeamService
                             {
                                 rData.Result = 1;
 
+                                teamData.TeamMemberIDs = jsNew.ToString();
+                                redis.GetRedis((int)Connect.RedisDB.emRedisDB_Team).HashSet($"TeamData_" + teamData.TeamID, hashTransfer.TransToHashEntryArray(teamData));
+
                                 log.SaveLog($"[Info] Controller::OnJoinOrLeaveTeam, Remove Member:{packet.MemberID} To Team:{packet.TeamID}'s TeamMemberIDs Success");
 
                                 // 更新新加入會員的車隊列表
@@ -1909,7 +1981,7 @@ namespace TeamService
                                             sNotifyMsg = $"您已離開車隊: {teamData.TeamName}";
                                         }
 
-                                        ntMsg.NotifyMsgToDevice(account.NotifyToken, sTitle, sNotifyMsg);
+                                        ntMsg.NotifyMsgToDevice(targetID, account.NotifyToken, sTitle, sNotifyMsg);
                                     }
 
                                 }

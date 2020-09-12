@@ -6,12 +6,33 @@ using System.Threading.Tasks;
 using System.Runtime.InteropServices;
 
 using StackExchange.Redis;
+using System.Reflection;
 
 using Tools.Logger;
 
 
 namespace Connect
 {
+    public enum RedisDB : int
+    {
+        emRedisDB_RideGroup = 0,
+        emRedisDB_1,
+        emRedisDB_2,
+        emRedisDB_3,
+        emRedisDB_4,
+        emRedisDB_5,
+        emRedisDB_6,
+        emRedisDB_User,
+        emRedisDB_Ride,
+        emRedisDB_Team,
+        emRedisDB_10,
+        emRedisDB_11,
+        emRedisDB_12,
+        emRedisDB_13,
+        emRedisDB_14,
+        emRedisDB_15,
+    }
+    
     class RedisConnect
     {
         [DllImport("kernel32")]
@@ -23,7 +44,7 @@ namespace Connect
 
         private int dbIdx = 0;
 
-        private IDatabase db = null;
+        ConnectionMultiplexer redis = null;
 
         private Logger log = null;
 
@@ -86,16 +107,6 @@ namespace Connect
                     bReturn = false;
                 }
 
-                // DataBase Index
-                if (bReturn && GetPrivateProfileString("CONNECT", "DataBaseIndex", "", temp, 255, configPath) > 0)
-                {
-                    dbIdx = Convert.ToInt32(temp.ToString());
-                }
-                else
-                {
-                    bReturn = false;
-                }
-
             }
             catch
             {
@@ -118,8 +129,7 @@ namespace Connect
             {
                 // 建立連線
                 RedisConnection.Init($"{ip}:{port}");
-                var redis = RedisConnection.Instance.ConnectionMultiplexer;
-                db = redis.GetDatabase(dbIdx);
+                redis = RedisConnection.Instance.ConnectionMultiplexer;
 
                 bReturn = true;
 
@@ -157,8 +167,33 @@ namespace Connect
             return bReturn;
         }
 
-        public IDatabase GetRedis()
+        public IDatabase GetRedis(int dbIdx)
         {
+            IDatabase db = null;
+
+            try
+            {
+                if (-1 < dbIdx && dbIdx < 16)
+                {
+                    if (redis != null)
+                    {
+                        db = redis.GetDatabase(dbIdx);
+                    }
+                    else
+                    {
+                        log.SaveLog("[Warning] RedisConnect::GetRedis redis Object Is Null Error:");
+                    }
+                }
+                else
+                {
+                    log.SaveLog("[Warning] RedisConnect::GetRedis dbIdx Error:" + dbIdx);
+                }
+            }
+            catch (Exception ex)
+            {
+                log.SaveLog("[Error] RedisConnect::GetRedis Catch Error, Msg:" + ex.Message);
+            }
+
             return db;
         }
     }
@@ -198,4 +233,5 @@ namespace Connect
         }
 
     }
+
 }

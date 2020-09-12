@@ -9,6 +9,9 @@ using System.Net;
 using System.IO;
 using System.Web.Script.Serialization;
 
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+
 namespace Tools.NotifyMessage
 {
     class NotifyMessage
@@ -110,12 +113,16 @@ namespace Tools.NotifyMessage
         /**
          * 推播訊息至裝置
          */
-        public void NotifyMsgToDevice(string deviceId, string tit, string msg)
+        public void NotifyMsgToDevice(string memberId, string deviceId, string tit, string msg)
         {
             if (serverKey != "" && senderId != "")
             {
                 try
                 {
+                    JObject jsBody = new JObject();
+                    jsBody.Add("Owner", memberId);
+                    jsBody.Add("Content", msg);
+
                     WebRequest tRequest = WebRequest.Create("https://fcm.googleapis.com/fcm/send");
                     tRequest.Method = "post";
                     tRequest.ContentType = "application/json";
@@ -124,7 +131,7 @@ namespace Tools.NotifyMessage
                         to = deviceId,
                         notification = new
                         {
-                            body = msg,
+                            body = jsBody.ToString(),
                             title = tit,
                             sound = "Enabled"
 
