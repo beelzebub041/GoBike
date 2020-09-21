@@ -42,7 +42,7 @@ namespace TeamService
 
         private object msgLock = new object();
 
-        private string version = "Team031";
+        private string version = "Team032";
 
         public Controller(Form1 fm1)
         {
@@ -738,13 +738,13 @@ namespace TeamService
 
                                     rData.Result = 1;
 
-                                    log.SaveLog($"[Info] Controller::OnUpdateViceLeaderList, Remove Vice Leader:{packet.TeamID} Success");
+                                    log.SaveLog($"[Info] Controller::OnUpdateViceLeaderList, Remove Vice Leader:{packet.MemberID} Success");
                                 }
                                 else
                                 {
                                     rData.Result = 0;
 
-                                    log.SaveLog($"[Info] Controller::OnUpdateViceLeaderList, Can Not Find Vice Leader:{packet.TeamID}");
+                                    log.SaveLog($"[Info] Controller::OnUpdateViceLeaderList, Can Not Find Vice Leader:{packet.MemberID}");
 
                                 }
                             }
@@ -760,7 +760,7 @@ namespace TeamService
                                     teamData.TeamViceLeaderIDs = jsNew.ToString();
                                     redis.GetRedis((int)Connect.RedisDB.emRedisDB_Team).HashSet($"TeamData_" + teamData.TeamID, hashTransfer.TransToHashEntryArray(teamData));
 
-                                    log.SaveLog($"[Info] Controller::OnUpdateViceLeaderList, Update Vice Leader:{packet.TeamID} Success");
+                                    log.SaveLog($"[Info] Controller::OnUpdateViceLeaderList, Update Vice Leader:{packet.MemberID} Success");
 
                                     if (packet.Action == 1)
                                     {
@@ -2063,7 +2063,7 @@ namespace TeamService
                             // 被踢成員若為隊長 或 自己踢自己 或被踢的人非車隊成員
                             if (idList[idx] == teamData.Leader
                                 || idList[idx] == packet.MemberID
-                                || (!viceLeaderList.Contains(packet.MemberID) && !memberList.Contains(packet.MemberID) && idList[idx] != teamData.Leader))
+                                || (!viceLeaderList.Contains(idList[idx]) && !memberList.Contains(idList[idx]) && idList[idx] != teamData.Leader))
                             {
                                 checkSuccess = false;
 
@@ -2085,7 +2085,8 @@ namespace TeamService
                                     {
                                         TeamID = packet.TeamID,
                                         Action = -1,
-                                        MemberID = packet.MemberID
+                                        LeaderID = teamData.Leader,
+                                        MemberID = idList[idx]
                                     };
 
                                     OnUpdateViceLeaderList(newViceInfo);
