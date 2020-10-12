@@ -14,26 +14,34 @@ namespace UserPacket.ServerToClient
 
     // 使用者註冊結果
     class UserRegisteredResult
-    {
-        /*
-        * 0: 註冊失敗
-        * 1: 註冊成功
-        * 2: 帳號重複
-        * 3: 密碼錯誤
-        * 4: 帳號格式不符
-        */
+    {   
+        // 結果定義
+        public enum ResultDefine : int
+        {
+            emResult_Fail = 0,          // 0: 註冊失敗
+            emResult_Success,           // 1: 註冊成功
+            emResult_AccountRepeat,     // 2: 帳號重複
+            emResult_PwdError,          // 3: 密碼錯誤
+            emResult_FormatError,       // 4: 帳號格式不符
+        }
+
+        // 結果
         public int Result { get; set; }
     }
 
     // 使用者登入結果
     class UserLoginResult
     {
-        /*
-        * 0: 登入失敗
-        * 1: 登入成功
-        * 2: 帳號錯誤
-        * 3: 密碼錯誤
-        */
+        // 結果定義
+        public enum ResultDefine : int
+        {
+            emResult_Fail = 0,          // 0: 登入失敗
+            emResult_Success,           // 1: 登入成功
+            emResult_AccountError,      // 2: 帳號錯誤
+            emResult_PwdError,          // 3: 密碼錯誤
+        }
+
+        // 結果
         public int Result { get; set; }
 
         /**
@@ -45,16 +53,28 @@ namespace UserPacket.ServerToClient
     // 更新使用者資訊結果
     class UpdateUserInfoResult
     {
-        /*
-        * 0: 更新失敗
-        * 1: 更新成功
-        */
+        // 結果定義
+        public enum ResultDefine : int
+        {
+            emResult_Fail = 0,          // 0: 更新失敗
+            emResult_Success,           // 1: 更新成功
+        }
+
+        // 結果
         public int Result { get; set; }
     }
 
     // 更新密碼結果
     class UpdatePasswordResult
     {
+        // 結果定義
+        public enum ResultDefine : int
+        {
+            emResult_Fail = 0,          // 0: 更新失敗
+            emResult_Success,           // 1: 更新成功
+            emResult_OldPwdError,       // 2: 舊密碼錯誤
+        }
+
         /**
          * 動作
          * 0: 無動作
@@ -63,11 +83,7 @@ namespace UserPacket.ServerToClient
          */
         public int Action { get; set; }
 
-        /*
-        * 0: 更新失敗
-        * 1: 更新成功
-        * 1: 舊密碼錯誤
-        */
+        // 結果
         public int Result { get; set; }
 
     }
@@ -75,6 +91,13 @@ namespace UserPacket.ServerToClient
     // 更新好友列表結果
     class UpdateFriendListResult
     {
+        // 結果定義
+        public enum ResultDefine : int
+        {
+            emResult_Fail = 0,          // 0: 更新失敗
+            emResult_Success,           // 1: 更新成功
+        }
+
         /**
           * 更新動作
           * -1: 無動作
@@ -83,10 +106,7 @@ namespace UserPacket.ServerToClient
           */
         public int Action { get; set; }
 
-        /*
-        * 0: 失敗
-        * 1: 成功
-        */
+        // 結果
         public int Result { get; set; }
 
     }
@@ -94,6 +114,13 @@ namespace UserPacket.ServerToClient
     // 更新黑名單列表結果
     class UpdateBlackListResult
     {
+        // 結果定義
+        public enum ResultDefine : int
+        {
+            emResult_Fail = 0,          // 0: 更新失敗
+            emResult_Success,           // 1: 更新成功
+        }
+
         /**
           * 更新動作
           * -1: 無動作
@@ -102,10 +129,7 @@ namespace UserPacket.ServerToClient
           */
         public int Action { get; set; }
 
-        /*
-        * 0: 失敗
-        * 1: 成功
-        */
+        // 結果
         public int Result { get; set; }
 
     }
@@ -114,10 +138,14 @@ namespace UserPacket.ServerToClient
     // 更新推播Token結果
     class UpdateNotifyTokenResult
     {
-        /*
-        * 0: 失敗
-        * 1: 成功
-        */
+        // 結果定義
+        public enum ResultDefine : int
+        {
+            emResult_Fail = 0,          // 0: 失敗
+            emResult_Success,           // 1: 成功
+        }
+
+        // 結果
         public int Result { get; set; }
     }
 
@@ -233,12 +261,15 @@ namespace UserPacket.ClientToServer
     */
     class UpdatePassword
     {
-        /**
-         * 動作
-         * 0: 無動作
-         * 1: 更新密碼
-         * 2: 忘記密碼
-         */
+        // 動作定義
+        public enum ActionDefine : int
+        {
+            emAction_None = 0,          // 0: 無動作
+            emAction_UpdatePwd,         // 1: 更新密碼
+            emAction_ForgetPwd,         // 2: 忘記密碼
+        }
+
+        // 動作
         public int Action { get; set; }
 
         // 使用者索引
@@ -257,15 +288,18 @@ namespace UserPacket.ClientToServer
     */
     class UpdateFriendList
     {
+        // 動作定義
+        public enum ActionDefine : int
+        {
+            emAction_Delete = -1,          // -1: 刪除
+            emAction_None,                 // 0: 無動作
+            emAction_Add,                  // 1: 新增
+        }
+
         // 會員ID
         public string MemberID { get; set; }
 
-        /**
-        * 更新動作
-        * -1: 刪除
-        * 0: 無動作
-        * 1: 新增
-        */
+        // 動作
         public int Action { get; set; }
 
         // 好友的會員ID
@@ -277,15 +311,18 @@ namespace UserPacket.ClientToServer
     */
     class UpdateBlackList
     {
+        // 動作定義
+        public enum ActionDefine : int
+        {
+            emAction_Delete = -1,          // -1: 刪除
+            emAction_None,                 // 0: 無動作
+            emAction_Add,                  // 1: 新增
+        }
+
         // 會員ID
         public string MemberID { get; set; }
 
-        /**
-        * 更新動作
-        * -1: 刪除
-        * 0: 無動作
-        * 1: 新增
-        */
+        // 動作
         public int Action { get; set; }
 
         // 黑名單的會員ID

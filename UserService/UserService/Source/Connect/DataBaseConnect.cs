@@ -7,14 +7,20 @@ using System.Runtime.InteropServices;
 
 using SqlSugar;
 
-using Tools.Logger;
-
 namespace Connect
 {
     class DataBaseConnect
     {
         [DllImport("kernel32")]
         private static extern int GetPrivateProfileString(string section, string key, string def, StringBuilder retVal, int size, string filePath);
+
+        // ==================== Delegate ==================== //
+
+        public delegate void LogDelegate(string msg);
+
+        private LogDelegate SaveLog = null;
+
+        // ============================================ //
 
         private string dataBaseName = "";
 
@@ -28,18 +34,15 @@ namespace Connect
 
         private SqlSugarClient sql = null;     // My SQL 連線物件
 
-        private Logger log = null;
 
-
-        public DataBaseConnect(Logger log)
+        public DataBaseConnect(LogDelegate log)
         {
-            this.log = log;
-
+            this.SaveLog = log;
         }
 
         public bool Initialize()
         {
-            bool bReturn = false;
+            bool ret = false;
 
             if (LoadConfig())
             {
@@ -54,15 +57,15 @@ namespace Connect
 
                 sql = new SqlSugarClient(conConfig);
 
-                bReturn = true;
+                ret = true;
 
             }
             else
             {
-                log.SaveLog("[Error] DataBaseConnect::Initialize, Initialize Fail");
+                SaveLog("[Error] DataBaseConnect::Initialize, Initialize Fail");
             }
 
-            return bReturn;
+            return ret;
         }
 
         /**
@@ -70,7 +73,7 @@ namespace Connect
          */
         private bool LoadConfig()
         {
-            bool bReturn = true;
+            bool ret = true;
 
             try
             {
@@ -85,58 +88,58 @@ namespace Connect
                 }
                 else
                 {
-                    bReturn = false;
+                    ret = false;
                 }
 
                 // IP
-                if (bReturn && GetPrivateProfileString("CONNECT", "IP", "", temp, 255, configPath) > 0)
+                if (ret && GetPrivateProfileString("CONNECT", "IP", "", temp, 255, configPath) > 0)
                 {
                     ip = temp.ToString();
                 }
                 else
                 {
-                    bReturn = false;
+                    ret = false;
                 }
 
                 // Port
-                if (bReturn && GetPrivateProfileString("CONNECT", "Port", "", temp, 255, configPath) > 0)
+                if (ret && GetPrivateProfileString("CONNECT", "Port", "", temp, 255, configPath) > 0)
                 {
                     port = Convert.ToInt32(temp.ToString());
                 }
                 else
                 {
-                    bReturn = false;
+                    ret = false;
                 }
 
                 // Account
-                if (bReturn && GetPrivateProfileString("CONNECT", "Account", "", temp, 255, configPath) > 0)
+                if (ret && GetPrivateProfileString("CONNECT", "Account", "", temp, 255, configPath) > 0)
                 {
                     account = temp.ToString();
                 }
                 else
                 {
-                    bReturn = false;
+                    ret = false;
                 }
 
                 // Password
-                if (bReturn && GetPrivateProfileString("CONNECT", "Password", "", temp, 255, configPath) > 0)
+                if (ret && GetPrivateProfileString("CONNECT", "Password", "", temp, 255, configPath) > 0)
                 {
                     password = temp.ToString();
                 }
                 else
                 {
-                    bReturn = false;
+                    ret = false;
                 }
 
             }
             catch
             {
-                bReturn = false;
+                ret = false;
 
-                log.SaveLog("[Error] DataBaseConnect::LoadConfig, Config Parameter Error");
+                SaveLog("[Error] DataBaseConnect::LoadConfig, Config Parameter Error");
             }
 
-            return bReturn;
+            return ret;
         }
 
         /**
@@ -144,23 +147,23 @@ namespace Connect
          */
         public bool Connect()
         {
-            bool bReturn = false;
+            bool ret = false;
 
             try
             {
                 // 建立連線
                 sql.Open();
 
-                bReturn = true;
+                ret = true;
 
-                log.SaveLog("Connect SQL Success");
+                SaveLog($"[Info] Connect Data Base Success");
             }
             catch (Exception ex)
             {
-                log.SaveLog("[Error] DataBaseConnect::Connect SQL Connect Fail, Error Msg:" + ex.Message);
+                SaveLog($"[Error] DataBaseConnect::Connect, Connect Data Base Fail, Catch Msg: {ex.Message}");
             }
 
-            return bReturn;
+            return ret;
         }
 
         /**
@@ -168,24 +171,24 @@ namespace Connect
          */
         public bool Disconnect()
         {
-            bool bReturn = false;
+            bool ret = false;
 
             try
             {
                 // 關閉連線
                 sql.Close();
 
-                bReturn = true;
+                ret = true;
 
-                log.SaveLog("[Info] Disconnect SQL Success");
+                SaveLog($"[Info] Disconnect Data Base Success");
 
             }
             catch (Exception ex)
             {
-                log.SaveLog("[Error] DataBaseConnect::Disconnect SQL Disconnect Fail, Error Msg:" + ex.Message);
+                SaveLog($"[Error] DataBaseConnect::Disconnect, Disconnect Data Base Fail, Catch Msg: {ex.Message}");
             }
 
-            return bReturn;
+            return ret;
         }
 
         public SqlSugarClient GetSql()

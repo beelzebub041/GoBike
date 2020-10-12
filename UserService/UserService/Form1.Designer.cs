@@ -1,4 +1,4 @@
-﻿namespace UserService
+﻿namespace Service
 {
     partial class Form1
     {

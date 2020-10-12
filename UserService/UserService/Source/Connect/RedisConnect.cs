@@ -8,8 +8,6 @@ using System.Runtime.InteropServices;
 using StackExchange.Redis;
 using System.Reflection;
 
-using Tools.Logger;
-
 
 namespace Connect
 {
@@ -38,19 +36,23 @@ namespace Connect
         [DllImport("kernel32")]
         private static extern int GetPrivateProfileString(string section, string key, string def, StringBuilder retVal, int size, string filePath);
 
+        // ==================== Delegate ==================== //
+
+        public delegate void LogDelegate(string msg);
+
+        private LogDelegate SaveLog = null;
+
+        // ============================================ //
+
         private string ip = "";
 
         private int port = -1;
 
-        private int dbIdx = 0;
-
         ConnectionMultiplexer redis = null;
 
-        private Logger log = null;
-
-        public RedisConnect(Logger log)
+        public RedisConnect(LogDelegate log)
         {
-            this.log = log;
+            this.SaveLog = log;
         }
 
         ~RedisConnect()
@@ -60,18 +62,18 @@ namespace Connect
 
         public bool Initialize()
         {
-            bool bReturn = false;
+            bool ret = false;
 
             if (LoadConfig())
             {
-                bReturn = true;
+                ret = true;
             }
             else
             {
-                log.SaveLog("[Error] RedisConnect::Initialize, LoadConfig Fail");
+                SaveLog("[Error] RedisConnect::Initialize, LoadConfig Fail");
             }
 
-            return bReturn;
+            return ret;
         }
 
         /**
@@ -79,7 +81,7 @@ namespace Connect
          */
         private bool LoadConfig()
         {
-            bool bReturn = true;
+            bool ret = true;
 
             try
             {
@@ -88,34 +90,34 @@ namespace Connect
                 StringBuilder temp = new StringBuilder(255);
 
                 // IP
-                if (bReturn && GetPrivateProfileString("CONNECT", "IP", "", temp, 255, configPath) > 0)
+                if (ret && GetPrivateProfileString("CONNECT", "IP", "", temp, 255, configPath) > 0)
                 {
                     ip = temp.ToString();
                 }
                 else
                 {
-                    bReturn = false;
+                    ret = false;
                 }
 
                 // Port
-                if (bReturn && GetPrivateProfileString("CONNECT", "Port", "", temp, 255, configPath) > 0)
+                if (ret && GetPrivateProfileString("CONNECT", "Port", "", temp, 255, configPath) > 0)
                 {
                     port = Convert.ToInt32(temp.ToString());
                 }
                 else
                 {
-                    bReturn = false;
+                    ret = false;
                 }
 
             }
             catch
             {
-                bReturn = false;
+                ret = false;
 
-                log.SaveLog("[Error] RedisConnect::LoadConfig, Config Parameter Error");
+                SaveLog("[Error] RedisConnect::LoadConfig, Config Parameter Error");
             }
 
-            return bReturn;
+            return ret;
         }
 
         /**
@@ -123,7 +125,7 @@ namespace Connect
          */
         public bool Connect()
         {
-            bool bReturn = false;
+            bool ret = false;
 
             try
             {
@@ -131,16 +133,16 @@ namespace Connect
                 RedisConnection.Init($"{ip}:{port}");
                 redis = RedisConnection.Instance.ConnectionMultiplexer;
 
-                bReturn = true;
+                ret = true;
 
-                log.SaveLog("Connect Redis Success");
+                SaveLog($"[Info] Connect Redis Success");
             }
             catch (Exception ex)
             {
-                log.SaveLog("[Error] RedisConnect::Connect Connect Redis Catch Error, Msg:" + ex.Message);
+                SaveLog($"[Error] RedisConnect::Connect, Connect Redis Fail, Catch Msg: {ex.Message}");
             }
 
-            return bReturn;
+            return ret;
         }
 
         /**
@@ -148,23 +150,23 @@ namespace Connect
          */
         public bool Disconnect()
         {
-            bool bReturn = false;
+            bool ret = false;
 
             try
             {
                 // 關閉連線
 
-                bReturn = true;
+                ret = true;
 
-                log.SaveLog("[Info] Disconnect Redis Success");
+                SaveLog("[Info] Disconnect Redis Success");
 
             }
             catch (Exception ex)
             {
-                log.SaveLog("[Error] RedisConnect::Disconnect Disconnect Redis Catch Error, Msg:" + ex.Message);
+                SaveLog($"[Error] RedisConnect::Disconnect, Disconnect Redis Fsil, Catch Msg: {ex.Message}");
             }
 
-            return bReturn;
+            return ret;
         }
 
         public IDatabase GetRedis(int dbIdx)
@@ -181,17 +183,17 @@ namespace Connect
                     }
                     else
                     {
-                        log.SaveLog("[Warning] RedisConnect::GetRedis redis Object Is Null Error:");
+                        SaveLog($"[Warning] RedisConnect::GetRedis, Redis Object Is Null");
                     }
                 }
                 else
                 {
-                    log.SaveLog("[Warning] RedisConnect::GetRedis dbIdx Error:" + dbIdx);
+                    SaveLog($"[Warning] RedisConnect::GetRedis, dbIdx Error: {dbIdx}");
                 }
             }
             catch (Exception ex)
             {
-                log.SaveLog("[Error] RedisConnect::GetRedis Catch Error, Msg:" + ex.Message);
+                SaveLog($"[Error] RedisConnect::GetRedis, Catch Msg: {ex.Message}");
             }
 
             return db;
