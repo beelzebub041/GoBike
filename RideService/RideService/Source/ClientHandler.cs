@@ -7,12 +7,16 @@ using System.Runtime.InteropServices;
 
 using WebSocketSharp;
 using WebSocketSharp.Server;
+using System.Collections.Concurrent;
 
-using Tools.Logger;
+//using Tools.Logger;
 
-namespace RideService
+namespace Service.Source
 {
-    class Server
+
+
+
+    class ClientHandler
     {
         // ==================== Delegate ==================== //
 
@@ -20,9 +24,9 @@ namespace RideService
 
         private LogDelegate log = null;
 
-        public delegate string MsgDelegate(string msg);
+        public delegate string MsgDelegate(string data);
 
-        private MsgDelegate msg = null;
+        private MsgDelegate msgProcessor = null;
 
         // ============================================ //
         [DllImport("kernel32")]
@@ -30,20 +34,22 @@ namespace RideService
 
         private WebSocketServer wsServer = null;
 
+        private string serviceName = "/User";
+
         private string serverIp = "";
 
         private string serverPort = "";
 
-        public Server(LogDelegate log, MsgDelegate msg)
+        public ClientHandler(LogDelegate log, MsgDelegate processor)
         {
             this.log = log;
 
-            this.msg = msg;
+            this.msgProcessor = processor;
         }
 
-        ~Server()
+        ~ClientHandler()
         {
-            Stop();
+            Destroy();
         }
 
         /**
@@ -51,20 +57,21 @@ namespace RideService
          */
         public bool Initialize()
         {
-            bool bReturn = false;
+            bool ret = false;
 
             try
             {
                 if (LoadingConfig())
                 {
                     wsServer = new WebSocketServer($"ws://{serverIp}:{serverPort}");
-                    wsServer.AddWebSocketService("/Ride", () => new UserHandler(SaveLog, MessageProcess));
+                    wsServer.AddWebSocketService(serviceName, () => new Handler(SaveLog, MsgDispatch));
+
                     wsServer.Start();
                     if (wsServer.IsListening)
                     {
-                        bReturn = true;
+                        ret = true;
 
-                        log("Create Web Socket Server Success");
+                        SaveLog($"[Info] Create Client Handler Success");
 
                         Console.WriteLine("[Info] Listening on port {0}, and providing WebSocket services:", wsServer.Port);
                         foreach (var path in wsServer.WebSocketServices.Paths)
@@ -73,31 +80,31 @@ namespace RideService
                 }
                 else
                 {
-                    log("[Error] Server::Initialize, LoadingConfig Fail");
+                    SaveLog($"[Error] Create Client Handler Fail");
                 }
 
             }
-            catch
+            catch (Exception ex)
             {
-                log("[Error] Server::Initialize, Try Catch Errpr");
+                SaveLog($"[Error] ClientHandler::Initialize, Catch Msg: {ex.Message}");
 
             }
 
-            return bReturn;
+            return ret;
         }
 
-        public bool Stop()
+        public bool Destroy()
         {
-            bool bReturn = false;
+            bool ret = false;
             
             if (wsServer != null)
             {
                 wsServer.Stop();
 
-                bReturn = true;
+                ret = true;
             }
 
-            return bReturn;
+            return ret;
         }
 
         /**
@@ -138,7 +145,7 @@ namespace RideService
             {
                 bReturn = false;
 
-                log("[Error] Server::LoadConfig, Config Parameter Error");
+                SaveLog("[Error] Server::LoadConfig, Config Parameter Error");
             }
 
             return bReturn;
@@ -146,66 +153,69 @@ namespace RideService
 
         public void SaveLog(string msg)
         {
-            this.log(msg);
-
+            log?.Invoke(msg);
         }
 
-        public string MessageProcess(string msg)
+        public string MsgDispatch(string msg)
         {
-            return this.msg(msg);
+            return msgProcessor?.Invoke(msg);
         }
 
     }
 
-
-    public class UserHandler : WebSocketBehavior
+    public class Handler : WebSocketBehavior
     {
 
         public delegate void LogDelegate(string msg);
 
-        private LogDelegate log = null;
+        private LogDelegate SaveLog = null;
 
+        public delegate string MsgDelegate(string data);
 
-        public delegate string MsgDelegate(string msg);
+        private MsgDelegate MsgDispatch = null;
 
-        private MsgDelegate msgProcess = null;
-
-        public UserHandler(LogDelegate log, MsgDelegate msg)
+        public Handler(LogDelegate log, MsgDelegate MsgDispatch)
         {
-            this.log = log;
+            this.SaveLog = log;
 
-            this.msgProcess = msg;
+            this.MsgDispatch = MsgDispatch;
         }
 
         protected override void OnOpen()
         {
             base.OnOpen();
 
-            log($"Client:{ID} Connect");
-            //Console.WriteLine("Client:{0} Connect", ID);
-
+            SaveLog($"Client:{ID} Connect");
         }
 
         protected override void OnClose(CloseEventArgs e)
         {
             base.OnClose(e);
 
-            log($"Client:{ID} Connect Close");
-            //Console.WriteLine("Connect Close");
-
+            SaveLog($"Client:{ID} Connect Close");
         }
 
         protected override void OnMessage(MessageEventArgs e)
         {
-            log($"Receive Client msg: {e.Data}");
+            SaveLog($"Receive Client msg: {e.Data}");
 
-            string sendMsg = msgProcess(e.Data);
-
-            log($"Send msg: {sendMsg}");
-
-            Send(sendMsg);
-
+            SendToClient(MsgDispatch(e.Data));
         }
+
+        public void SendToClient(string msg)
+        {
+            try
+            {
+                Send(msg);
+
+                SaveLog($"Send msg: {msg}");
+            }
+            catch
+            {
+
+            }
+        }
+
     }
 
 }

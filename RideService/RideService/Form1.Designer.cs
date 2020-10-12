@@ -1,4 +1,4 @@
-﻿namespace RideService
+﻿namespace Service
 {
     partial class Form1
     {

@@ -15,10 +15,14 @@ namespace RidePacket.ServerToClient
      */
     class CreateRideRecordResult
     {
-        /*
-        * 0: 建立失敗
-        * 1: 建立成功
-        */
+        // 結果定義
+        public enum ResultDefine : int
+        {
+            emResult_Fail = 0,          // 0: 建立失敗
+            emResult_Success,           // 1: 建立成功
+        }
+
+        // 結果
         public int Result { get; set; }
 
         // 總距離
@@ -36,6 +40,14 @@ namespace RidePacket.ServerToClient
      */
     class UpdateRideGroupResult
     {
+        // 結果定義
+        public enum ResultDefine : int
+        {
+            emResult_Fail = 0,          // 0: 失敗
+            emResult_Success,           // 1: 成功
+            emResult_RideGroupRepeat,   // 2: 組隊已存在
+        }
+
         /**
          * 更新動作
          * -1: 刪除
@@ -44,11 +56,7 @@ namespace RidePacket.ServerToClient
          */
         public int Action { get; set; }
 
-        /*
-        * 0: 失敗
-        * 1: 成功
-        * 2: 組隊已存在
-        */
+        // 結果
         public int Result { get; set; }
 
     }
@@ -58,10 +66,14 @@ namespace RidePacket.ServerToClient
      */
     class ReplyRideGroupResult
     {
-        /*
-        * 0: 回覆失敗
-        * 1: 回覆成功
-        */
+        // 結果定義
+        public enum ResultDefine : int
+        {
+            emResult_Fail = 0,          // 0: 失敗
+            emResult_Success,           // 1: 成功
+        }
+
+        // 結果
         public int Result { get; set; }
 
     }
@@ -71,10 +83,14 @@ namespace RidePacket.ServerToClient
      */
     class UpdateCoordinateResult
     {
-        /*
-        * 0: 更新失敗
-        * 1: 更新成功
-        */
+        // 結果定義
+        public enum ResultDefine : int
+        {
+            emResult_Fail = 0,          // 0: 失敗
+            emResult_Success,           // 1: 成功
+        }
+
+        // 結果
         public int Result { get; set; }
 
     }
@@ -84,10 +100,14 @@ namespace RidePacket.ServerToClient
      */
     class NotifyRideGroupMemberResult
     {
-        /*
-        * 0: 通知失敗
-        * 1: 通知成功
-        */
+        // 結果定義
+        public enum ResultDefine : int
+        {
+            emResult_Fail = 0,          // 0: 失敗
+            emResult_Success,           // 1: 成功
+        }
+
+        // 結果
         public int Result { get; set; }
 
     }
@@ -153,12 +173,15 @@ namespace RidePacket.ClientToServer
     */
     class UpdateRideGroup
     {
-        /**
-         * 更新動作
-         * -1: 刪除
-         * 0: 無動作
-         * 1: 新增
-         */
+        // 動作定義
+        public enum ActionDefine : int
+        {
+            emAction_Delete = -1,          // -1: 刪除
+            emAction_None,                 // 0: 無動作
+            emAction_Add,                  // 1: 新增
+        }
+
+        // 動作
         public int Action { get; set; }
 
 
@@ -175,12 +198,15 @@ namespace RidePacket.ClientToServer
     */
     class ReplyRideGroup
     {
-        /**
-        * 更新動作
-        * -1: 拒絕
-        * 0: 無動作
-        * 1: 加入
-        */
+        // 動作定義
+        public enum ActionDefine : int
+        {
+            emAction_Delete = -1,          // -1: 拒絕
+            emAction_None,                 // 0: 無動作
+            emAction_Add,                  // 1: 加入
+        }
+
+        // 動作
         public int Action { get; set; }
 
 
@@ -210,12 +236,15 @@ namespace RidePacket.ClientToServer
     */
     class NotifyRideGroupMember
     {
-        /**
-        * 更新動作
-        * -1: 取消通知
-        * 0: 無動作
-        * 1: 新增通知
-        */
+        // 動作定義
+        public enum ActionDefine : int
+        {
+            emAction_Delete = -1,          // -1: 取消
+            emAction_None,                 // 0: 無動作
+            emAction_Add,                  // 1: 新增
+        }
+
+        // 動作
         public int Action { get; set; }
 
 
