@@ -34,7 +34,7 @@ namespace Service.Source
 
         private WebSocketServer wsServer = null;
 
-        private string serviceName = "/User";
+        private string serviceName = "/Ride";
 
         private string serverIp = "";
 
