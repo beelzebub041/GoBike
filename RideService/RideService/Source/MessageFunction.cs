@@ -24,7 +24,7 @@ using RidePacket.ServerToClient;
 
 namespace Service.Source
 {
-    class MessageFcunction
+    class MessageFunction
     {
         // ==================== Delegate ==================== //
 
@@ -44,7 +44,7 @@ namespace Service.Source
 
         private NotifyMessage ntMsg = null;
 
-        public MessageFcunction(LogDelegate log)
+        public MessageFunction(LogDelegate log)
         {
             this.log = log;
 
@@ -60,7 +60,7 @@ namespace Service.Source
 
         }
 
-        ~MessageFcunction()
+        ~MessageFunction()
         {
 
         }

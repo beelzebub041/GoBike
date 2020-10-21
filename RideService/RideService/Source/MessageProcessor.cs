@@ -34,7 +34,7 @@ namespace Service.Source
 
         private Dictionary<int, MsgFunction> msgFuncList = null;
 
-        private MessageFcunction msgFunc = null;
+        private MessageFunction msgFunc = null;
 
         public MessageProcessor(LogDelegate log)
         {
@@ -42,7 +42,7 @@ namespace Service.Source
 
             msgFuncList = new Dictionary<int, MsgFunction>();
 
-            msgFunc = new MessageFcunction(SaveLog);
+            msgFunc = new MessageFunction(SaveLog);
 
         }
 
