@@ -121,7 +121,7 @@
     <Compile Include="Source\ControlCenter.cs" />
     <Compile Include="Source\Define\DataBaseCommand.cs" />
     <Compile Include="Source\Interface\IControlCenter.cs" />
-    <Compile Include="Source\MessageFcunction.cs" />
+    <Compile Include="Source\MessageFunction.cs" />
     <Compile Include="Source\MessageProcessor.cs" />
     <Compile Include="Source\Packet\UserPacket.cs" />
     <Compile Include="Source\Tools\Logger.cs" />
