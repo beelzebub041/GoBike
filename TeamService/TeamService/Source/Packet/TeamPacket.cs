@@ -21,11 +21,15 @@ namespace TeamPacket.ServerToClient
     // 建立新車隊
     class CreateNewTeamResult
     {
-        /*
-        * 0: 建立失敗
-        * 1: 建立成功
-        * 2: 重複擔任隊長
-        */
+        // 結果定義
+        public enum ResultDefine : int
+        {
+            emResult_Fail = 0,          // 0: 建立失敗
+            emResult_Success,           // 1: 建立成功
+            emResult_LeaderRepeat,      // 2: 重複擔任隊長
+        }
+
+        // 結果
         public int Result { get; set; }
 
         // 車隊ID
@@ -35,11 +39,15 @@ namespace TeamPacket.ServerToClient
     // 更新車隊資料
     class UpdateTeamDataResult
     {
-        /*
-        * 0: 更新失敗
-        * 1: 更新成功
-        * 2: 權限不足
-        */
+        // 結果定義
+        public enum ResultDefine : int
+        {
+            emResult_Fail = 0,                      // 0: 更新失敗
+            emResult_Success,                       // 1: 更新成功
+            emResult_InsufficientPermissions,       // 2: 權限不足
+        }
+
+        // 結果
         public int Result { get; set; }
 
     }
@@ -47,18 +55,30 @@ namespace TeamPacket.ServerToClient
     // 更換隊長結果
     class ChangeLanderResult
     {
-        /*
-        * 0: 改變失敗
-        * 1: 改變成功
-        * 2: 重複擔任
-        * 3: 權限不足
-        */
+        // 結果定義
+        public enum ResultDefine : int
+        {
+            emResult_Fail = 0,                      // 0: 改變失敗
+            emResult_Success,                       // 1: 改變成功
+            emResult_Repeat,                        // 2: 重複擔任
+            emResult_InsufficientPermissions,       // 3: 權限不足
+        }
+
+        // 結果
         public int Result { get; set; }
     }
 
     // 更新副隊長列表結果
     class UpdateViceLeaderListResult
     {
+        // 結果定義
+        public enum ResultDefine : int
+        {
+            emResult_Fail = 0,                      // 0: 更新失敗
+            emResult_Success,                       // 1: 更新成功
+            emResult_InsufficientPermissions,       // 2: 權限不足
+        }
+
         /**
          * 更新動作
          * -1: 無動作
@@ -67,11 +87,8 @@ namespace TeamPacket.ServerToClient
          */
         public int Action { get; set; }
 
-        /*
-        * 0: 更新失敗
-        * 1: 更新成功
-        * 2: 權限不足
-        */
+
+        // 結果
         public int Result { get; set; }
 
     }
@@ -79,6 +96,13 @@ namespace TeamPacket.ServerToClient
     // 更新隊員列表結果
     class UpdateTeamMemberListResult
     {
+        // 結果定義
+        public enum ResultDefine : int
+        {
+            emResult_Fail = 0,                      // 0: 更新失敗
+            emResult_Success,                       // 1: 更新成功
+        }
+
         /**
           * 更新動作
           * -1: 無動作
@@ -87,10 +111,7 @@ namespace TeamPacket.ServerToClient
           */
         public int Action { get; set; }
 
-        /*
-        * 0: 更新失敗
-        * 1: 更新成功
-        */
+        // 結果
         public int Result { get; set; }
 
     }
@@ -98,6 +119,13 @@ namespace TeamPacket.ServerToClient
     // 更新申請加入車隊列表結果
     class UpdateApplyJoinListResult
     {
+        // 結果定義
+        public enum ResultDefine : int
+        {
+            emResult_Fail = 0,                      // 0: 更新失敗
+            emResult_Success,                       // 1: 更新成功
+        }
+
         /**
           * 更新動作
           * -1: 無動作
@@ -106,10 +134,7 @@ namespace TeamPacket.ServerToClient
           */
         public int Action { get; set; }
 
-        /*
-        * 0: 失敗
-        * 1: 成功
-        */
+        // 結果
         public int Result { get; set; }
 
     }
@@ -117,6 +142,14 @@ namespace TeamPacket.ServerToClient
     // 更新公告結果
     class UpdateBulletinResult
     {
+        // 結果定義
+        public enum ResultDefine : int
+        {
+            emResult_Fail = 0,                      // 0: 更新失敗
+            emResult_Success,                       // 1: 更新成功
+            emResult_InsufficientPermissions,       // 2: 權限不足
+        }
+
         /**
           * 更新動作
           * -1: 無動作
@@ -126,11 +159,7 @@ namespace TeamPacket.ServerToClient
           */
         public int Action { get; set; }
 
-        /*
-        * 0: 更新失敗
-        * 1: 更新成功
-        * 2: 修改權限不足
-        */
+        // 結果
         public int Result { get; set; }
 
         // 公告ID
@@ -141,6 +170,14 @@ namespace TeamPacket.ServerToClient
     // 更新活動結果
     class UpdateActivityResult
     {
+        // 結果定義
+        public enum ResultDefine : int
+        {
+            emResult_Fail = 0,                      // 0: 更新失敗
+            emResult_Success,                       // 1: 更新成功
+            emResult_InsufficientPermissions,       // 2: 權限不足
+        }
+
         /**
           * 更新動作
           * -1: 無動作
@@ -150,11 +187,7 @@ namespace TeamPacket.ServerToClient
           */
         public int Action { get; set; }
 
-        /*
-        * 0: 更新失敗
-        * 1: 更新成功
-        * 2: 修改權限不足
-        */
+        // 結果
         public int Result { get; set; }
 
         // 活動ID
@@ -165,11 +198,15 @@ namespace TeamPacket.ServerToClient
     // 解散車隊結果
     class DeleteTeamResult
     {
-        /*
-        * 0: 解散失敗
-        * 1: 解散成功
-        * 2: 權限不足
-        */
+        // 結果定義
+        public enum ResultDefine : int
+        {
+            emResult_Fail = 0,                      // 0: 解散失敗
+            emResult_Success,                       // 1: 解散成功
+            emResult_InsufficientPermissions,       // 2: 權限不足
+        }
+
+        // 結果
         public int Result { get; set; }
 
     }
@@ -177,6 +214,13 @@ namespace TeamPacket.ServerToClient
     // 加入或離開車隊活動結果
     class JoinOrLeaveTeamActivityResult
     {
+        // 結果定義
+        public enum ResultDefine : int
+        {
+            emResult_Fail = 0,                      // 0: 解散失敗
+            emResult_Success,                       // 1: 解散成功
+        }
+
         /*
         * -1: 離開 
         * 0: 無動作
@@ -184,10 +228,7 @@ namespace TeamPacket.ServerToClient
         */
         public int Action { get; set; }
 
-        /*
-        * 0: 失敗
-        * 1: 成功
-        */
+        // 結果
         public int Result { get; set; }
 
     }
@@ -195,6 +236,13 @@ namespace TeamPacket.ServerToClient
     // 加入或離開車隊結果
     class JoinOrLeaveTeamResult
     {
+        // 結果定義
+        public enum ResultDefine : int
+        {
+            emResult_Fail = 0,                      // 0: 失敗
+            emResult_Success,                       // 1: 成功
+        }
+
         /*
         * -1: 離開 
         * 0: 無動作
@@ -202,10 +250,7 @@ namespace TeamPacket.ServerToClient
         */
         public int Action { get; set; }
 
-        /*
-        * 0: 失敗
-        * 1: 成功
-        */
+        // 結果
         public int Result { get; set; }
 
     }
@@ -213,12 +258,15 @@ namespace TeamPacket.ServerToClient
     // 踢離車隊成員結果
     class KickTeamMemberResult
     {
+        // 結果定義
+        public enum ResultDefine : int
+        {
+            emResult_Fail = 0,                      // 0: 失敗
+            emResult_Success,                       // 1: 成功
+            emResult_InsufficientPermissions,       // 2: 權限不足
+        }
 
-        /*
-        * 0: 失敗
-        * 1: 成功
-        * 2: 權限不足
-        */
+        // 結果定義
         public int Result { get; set; }
 
     }
@@ -377,15 +425,18 @@ namespace TeamPacket.ClientToServer
     */
     class UpdateApplyJoinList
     {
+        // 動作定義
+        public enum ActionDefine : int
+        {
+            emResult_Delete = -1,                // -1: 刪除
+            emResult_None,                       // 0: 無動作
+            emResult_Add,                        // 1: 新增
+        }
+
         // 車隊ID
         public string TeamID { get; set; }
 
-        /**
-        * 更新動作
-        * -1: 刪除
-        * 0: 無動作
-        * 1: 新增
-        */
+        // 動作
         public int Action { get; set; }
 
         // 隊員的MemberID
@@ -397,13 +448,16 @@ namespace TeamPacket.ClientToServer
     */
     class UpdateBulletin
     {
-        /**
-        * 更新動作
-        * -1: 刪除
-        * 0: 無動作
-        * 1: 新增
-        * 2: 修改
-        */
+        // 動作定義
+        public enum ActionDefine : int
+        {
+            emResult_Delete = -1,                // -1: 刪除
+            emResult_None,                       // 0: 無動作
+            emResult_Add,                        // 1: 新增
+            emResult_Modify,                     // 2: 修改
+        }
+
+        // 動作
         public int Action { get; set; }
 
         // 公告ID, 修改與刪除需帶入, 新增帶空值
@@ -431,13 +485,16 @@ namespace TeamPacket.ClientToServer
     */
     class UpdateActivity
     {
-        /**
-        * 更新動作
-        * -1: 刪除
-        * 0: 無動作
-        * 1: 新增
-        * 2: 修改
-        */
+        // 動作定義
+        public enum ActionDefine : int
+        {
+            emResult_Delete = -1,                // -1: 刪除
+            emResult_None,                       // 0: 無動作
+            emResult_Add,                        // 1: 新增
+            emResult_Modify,                     // 2: 修改
+        }
+
+        // 動作
         public int Action { get; set; }
 
         // 活動ID, 修改與刪除需帶入, 新增帶空值
@@ -495,11 +552,15 @@ namespace TeamPacket.ClientToServer
     */
     class JoinOrLeaveTeamActivity
     {
-        /**
-         * -1: 離開
-         * 0: 無動作
-         * 1: 加入
-         */
+        // 動作定義
+        public enum ActionDefine : int
+        {
+            emResult_Delete = -1,                // -1: 刪除
+            emResult_None,                       // 0: 無動作
+            emResult_Add,                        // 1: 新增
+        }
+
+        // 動作
         public int Action { get; set; }
 
         // 車隊ID
@@ -517,11 +578,15 @@ namespace TeamPacket.ClientToServer
     */
     class JoinOrLeaveTeam
     {
-        /**
-         * -1: 離開
-         * 0: 無動作
-         * 1: 加入
-         */
+        // 動作定義
+        public enum ActionDefine : int
+        {
+            emResult_Delete = -1,                // -1: 刪除
+            emResult_None,                       // 0: 無動作
+            emResult_Add,                        // 1: 新增
+        }
+
+        // 動作
         public int Action { get; set; }
 
         // 車隊ID

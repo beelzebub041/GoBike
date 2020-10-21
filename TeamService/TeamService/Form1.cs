@@ -8,10 +8,9 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 
-using Connect;
-using Tools.Logger;
+using Service.Source;
 
-namespace TeamService
+namespace Service
 {
     public partial class Form1 : Form
     {
@@ -36,10 +35,16 @@ namespace TeamService
 
         void Initialize()
         {
-            Controller ctrl = new Controller(this);
+            ControlCenter ctrl = new ControlCenter(this);
 
-            ctrl.Initialize();
-            
+            if (ctrl.Initialize())
+            {
+
+            }
+            else
+            {
+
+            }
         }
 
         public void updateTextBox(string msg)

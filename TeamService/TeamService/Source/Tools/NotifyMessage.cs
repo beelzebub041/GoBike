@@ -16,7 +16,11 @@ namespace Tools.NotifyMessage
 {
     class NotifyMessage
     {
-        private Logger.Logger log = null;
+        // ==================== Delegate ==================== //
+
+        public delegate void LogDelegate(string msg);
+
+        private LogDelegate SaveLog = null;
 
         // ============================================ //
         string serverKey = "";
@@ -26,9 +30,9 @@ namespace Tools.NotifyMessage
         [DllImport("kernel32")]
         private static extern int GetPrivateProfileString(string section, string key, string def, StringBuilder retVal, int size, string filePath);
 
-        public NotifyMessage(Logger.Logger log)
+        public NotifyMessage(LogDelegate log)
         {
-            this.log = log;
+            this.SaveLog = log;
         }
 
         ~NotifyMessage()
@@ -49,17 +53,17 @@ namespace Tools.NotifyMessage
                 {
                     bReturn = true;
 
-                    log.SaveLog($"[Info] NotifyMessage::Initialize, Initialize Success");
+                    SaveLog($"[Info] NotifyMessage::Initialize, Initialize Success");
                 }
                 else
                 {
-                    log.SaveLog("[Error] NotifyMessage::Initialize, LoadingConfig Fail");
+                    SaveLog("[Error] NotifyMessage::Initialize, LoadingConfig Fail");
                 }
 
             }
             catch (Exception ex)
             {
-                log.SaveLog($"[Error] NotifyMessage::Initialize, Catch Error Msg:{ex.Message}");
+                SaveLog($"[Error] NotifyMessage::Initialize, Catch Error Msg:{ex.Message}");
 
             }
 
@@ -104,7 +108,7 @@ namespace Tools.NotifyMessage
             {
                 bReturn = false;
 
-                log.SaveLog($"[Error] NotifyMessage::LoadConfig, Config Parameter Error");
+                SaveLog($"[Error] NotifyMessage::LoadConfig, Config Parameter Error");
             }
 
             return bReturn;
@@ -161,13 +165,13 @@ namespace Tools.NotifyMessage
                 }
                 catch (Exception ex)
                 {
-                    log.SaveLog($"[Error] NotifyMessage::SendToDevice, Catch Error Msg: {ex.Message}");
+                    SaveLog($"[Error] NotifyMessage::SendToDevice, Catch Error Msg: {ex.Message}");
                 }
 
             }
             else
             {
-                log.SaveLog($"[Error] NotifyMessage::SendToDevice, serverKey or senderId is Empty String");
+                SaveLog($"[Error] NotifyMessage::SendToDevice, serverKey or senderId is Empty String");
             }
 
         }

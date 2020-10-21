@@ -21,7 +21,17 @@ namespace Tools.RedisHashTransfer
         {
             PropertyInfo[] properties = hashObject.GetType().GetProperties();
 
-            return properties.Select(property => new HashEntry(property.Name, property.GetValue(hashObject).ToString())).ToArray();
+            try
+            {
+                return properties.Select(property => new HashEntry(property.Name, property.GetValue(hashObject).ToString())).ToArray();
+            }
+            catch
+            {
+                Console.WriteLine($"[Error] RedisHashTransfer::TransToHashEntryArray, Transfer Error");
+
+                return new HashEntry[1];
+            }
+
         }
     }
 }

@@ -1,4 +1,4 @@
-﻿namespace TeamService
+﻿namespace Service
 {
     partial class Form1
     {
