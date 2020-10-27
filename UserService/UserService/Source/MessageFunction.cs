@@ -175,7 +175,7 @@ namespace Service.Source
 
                                 redis.GetRedis((int)Connect.RedisDB.emRedisDB_User).HashSet($"UserAccount_" + newAccount.Email, hashTransfer.TransToHashEntryArray(newAccount));
                                 redis.GetRedis((int)Connect.RedisDB.emRedisDB_User).HashSet($"UserInfo_" + info.MemberID, hashTransfer.TransToHashEntryArray(info));
-                                redis.GetRedis((int)Connect.RedisDB.emRedisDB_Ride).HashSet($"RideData_" + rideData.MemberID, hashTransfer.TransToHashEntryArray(data));
+                                redis.GetRedis((int)Connect.RedisDB.emRedisDB_Ride).HashSet($"RideData_" + rideData.MemberID, hashTransfer.TransToHashEntryArray(rideData));
 
                                 // DB 交易提交
                                 db.GetSql().CommitTran();
@@ -210,7 +210,7 @@ namespace Service.Source
                 {
                     rData.Result = (int)UserRegisteredResult.ResultDefine.emResult_Fail;
 
-                    SaveLog($"[Error] MessageFcunction::OnCreateNewAccount Create Error Msg:{ex.Message}");
+                    SaveLog($"[Error] MessageFcunction::OnCreateNewAccount Catch Error Msg:{ex.Message}");
                 }
 
                 // DB 交易失敗, 啟動Rollback
@@ -479,75 +479,98 @@ namespace Service.Source
 
             try
             {
-                UserInfo userInfo = db.GetSql().Queryable<UserInfo>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).Single();
-
-                // 有找到會員
-                if (userInfo != null)
+                // 不能為同一人
+                if (packet.MemberID != packet.FriendID)
                 {
-                    JArray jaData = JArray.Parse(userInfo.FriendList);
+                    UserInfo userInfo = db.GetSql().Queryable<UserInfo>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).Single();
 
-                    List<string> idList = jaData.ToObject<List<string>>();
-
-                    // 新增
-                    if (packet.Action == (int)UpdateFriendList.ActionDefine.emAction_Add)
+                    // 有找到會員資料
+                    if (userInfo != null)
                     {
-                        if (!idList.Contains(packet.FriendID))
-                        {
-                            idList.Add(packet.FriendID);
+                        UserInfo friendInfo = db.GetSql().Queryable<UserInfo>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.FriendID).Single();
 
-                            rData.Result = (int)UpdateFriendListResult.ResultDefine.emResult_Success;
+                        // 有找到好友的會員資料
+                        if (friendInfo != null)
+                        {
+                            JArray jaData = JArray.Parse(userInfo.FriendList);
+
+                            List<string> idList = jaData.ToObject<List<string>>();
+
+                            // 新增
+                            if (packet.Action == (int)UpdateFriendList.ActionDefine.emAction_Add)
+                            {
+                                if (!idList.Contains(packet.FriendID))
+                                {
+                                    idList.Add(packet.FriendID);
+
+                                    rData.Result = (int)UpdateFriendListResult.ResultDefine.emResult_Success;
+
+                                }
+                                else
+                                {
+                                    rData.Result = (int)UpdateFriendListResult.ResultDefine.emResult_Fail;
+                                }
+
+                            }
+                            // 刪除
+                            else if (packet.Action == (int)UpdateFriendList.ActionDefine.emAction_Delete)
+                            {
+                                if (idList.Contains(packet.FriendID))
+                                {
+                                    idList.Remove(packet.FriendID);
+
+                                    rData.Result = (int)UpdateFriendListResult.ResultDefine.emResult_Success;
+                                }
+                                else
+                                {
+                                    rData.Result = (int)UpdateFriendListResult.ResultDefine.emResult_Fail;
+                                }
+                            }
+
+                            if (rData.Result == (int)UpdateFriendListResult.ResultDefine.emResult_Success)
+                            {
+                                JArray jsNew = JArray.FromObject(idList);
+
+                                if (db.GetSql().Updateable<UserInfo>().SetColumns(it => new UserInfo() { FriendList = jsNew.ToString() }).With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).ExecuteCommand() > 0)
+                                {
+                                    rData.Result = (int)UpdateFriendListResult.ResultDefine.emResult_Success;
+
+                                    userInfo.FriendList = jsNew.ToString();
+                                    redis.GetRedis((int)Connect.RedisDB.emRedisDB_User).HashSet($"UserInfo_" + userInfo.MemberID, hashTransfer.TransToHashEntryArray(userInfo));
+
+                                    SaveLog($"[Error] MessageFcunction::OnUpdateFriendList Member: {packet.MemberID} Update FriendList Success");
+
+                                }
+                                else
+                                {
+                                    rData.Result = (int)UpdateFriendListResult.ResultDefine.emResult_Fail;
+
+                                    SaveLog($"[Error] MessageFcunction::OnUpdateFriendList Member: {packet.MemberID} Update FriendList Fail");
+                                }
+                            }
 
                         }
                         else
                         {
                             rData.Result = (int)UpdateFriendListResult.ResultDefine.emResult_Fail;
-                        }
 
+                            SaveLog($"[Error] MessageFcunction::OnUpdateFriendList Can Not Find  Firend Member:{packet.FriendID}");
+                        }
                     }
-                    // 刪除
-                    else if (packet.Action == (int)UpdateFriendList.ActionDefine.emAction_Delete)
+                    else
                     {
-                        if (idList.Contains(packet.FriendID))
-                        {
-                            idList.Remove(packet.FriendID);
+                        rData.Result = (int)UpdateFriendListResult.ResultDefine.emResult_Fail;
 
-                            rData.Result = (int)UpdateFriendListResult.ResultDefine.emResult_Success;
-                        }
-                        else
-                        {
-                            rData.Result = (int)UpdateFriendListResult.ResultDefine.emResult_Fail;
-                        }
+                        SaveLog($"[Error] MessageFcunction::OnUpdateFriendList Can Not Find Member:{packet.MemberID}");
                     }
-
-                    if (rData.Result == (int)UpdateFriendListResult.ResultDefine.emResult_Success)
-                    {
-                        JArray jsNew = JArray.FromObject(idList);
-
-                        if (db.GetSql().Updateable<UserInfo>().SetColumns(it => new UserInfo() { FriendList = jsNew.ToString() }).With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).ExecuteCommand() > 0)
-                        {
-                            rData.Result = (int)UpdateFriendListResult.ResultDefine.emResult_Success;
-
-                            userInfo.FriendList = jsNew.ToString();
-                            redis.GetRedis((int)Connect.RedisDB.emRedisDB_User).HashSet($"UserInfo_" + userInfo.MemberID, hashTransfer.TransToHashEntryArray(userInfo));
-
-                            SaveLog($"[Error] MessageFcunction::OnUpdateFriendList Member: {packet.MemberID} Update FriendList Success");
-
-                        }
-                        else
-                        {
-                            rData.Result = (int)UpdateFriendListResult.ResultDefine.emResult_Fail;
-
-                            SaveLog($"[Error] MessageFcunction::OnUpdateFriendList Member: {packet.MemberID} Update FriendList Fail");
-                        }
-                    }
-
                 }
                 else
                 {
                     rData.Result = (int)UpdateFriendListResult.ResultDefine.emResult_Fail;
 
-                    SaveLog($"[Error] MessageFcunction::OnUpdateFriendList Can Not Find Member:{packet.MemberID}");
+                    SaveLog($"[Error] MessageFcunction::OnUpdateFriendList Member: {packet.MemberID} Is Same With Friend Member: {packet.FriendID}");
                 }
+
             }
             catch (Exception ex)
             {
@@ -574,96 +597,130 @@ namespace Service.Source
             UpdateBlackListResult rData = new UpdateBlackListResult();
             rData.Action = packet.Action;
 
+            UserInfo userInfo = null;
+
             try
             {
-                UserInfo userInfo = db.GetSql().Queryable<UserInfo>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).Single();
-
-                // 有找到會員
-                if (userInfo != null)
+                if (packet.MemberID != packet.BlackID)
                 {
-                    JArray jsData = JArray.Parse(userInfo.BlackList);
+                    userInfo = db.GetSql().Queryable<UserInfo>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).Single();
 
-                    List<string> idList = jsData.ToObject<List<string>>();
-
-                    // 新增
-                    if (packet.Action == (int)UpdateBlackList.ActionDefine.emAction_Add)
+                    // 有找到會員
+                    if (userInfo != null)
                     {
-                        if (!idList.Contains(packet.BlackID))
+                        UserInfo blackInfo = db.GetSql().Queryable<UserInfo>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).Single();
+
+                        if (blackInfo != null)
                         {
-                            idList.Add(packet.BlackID);
+                            JArray jsData = JArray.Parse(userInfo.BlackList);
 
-                            rData.Result = (int)UpdateBlackListResult.ResultDefine.emResult_Success;
+                            List<string> idList = jsData.ToObject<List<string>>();
 
-                            // 檢查是否有在好友名單中
-                            JArray jsFriendData = JArray.Parse(userInfo.FriendList);
-
-                            List<string> friendList = jsFriendData.ToObject<List<string>>();
-
-                            if (friendList.Contains(packet.BlackID))
+                            // 新增
+                            if (packet.Action == (int)UpdateBlackList.ActionDefine.emAction_Add)
                             {
-                                friendList.Remove(packet.BlackID);
-
-                                JArray jsFriendNew = JArray.FromObject(friendList);
-
-                                if (db.GetSql().Updateable<UserInfo>().SetColumns(it => new UserInfo() { FriendList = jsFriendNew.ToString() }).With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).ExecuteCommand() > 0)
+                                if (!idList.Contains(packet.BlackID))
                                 {
-                                    SaveLog($"[Info] MessageFcunction::OnUpdateBlackList Remove MemberID:{packet.MemberID} From Friend List");
+                                    idList.Add(packet.BlackID);
+
+                                    rData.Result = (int)UpdateBlackListResult.ResultDefine.emResult_Success;
                                 }
                                 else
                                 {
-                                    SaveLog($"[Warning] MessageFcunction::OnUpdateBlackList Can Not Remove MemberID:{packet.MemberID} From Friend List");
+                                    rData.Result = (int)UpdateBlackListResult.ResultDefine.emResult_Fail;
                                 }
 
                             }
+                            // 刪除
+                            else if (packet.Action == (int)UpdateBlackList.ActionDefine.emAction_Delete)
+                            {
+                                if (idList.Contains(packet.BlackID))
+                                {
+                                    idList.Remove(packet.BlackID);
 
+                                    rData.Result = (int)UpdateBlackListResult.ResultDefine.emResult_Success;
+                                }
+                                else
+                                {
+                                    rData.Result = (int)UpdateBlackListResult.ResultDefine.emResult_Fail;
+                                }
+                            }
+
+                            if (rData.Result == (int)UpdateBlackListResult.ResultDefine.emResult_Success)
+                            {
+                                JArray jsNew = JArray.FromObject(idList);
+
+                                // 設定DB 交易的起始點
+                                db.GetSql().BeginTran();
+
+                                if (db.GetSql().Updateable<UserInfo>().SetColumns(it => new UserInfo() { BlackList = jsNew.ToString() }).With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).ExecuteCommand() > 0)
+                                {
+                                    rData.Result = (int)UpdateBlackListResult.ResultDefine.emResult_Success;
+
+                                    userInfo.BlackList = jsNew.ToString();
+
+                                    SaveLog($"[Info] MessageFcunction::OnUpdateBlackList Member: {packet.MemberID} Update BlackList Success");
+
+                                    // 檢查是否有在好友名單中
+                                    {
+                                        JArray jsFriendData = JArray.Parse(userInfo.FriendList);
+
+                                        List<string> friendList = jsFriendData.ToObject<List<string>>();
+
+                                        if (friendList.Contains(packet.BlackID))
+                                        {
+                                            friendList.Remove(packet.BlackID);
+
+                                            JArray jsFriendNew = JArray.FromObject(friendList);
+
+                                            if (db.GetSql().Updateable<UserInfo>().SetColumns(it => new UserInfo() { FriendList = jsFriendNew.ToString() }).With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).ExecuteCommand() > 0)
+                                            {
+                                                rData.Result = (int)UpdateBlackListResult.ResultDefine.emResult_Success;
+
+                                                userInfo.FriendList = jsFriendNew.ToString();
+
+                                                SaveLog($"[Info] MessageFcunction::OnUpdateBlackList Remove MemberID:{packet.MemberID} From Friend List");
+                                            }
+                                            else
+                                            {
+                                                rData.Result = (int)UpdateBlackListResult.ResultDefine.emResult_Fail;
+
+                                                SaveLog($"[Error] MessageFcunction::OnUpdateBlackList Can Not Remove MemberID:{packet.MemberID} From Friend List");
+                                            }
+                                        }
+                                    }
+
+                                }
+                                else
+                                {
+                                    rData.Result = (int)UpdateBlackListResult.ResultDefine.emResult_Fail;
+
+                                    SaveLog($"[Error] MessageFcunction::OnUpdateBlackList Member: {packet.MemberID} Update BlackList Success");
+
+                                }
+                            }
                         }
                         else
                         {
                             rData.Result = (int)UpdateBlackListResult.ResultDefine.emResult_Fail;
+
+                            SaveLog($"[Error] MessageFcunction::OnUpdateBlackList Can Not Find Black Member:{packet.BlackID}");
                         }
 
                     }
-                    // 刪除
-                    else if (packet.Action == (int)UpdateBlackList.ActionDefine.emAction_Delete)
+                    else
                     {
-                        if (idList.Contains(packet.BlackID))
-                        {
-                            idList.Remove(packet.BlackID);
+                        rData.Result = (int)UpdateBlackListResult.ResultDefine.emResult_Fail;
 
-                            rData.Result = (int)UpdateBlackListResult.ResultDefine.emResult_Success;
-                        }
-                        else
-                        {
-                            rData.Result = (int)UpdateBlackListResult.ResultDefine.emResult_Fail;
-                        }
+                        SaveLog($"[Error] MessageFcunction::OnUpdateBlackList Can Not Find Member:{packet.MemberID}");
+
                     }
-
-                    if (rData.Result == (int)UpdateBlackListResult.ResultDefine.emResult_Success)
-                    {
-                        JArray jsNew = JArray.FromObject(idList);
-
-                        if (db.GetSql().Updateable<UserInfo>().SetColumns(it => new UserInfo() { BlackList = jsNew.ToString() }).With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).ExecuteCommand() > 0)
-                        {
-                            rData.Result = (int)UpdateBlackListResult.ResultDefine.emResult_Success;
-
-                            userInfo.BlackList = jsNew.ToString();
-                            redis.GetRedis((int)Connect.RedisDB.emRedisDB_User).HashSet($"UserInfo_" + userInfo.MemberID, hashTransfer.TransToHashEntryArray(userInfo));
-
-                            SaveLog($"[Error] MessageFcunction::OnUpdateBlackList Member: {packet.MemberID} Update BlackList Success");
-                        }
-                        else
-                        {
-                            rData.Result = (int)UpdateBlackListResult.ResultDefine.emResult_Fail;
-
-                            SaveLog($"[Error] MessageFcunction::OnUpdateBlackList Member: {packet.MemberID} Update BlackList Success");
-
-                        }
-                    }
-
                 }
                 else
                 {
                     rData.Result = (int)UpdateBlackListResult.ResultDefine.emResult_Fail;
+
+                    SaveLog($"[Error] MessageFcunction::OnUpdateBlackList Member: {packet.MemberID} Is Same With Black Member: {packet.BlackID}");
                 }
 
             }
@@ -672,6 +729,19 @@ namespace Service.Source
                 SaveLog($"[Error] MessageFcunction::OnUpdateBlackList Catch Error, Msg:{ex.Message}");
 
                 rData.Result = (int)UpdateBlackListResult.ResultDefine.emResult_Fail;
+            }
+
+            if (rData.Result == (int)UpdateBlackListResult.ResultDefine.emResult_Success)
+            {
+                // DB 交易提交
+                db.GetSql().CommitTran();
+
+                redis.GetRedis((int)Connect.RedisDB.emRedisDB_User).HashSet($"UserInfo_" + userInfo.MemberID, hashTransfer.TransToHashEntryArray(userInfo));
+            }
+            else
+            {
+                // DB 交易失敗, 啟動Rollback
+                db.GetSql().RollbackTran();
             }
 
             JObject jsMain = new JObject();
