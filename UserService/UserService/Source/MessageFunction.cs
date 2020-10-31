@@ -12,6 +12,7 @@ using WebSocketSharp.Server;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
+using Tools.WeekProcess;
 using Tools.RedisHashTransfer;
 
 using DataBaseDef;
@@ -38,6 +39,8 @@ namespace Service.Source
 
         RedisHashTransfer hashTransfer = null;
 
+        WeekProcess weekProcess = null;
+
         public MessageFunction(LogDelegate log)
         {
             this.log = log;
@@ -47,6 +50,8 @@ namespace Service.Source
             redis = new RedisConnect(SaveLog);
 
             hashTransfer = new RedisHashTransfer();
+
+            weekProcess = new WeekProcess();
 
         }
 
@@ -105,6 +110,11 @@ namespace Service.Source
 
             UserRegisteredResult rData = new UserRegisteredResult();
 
+            UserAccount newAccount = new UserAccount();
+            UserInfo info = new UserInfo();
+            RideData rideData = new RideData();
+            WeekRideData curWeek = new WeekRideData();
+
             if (packet.Password == packet.CheckPassword)
             {
                 try
@@ -121,45 +131,45 @@ namespace Service.Source
                         string[] guidList = guidAll.Split('-');
 
                         // 建立新帳號
-                        UserAccount newAccount = new UserAccount
-                        {
-                            MemberID = "Dblha-" + guidList[0],        // 取GUID前8碼
-                            Email = packet.Email,
-                            Password = packet.Password,
-                            FBToken = packet.FBToken != null ? packet.FBToken : "",
-                            GoogleToken = packet.GoogleToken != null ? packet.GoogleToken : "",
-                            NotifyToken = "",
-                            RegisterSource = packet.RegisterSource,
-                            RegisterDate = dateTime,
-                        };
+                        newAccount.MemberID = "Dblha-" + guidList[0];        // 取GUID前8碼
+                        newAccount.Email = packet.Email;
+                        newAccount.Password = packet.Password;
+                        newAccount.FBToken = packet.FBToken != null ? packet.FBToken : "";
+                        newAccount.GoogleToken = packet.GoogleToken != null ? packet.GoogleToken : "";
+                        newAccount.NotifyToken = "";
+                        newAccount.RegisterSource = packet.RegisterSource;
+                        newAccount.RegisterDate = dateTime;
 
                         // 新增使用者資訊
-                        UserInfo info = new UserInfo
-                        {
-                            MemberID = newAccount.MemberID,
-                            NickName = "",
-                            Birthday = "",
-                            BodyHeight = 0,
-                            BodyWeight = 0,
-                            FrontCover = "",
-                            Avatar = "",
-                            Photo = "",
-                            Mobile = "",
-                            County = -1,
-                            TeamList = "[]",
-                            FriendList = "[]",
-                            BlackList = "[]",
-                            SpecificationModel = ""
-                        };
+                        info.MemberID = newAccount.MemberID;
+                        info.NickName = "";
+                        info.Birthday = "";
+                        info.BodyHeight = 0;
+                        info.BodyWeight = 0;
+                        info.FrontCover = "";
+                        info.Avatar = "";
+                        info.Photo = "";
+                        info.Mobile = "";
+                        info.County = -1;
+                        info.TeamList = "[]";
+                        info.FriendList = "[]";
+                        info.BlackList = "[]";
+                        info.SpecificationModel = "";
 
                         // 新增騎乘資料
-                        RideData rideData = new RideData
-                        {
-                            MemberID = newAccount.MemberID,
-                            TotalDistance = 0,
-                            TotalAltitude = 0,
-                            TotalRideTime = 0,
-                        };
+                        rideData.MemberID = newAccount.MemberID;
+                        rideData.TotalDistance = 0;
+                        rideData.TotalAltitude = 0;
+                        rideData.TotalRideTime = 0;
+
+                        // 新增本週騎乘資料
+                        string firsDay = weekProcess.GetWeekFirstDay(DateTime.UtcNow);
+                        string lastDay = weekProcess.GetWeekLastDay(DateTime.UtcNow);
+
+                        curWeek.MemberID = newAccount.MemberID;
+                        curWeek.WeekFirstDay = firsDay;
+                        curWeek.WeekLastDay = lastDay;
+                        curWeek.WeekDistance = 0;
 
                         // 設定DB 交易的起始點
                         db.GetSql().BeginTran();
@@ -168,17 +178,11 @@ namespace Service.Source
                         if (db.GetSql().Insertable(newAccount).With(SqlSugar.SqlWith.TabLockX).ExecuteCommand() > 0)
                         {
 
-                            if (db.GetSql().Insertable(info).With(SqlSugar.SqlWith.TabLockX).ExecuteCommand() > 0 &&
-                                db.GetSql().Insertable(rideData).With(SqlSugar.SqlWith.TabLockX).ExecuteCommand() > 0)
+                            if (db.GetSql().Insertable(info).With(SqlSugar.SqlWith.TabLockX).ExecuteCommand() > 0 
+                                && db.GetSql().Insertable(rideData).With(SqlSugar.SqlWith.TabLockX).ExecuteCommand() > 0
+                                && db.GetSql().Insertable(curWeek).With(SqlSugar.SqlWith.TabLockX).ExecuteCommand() > 0)
                             {
                                 rData.Result = (int)UserRegisteredResult.ResultDefine.emResult_Success;
-
-                                redis.GetRedis((int)Connect.RedisDB.emRedisDB_User).HashSet($"UserAccount_" + newAccount.Email, hashTransfer.TransToHashEntryArray(newAccount));
-                                redis.GetRedis((int)Connect.RedisDB.emRedisDB_User).HashSet($"UserInfo_" + info.MemberID, hashTransfer.TransToHashEntryArray(info));
-                                redis.GetRedis((int)Connect.RedisDB.emRedisDB_Ride).HashSet($"RideData_" + rideData.MemberID, hashTransfer.TransToHashEntryArray(rideData));
-
-                                // DB 交易提交
-                                db.GetSql().CommitTran();
 
                                 SaveLog($"[Info] MessageFcunction::OnCreateNewAccount Create New Account Success");
                             }
@@ -191,7 +195,7 @@ namespace Service.Source
                         }
                         else
                         {
-                            rData.Result = (int)UserRegisteredResult.ResultDefine.emResult_Fail;
+                            rData.Result = (int)UserRegisteredResult.ResultDefine.emResult_AccountRepeat;
 
                             SaveLog($"[Warning] MessageFcunction::OnCreateNewAccount Email: {packet.Email} Repeat");
                         }
@@ -213,12 +217,6 @@ namespace Service.Source
                     SaveLog($"[Error] MessageFcunction::OnCreateNewAccount Catch Error Msg:{ex.Message}");
                 }
 
-                // DB 交易失敗, 啟動Rollback
-                if (rData.Result != (int)UserRegisteredResult.ResultDefine.emResult_Success)
-                {
-                    db.GetSql().RollbackTran();
-                }
-
             }
             else
             {
@@ -226,6 +224,23 @@ namespace Service.Source
 
                 SaveLog($"[Info] MessageFcunction::OnCreateNewAccount Check Password Error");
 
+            }
+
+            if (rData.Result == (int)UserRegisteredResult.ResultDefine.emResult_Success)
+            {
+                redis.GetRedis((int)Connect.RedisDB.emRedisDB_User).HashSet($"UserAccount_" + newAccount.Email, hashTransfer.TransToHashEntryArray(newAccount));
+                redis.GetRedis((int)Connect.RedisDB.emRedisDB_User).HashSet($"UserInfo_" + info.MemberID, hashTransfer.TransToHashEntryArray(info));
+                redis.GetRedis((int)Connect.RedisDB.emRedisDB_Ride).HashSet($"RideData_" + rideData.MemberID, hashTransfer.TransToHashEntryArray(rideData));
+                redis.GetRedis((int)Connect.RedisDB.emRedisDB_Ride).HashSet($"RideData_" + rideData.MemberID, hashTransfer.TransToHashEntryArray(rideData));
+                redis.GetRedis((int)Connect.RedisDB.emRedisDB_Ride).HashSet($"CurWeekRideData_" + newAccount.MemberID, hashTransfer.TransToHashEntryArray(curWeek));
+
+                // DB 交易提交
+                db.GetSql().CommitTran();
+            }
+            else
+            {
+                // DB 交易失敗, 啟動Rollback
+                db.GetSql().RollbackTran();
             }
 
             JObject jsMain = new JObject();
