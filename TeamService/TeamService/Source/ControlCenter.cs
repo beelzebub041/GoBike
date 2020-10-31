@@ -22,7 +22,7 @@ namespace Service.Source
 
         private MessageProcessor msgProcessor = null;   // MessageProcessor物件
 
-        private readonly string version = "Team033";    // 版本號
+        private readonly string version = "Team034";    // 版本號
 
         public ControlCenter(Form1 form)
         {

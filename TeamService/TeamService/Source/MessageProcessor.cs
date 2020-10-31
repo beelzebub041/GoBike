@@ -66,7 +66,7 @@ namespace Service.Source
                 AddMsgFunc((int)C2S_CmdID.emUpdateTeamData, msgFunc.OnUpdateTeamData);
                 AddMsgFunc((int)C2S_CmdID.emChangeLander, msgFunc.OnChangeLander);
                 AddMsgFunc((int)C2S_CmdID.emUpdateViceLeaderList, msgFunc.OnUpdateViceLeaderList);
-                AddMsgFunc((int)C2S_CmdID.emUpdateTeamMemberList, msgFunc.OnUpdateTeamMemberList);
+                //AddMsgFunc((int)C2S_CmdID.emUpdateTeamMemberList, msgFunc.OnUpdateTeamMemberList); 不使用
                 AddMsgFunc((int)C2S_CmdID.emUpdateApplyJoinList, msgFunc.OnUpdateApplyJoinList);
                 AddMsgFunc((int)C2S_CmdID.emUpdateBulletin, msgFunc.OnUpdateBulletin);
                 AddMsgFunc((int)C2S_CmdID.emUpdateActivity, msgFunc.OnUpdateActivity);

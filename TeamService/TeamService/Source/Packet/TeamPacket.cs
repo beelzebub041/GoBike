@@ -7,8 +7,8 @@ namespace TeamPacket.ServerToClient
         emUpdateTeamDataResult,
         emChangeLanderResult,
         emUpdateViceLeaderListResult,
-        emUpdateTeamMemberListResult,
-        emUpdateApplyJoinListResult,
+        //emUpdateTeamMemberListResult,     不使用
+        emUpdateApplyJoinListResult = 1006,
         emUpdateBulletinResult,
         emUpdateActivityResult,
         emDeleteTeamResult,
@@ -93,28 +93,28 @@ namespace TeamPacket.ServerToClient
 
     }
 
-    // 更新隊員列表結果
-    class UpdateTeamMemberListResult
-    {
-        // 結果定義
-        public enum ResultDefine : int
-        {
-            emResult_Fail = 0,                      // 0: 更新失敗
-            emResult_Success,                       // 1: 更新成功
-        }
+    //// 更新隊員列表結果
+    //class UpdateTeamMemberListResult
+    //{
+    //    // 結果定義
+    //    public enum ResultDefine : int
+    //    {
+    //        emResult_Fail = 0,                      // 0: 更新失敗
+    //        emResult_Success,                       // 1: 更新成功
+    //    }
 
-        /**
-          * 更新動作
-          * -1: 無動作
-          * 0: 新增
-          * 1: 刪除
-          */
-        public int Action { get; set; }
+    //    /**
+    //      * 更新動作
+    //      * -1: 無動作
+    //      * 0: 新增
+    //      * 1: 刪除
+    //      */
+    //    public int Action { get; set; }
 
-        // 結果
-        public int Result { get; set; }
+    //    // 結果
+    //    public int Result { get; set; }
 
-    }
+    //}
 
     // 更新申請加入車隊列表結果
     class UpdateApplyJoinListResult
@@ -281,8 +281,8 @@ namespace TeamPacket.ClientToServer
         emUpdateTeamData,
         emChangeLander,
         emUpdateViceLeaderList,
-        emUpdateTeamMemberList,
-        emUpdateApplyJoinList,
+        //emUpdateTeamMemberList,   不使用
+        emUpdateApplyJoinList = 1006,
         emUpdateBulletin,
         emUpdateActivity,
         emDeleteTeam,
@@ -399,26 +399,26 @@ namespace TeamPacket.ClientToServer
 
     }
 
-    /*
-    * 更新車隊隊員列表
-    */
-    class UpdateTeamMemberList
-    {
-        // 車隊ID
-        public string TeamID { get; set; }
+    ///*
+    //* 更新車隊隊員列表
+    //*/
+    //class UpdateTeamMemberList
+    //{
+    //    // 車隊ID
+    //    public string TeamID { get; set; }
 
-        /**
-        * 更新動作
-        * -1: 刪除
-        * 0: 無動作
-        * 1: 新增
-        */
-        public int Action { get; set; }
+    //    /**
+    //    * 更新動作
+    //    * -1: 刪除
+    //    * 0: 無動作
+    //    * 1: 新增
+    //    */
+    //    public int Action { get; set; }
 
-        // 隊員的MemberID
-        public string MemberID { get; set; }
+    //    // 隊員的MemberID
+    //    public string MemberID { get; set; }
 
-    }
+    //}
 
     /*
     * 更新申請加入車隊列表
