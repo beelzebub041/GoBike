@@ -126,6 +126,7 @@
     <Compile Include="Source\Packet\UserPacket.cs" />
     <Compile Include="Source\Tools\Logger.cs" />
     <Compile Include="Source\Tools\RedisHashTransfer.cs" />
+    <Compile Include="Source\Tools\WeekProcess.cs" />
     <EmbeddedResource Include="Form1.resx">
       <DependentUpon>Form1.cs</DependentUpon>
     </EmbeddedResource>
