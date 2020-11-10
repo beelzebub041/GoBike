@@ -214,7 +214,7 @@ namespace Service.Source
         /**
          * 更新車隊成員資訊
          */
-        private bool UpdateTeamMemberList(string memberID, string teamID, int action)
+        private bool UpdateTeamMemberList(string memberID, string teamID, int action, bool updateUserInfo = true)
         {
             bool success = false;
 
@@ -286,9 +286,12 @@ namespace Service.Source
 
                             SaveLog($"[Info] MessageFunction::OnUpdateTeamMemberList, Update Team Member:{memberID} Success");
 
-                            if (!UpdateUserTeamList(memberID, teamID, action))
+                            if (updateUserInfo)
                             {
-                                success = false;
+                                if (!UpdateUserTeamList(memberID, teamID, action))
+                                {
+                                    success = false;
+                                }
                             }
 
                         }
@@ -401,12 +404,12 @@ namespace Service.Source
                                     if (action == 1)
                                     {
                                         // 新副隊長從車隊隊員列表中移除
-                                        UpdateTeamMemberList(memberID, teamID, -1);
+                                        UpdateTeamMemberList(memberID, teamID, -1, false);
                                     }
                                     else if (action == -1 && !kick)
                                     {
                                         // 舊副隊長加入車隊隊員列表中
-                                        UpdateTeamMemberList(memberID, teamID, 1);
+                                        UpdateTeamMemberList(memberID, teamID, 1, false);
                                     }
                                 }
                                 else
