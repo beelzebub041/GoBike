@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>netcoreapp3.1</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="sqlSugarCore" Version="5.0.1.2" />
+    <PackageReference Include="StackExchange.Redis.Extensions.Core" Version="6.3.5" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Source\Connect\" />
+    <Folder Include="Source\Define\" />
+    <Folder Include="Source\Tools\" />
+  </ItemGroup>
+
+</Project>
