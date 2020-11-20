@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace DataUpdateService.Source.Interface
+namespace RedisDataUpdateService.Source.Interface
 {
     interface IUpdater
     {

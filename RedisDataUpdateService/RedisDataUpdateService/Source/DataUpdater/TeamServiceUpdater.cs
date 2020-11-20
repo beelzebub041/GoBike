@@ -6,7 +6,7 @@ using Connect;
 
 using DataBaseDef;
 
-using DataUpdateService.Source.Interface;
+using RedisDataUpdateService.Source.Interface;
 
 using Tools;
 using Tools.RedisHashTransfer;

@@ -1,6 +1,6 @@
 ﻿using System;
 
-using DataUpdateService.Source;
+using RedisDataUpdateService.Source;
 
 using Tools;
 
@@ -10,7 +10,7 @@ namespace RedisDataUpdateService
     {
         static void Main(string[] args)
         {
-            UpdateService service = new UpdateService();
+            Service service = new Service();
 
             try
             {

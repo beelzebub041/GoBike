@@ -5,9 +5,9 @@ using System.Text;
 using Tools;
 using RedisDataUpdateService.Source.DataUpdater;
 
-namespace DataUpdateService.Source
+namespace RedisDataUpdateService.Source
 {
-    class UpdateService
+    class Service
     {
         private UserServiceUpdater userUpdater = null;
 
@@ -15,9 +15,9 @@ namespace DataUpdateService.Source
 
         private TeamServiceUpdater teamUpdater = null;
 
-        private string version = "Update001";
+        private string version = "Update002";
 
-        public UpdateService()
+        public Service()
         {
             userUpdater = new UserServiceUpdater();
 
@@ -25,10 +25,10 @@ namespace DataUpdateService.Source
 
             teamUpdater = new TeamServiceUpdater();
 
-            Logger.Instance.SaveLog($"Redis Data Update Service Version: {version}");
+            Logger.Instance.SaveLog($"[Info] Redis Data Update Service Version: {version}");
         }
 
-        ~UpdateService()
+        ~Service()
         {
             Destroy();
         }
