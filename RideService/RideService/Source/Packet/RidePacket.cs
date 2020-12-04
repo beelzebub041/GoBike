@@ -203,7 +203,8 @@ namespace RidePacket.ClientToServer
         {
             emAction_Delete = -1,          // -1: 拒絕
             emAction_None,                 // 0: 無動作
-            emAction_Add,                  // 1: 加入
+            emAction_Join,                 // 1: 加入
+            emAction_Leave,                // 1: 離開
         }
 
         // 動作
