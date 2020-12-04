@@ -676,8 +676,6 @@ namespace Service.Source
 
             TeamData teamData = null;
 
-            List<string> notifyTargetList = new List<string>();
-
             try
             {
                 teamData = db.GetSql().Queryable<TeamData>().With(SqlSugar.SqlWith.RowLock).Where(it => it.TeamID == packet.TeamID).Single();
@@ -687,7 +685,6 @@ namespace Service.Source
                 // 有找到車隊 
                 if (teamData != null)
                 {
-                    notifyTargetList = GetAllMemberID(teamData);
 
                     // 只有隊長有更改權限
                     if (teamData.Leader == packet.LeaderID)
@@ -735,8 +732,6 @@ namespace Service.Source
                                         if (db.GetSql().Updateable<TeamData>(teamData).With(SqlSugar.SqlWith.RowLock).Where(it => it.TeamID == packet.TeamID).ExecuteCommand() > 0)
                                         {
                                             rData.Result = (int)ChangeLanderResult.ResultDefine.emResult_Success;
-
-                                            notifyTargetList.Remove(packet.MemberID);
 
                                             SaveLog($"[Info] MessageFunction::OnChangeLander, Change New Leader:{packet.MemberID} Success");
                                         }
@@ -802,18 +797,21 @@ namespace Service.Source
             {
                 redis.GetRedis((int)Connect.RedisDB.emRedisDB_Team).HashSet($"TeamData_" + teamData.TeamID, hashTransfer.TransToHashEntryArray(teamData));
 
+                UserInfo oldLeaderInfo = db.GetSql().Queryable<UserInfo>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == teamData.Leader).Single();
+                UserInfo newLeaderInfo = db.GetSql().Queryable<UserInfo>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).Single();
+
+                List<string> notifyTargetList = GetAllMemberID(teamData);
+                notifyTargetList.Remove(teamData.Leader);
+
                 for (int idx = 0; idx < notifyTargetList.Count(); idx++)
                 {
                     string targetID = notifyTargetList[idx];
 
                     UserAccount account = db.GetSql().Queryable<UserAccount>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == targetID).Single();
 
-                    UserInfo oldLeaderInfo = db.GetSql().Queryable<UserInfo>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == teamData.Leader).Single();
-                    UserInfo newLeaderInfo = db.GetSql().Queryable<UserInfo>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).Single();
-
                     if (account != null && oldLeaderInfo != null && newLeaderInfo != null)
                     {
-                        string sTitle = $"系統公告";
+                        string sTitle = $"車隊公告";
 
                         string sNotifyMsg = $"{teamData.TeamName} 隊長由 {oldLeaderInfo.NickName} 更換為 {newLeaderInfo.NickName} ";
 
@@ -1133,7 +1131,6 @@ namespace Service.Source
                 redis.GetRedis((int)Connect.RedisDB.emRedisDB_Team).HashSet($"TeamData_" + teamData.TeamID, hashTransfer.TransToHashEntryArray(teamData));
 
                 JArray jsViceLeader = JArray.Parse(teamData.TeamViceLeaderIDs);
-
                 List<string> notifyTargrtList = jsViceLeader.ToObject<List<string>>();
                 notifyTargrtList.Add(teamData.Leader);
 
@@ -1598,12 +1595,12 @@ namespace Service.Source
                     List<string> notifyTargetList = GetAllMemberID(teamData);
                     notifyTargetList.Remove(packet.MemberID);
 
+                    // 活動發起人
+                    UserInfo userInfo = db.GetSql().Queryable<UserInfo>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).Single();
+
                     for (int idx = 0; idx < notifyTargetList.Count(); idx++)
                     {
                         string targetID = notifyTargetList[idx];
-
-                        // 活動發起人
-                        UserInfo userInfo = db.GetSql().Queryable<UserInfo>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).Single();
 
                         // 收到公告的人
                         UserAccount account = db.GetSql().Queryable<UserAccount>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == targetID).Single();

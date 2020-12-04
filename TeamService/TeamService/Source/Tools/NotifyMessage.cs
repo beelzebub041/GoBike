@@ -40,9 +40,10 @@ namespace Tools.NotifyMessage
 
         }
 
-        /**
-         * 初始化
-         */
+        /// <summary>
+        /// 初始化
+        /// </summary>
+        /// <returns> 回傳是否初始化成功 </returns>
         public bool Initialize()
         {
             bool bReturn = true;
@@ -64,15 +65,15 @@ namespace Tools.NotifyMessage
             catch (Exception ex)
             {
                 SaveLog($"[Error] NotifyMessage::Initialize, Catch Error Msg:{ex.Message}");
-
             }
 
             return bReturn;
         }
 
-        /**
-         * 讀取設定檔
-         */
+        /// <summary>
+        /// 讀取設定檔
+        /// </summary>
+        /// <returns> 回傳是否讀取成功 </returns>
         private bool LoadingConfig()
         {
             bool bReturn = true;
@@ -114,18 +115,37 @@ namespace Tools.NotifyMessage
             return bReturn;
         }
 
-        /**
-         * 推播訊息至裝置
-         */
+        /// <summary>
+        /// 推播訊息至裝置
+        /// </summary>
+        /// <param name="memberId"> 會員 ID </param>
+        /// <param name="deviceId"> 裝置 ID </param>
+        /// <param name="tit"> 標題 </param>
+        /// <param name="msg"> 內容 </param>
         public void NotifyMsgToDevice(string memberId, string deviceId, string tit, string msg)
         {
             if (serverKey != "" && senderId != "")
             {
                 try
                 {
-                    JObject jsBody = new JObject();
-                    jsBody.Add("Owner", memberId);
-                    jsBody.Add("Content", msg);
+                    //JObject jsBody = new JObject();
+                    //jsBody.Add("Owner", memberId);
+                    //jsBody.Add("Content", msg);
+
+                    //WebRequest tRequest = WebRequest.Create("https://fcm.googleapis.com/fcm/send");
+                    //tRequest.Method = "post";
+                    //tRequest.ContentType = "application/json";
+                    //var data = new
+                    //{
+                    //    to = deviceId,
+                    //    notification = new
+                    //    {
+                    //        body = jsBody.ToString(),
+                    //        title = tit,
+                    //        sound = "Enabled"
+
+                    //    }
+                    //};
 
                     WebRequest tRequest = WebRequest.Create("https://fcm.googleapis.com/fcm/send");
                     tRequest.Method = "post";
@@ -135,12 +155,12 @@ namespace Tools.NotifyMessage
                         to = deviceId,
                         notification = new
                         {
-                            body = jsBody.ToString(),
+                            body = msg,
                             title = tit,
                             sound = "Enabled"
-
                         }
                     };
+
                     var serializer = new JavaScriptSerializer();
                     var json = serializer.Serialize(data);
                     Byte[] byteArray = Encoding.UTF8.GetBytes(json);
@@ -175,5 +195,6 @@ namespace Tools.NotifyMessage
             }
 
         }
+        
     }
 }
