@@ -332,7 +332,7 @@ namespace Service.Source
                             JObject jsGroupData = new JObject();
                             jsGroupData.Add("Leader", packet.MemberID);
                             jsGroupData.Add("InviteList", jsInviteList);
-                            jsGroupData.Add("MemberList", JArray.FromObject(MemberList).ToString());
+                            jsGroupData.Add("MemberList", new JArray());
 
                             if (redis.GetRedis((int)Connect.RedisDB.emRedisDB_RideGroup).StringSet(sRideGroupKey, jsGroupData.ToString()))
                             {
@@ -418,23 +418,18 @@ namespace Service.Source
                             // 刪除的人 為領隊
                             if (jsInfo.ContainsKey("Leader") && jsInfo["Leader"].ToString() == userInfo.MemberID)
                             {
-                                if (jsInfo.ContainsKey("MemberList"))
+                                if (jsInfo.ContainsKey("MemberList") && jsInfo.ContainsKey("InviteList"))
                                 {
+                                    JArray jsInviteList = JArray.Parse(jsInfo["InviteList"].ToString());
+                                    List<string> InviteList = jsInviteList.ToObject<List<string>>();
+
                                     JArray jsMemberList = JArray.Parse(jsInfo["MemberList"].ToString());
                                     List<string> memberList = jsMemberList.ToObject<List<string>>();
 
-                                    foreach (string member in memberList)
-                                    {
-                                        if (redis.GetRedis((int)Connect.RedisDB.emRedisDB_RideGroup).KeyExists($"GroupMember_{member}"))
-                                        {
-                                            redis.GetRedis((int)Connect.RedisDB.emRedisDB_RideGroup).KeyDelete($"GroupMember_{member}");
-                                        }
-                                    }
+                                    List<string> deleteList = InviteList.Concat(memberList).ToList<string>();
+                                    deleteList.Add(packet.MemberID);
 
-                                    JArray jsInviteList = JArray.Parse(jsInfo["InviteList"].ToString());
-                                    List<string> inviteList = jsInviteList.ToObject<List<string>>();
-
-                                    foreach (string member in inviteList)
+                                    foreach (string member in deleteList)
                                     {
                                         if (redis.GetRedis((int)Connect.RedisDB.emRedisDB_RideGroup).KeyExists($"GroupMember_{member}"))
                                         {
@@ -555,9 +550,9 @@ namespace Service.Source
                                 List<string> InviteList = jsInviteList.ToObject<List<string>>();
 
                                 JArray jsMemberList = JArray.Parse(jsGroupData["MemberList"].ToString());
-                                List<string> MemberList = jsMemberList.ToObject<List<string>>();
+                                List<string> memberList = jsMemberList.ToObject<List<string>>();
 
-                                groupMemberList = MemberList.ToList<string>();
+                                groupMemberList = memberList.ToList<string>();
                                 groupMemberList.Add(leaderAccount.MemberID);
 
                                 // 加入 或 拒絕
@@ -571,11 +566,11 @@ namespace Service.Source
                                         if (packet.Action == (int)ReplyRideGroup.ActionDefine.emAction_Join)
                                         {
                                             // 不再成員名單中
-                                            if (!MemberList.Contains(packet.MemberID))
+                                            if (!memberList.Contains(packet.MemberID))
                                             {
-                                                MemberList.Add(packet.MemberID);
+                                                memberList.Add(packet.MemberID);
 
-                                                jsGroupData["MemberList"] = JArray.FromObject(MemberList);
+                                                jsGroupData["MemberList"] = JArray.FromObject(memberList);
 
                                                 rData.Result = (int)ReplyRideGroupResult.ResultDefine.emResult_Success;
                                             }
@@ -626,7 +621,7 @@ namespace Service.Source
                                     // 離開的人為隊長
                                     if (packet.MemberID == leaderAccount.MemberID)
                                     {
-                                        List<string> deleteList = InviteList.Concat(MemberList).ToList<string>();
+                                        List<string> deleteList = InviteList.Concat(memberList).ToList<string>();
                                         deleteList.Add(packet.MemberID);
 
                                         SaveLog($"[Info] Controller::OnReplyRideGroup Leader: {leaderAccount.MemberID} Leave");
@@ -666,18 +661,31 @@ namespace Service.Source
 
                                     }
                                     // 在成員名單中
-                                    else if (MemberList.Contains(packet.MemberID))
+                                    else if (memberList.Contains(packet.MemberID))
                                     {
-                                        MemberList.Remove(packet.MemberID);
+                                        memberList.Remove(packet.MemberID);
 
-                                        jsGroupData["MemberList"] = JArray.FromObject(MemberList);
+                                        jsGroupData["MemberList"] = JArray.FromObject(memberList);
 
                                         // 刪除Redis資料
                                         if (redis.GetRedis((int)Connect.RedisDB.emRedisDB_RideGroup).KeyDelete(sMemberKey))
                                         {
-                                            rData.Result = (int)ReplyRideGroupResult.ResultDefine.emResult_Success;
-
                                             SaveLog($"[Info] Controller::OnReplyRideGroup Remove Group Member Temp Data: {sMemberKey} Success");
+
+                                            GroupData = jsGroupData.ToString();
+
+                                            if (redis.GetRedis((int)Connect.RedisDB.emRedisDB_RideGroup).StringSet(sRideGroupKey, GroupData))
+                                            {
+                                                rData.Result = (int)ReplyRideGroupResult.ResultDefine.emResult_Success;
+
+                                                SaveLog($"[Info] Controller::OnReplyRideGroup, Member:{packet.MemberID} Leave Ride Group: {sRideGroupKey} Success");
+                                            }
+                                            else
+                                            {
+                                                rData.Result = (int)ReplyRideGroupResult.ResultDefine.emResult_Fail;
+
+                                                SaveLog($"[Warning] Controller::OnReplyRideGroup, Member:{packet.MemberID} Leave Ride Group: {sRideGroupKey} Fail");
+                                            }
                                         }
                                         else
                                         {
@@ -718,7 +726,6 @@ namespace Service.Source
                                             SaveLog($"[Warning] Controller::OnReplyRideGroup, Member:{packet.MemberID} Join Ride Group: {sRideGroupKey} Fail");
                                         }
                                     }
-                                    
                                     
                                 }
                             }
