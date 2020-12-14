@@ -1130,6 +1130,8 @@ namespace Service.Source
 
                 redis.GetRedis((int)Connect.RedisDB.emRedisDB_Team).HashSet($"TeamData_" + teamData.TeamID, hashTransfer.TransToHashEntryArray(teamData));
 
+                UserInfo userInfo = db.GetSql().Queryable<UserInfo>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).Single();
+
                 JArray jsViceLeader = JArray.Parse(teamData.TeamViceLeaderIDs);
                 List<string> notifyTargrtList = jsViceLeader.ToObject<List<string>>();
                 notifyTargrtList.Add(teamData.Leader);
@@ -1139,7 +1141,6 @@ namespace Service.Source
                     string targetID = notifyTargrtList[idx];
 
                     UserAccount account = db.GetSql().Queryable<UserAccount>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == targetID).Single();
-                    UserInfo userInfo = db.GetSql().Queryable<UserInfo>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == targetID).Single();
 
                     if (account != null && userInfo != null)
                     {
