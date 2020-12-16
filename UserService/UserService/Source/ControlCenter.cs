@@ -5,52 +5,83 @@ using System.Windows.Forms;
 using System.Threading;
 
 using Service.Interface;
-
+using Connect;
 using Tools;
 
 namespace Service.Source
 {
     class ControlCenter: IControlCenter
     {
-        private Form1 form = null;                      // 視窗物件
+        /// <summary>
+        /// ControlCenter 實例
+        /// </summary>
+        private static ControlCenter instance = null;
 
-        private Logger log = null;                      // Log物件
+        /// <summary>
+        /// 版本號
+        /// </summary>
+        private readonly string version = "User031";
 
-        private object logLock = new object();          // Log Lock
+        /// <summary>
+        /// Loger 物件
+        /// </summary>
+        private Logger logger = null;
 
-        private ClientHandler clientHandler = null;     // ClientHandler物件
+        /// <summary>
+        /// ClientHandler物件
+        /// </summary>
+        private ClientHandler clientHandler = null;
 
-        private MessageProcessor msgProcessor = null;   // MessageProcessor物件
-
-        private readonly string version = "User030";    // 版本號
-
-        public ControlCenter(Form1 form)
+        /// <summary>
+        /// 建構式
+        /// </summary>
+        private ControlCenter()
         {
-            this.form = form;
-
-            log = new Logger();
-
-            msgProcessor = new MessageProcessor(SaveLog);
-
-            clientHandler = new ClientHandler(SaveLog, msgProcessor.MessageDispatch);
 
         }
 
+        /// <summary>
+        /// 解構式
+        /// </summary>
         ~ControlCenter()
         {
             
         }
 
-        // 初始化
-        public bool Initialize()
+        /// <summary>
+        /// 取得 ControlCenter 實例
+        /// </summary>
+        public static ControlCenter Instance
         {
-            SaveLog($"User Service Version: {version}");
+            get
+            {
+                if (instance == null)
+                {
+                    instance = new ControlCenter();
+                }
+                return instance;
+            }
+        }
 
+        /// <summary>
+        /// 初始化
+        /// </summary>
+        /// <returns> 是否成功初始化 </returns>
+        public bool Initialize(Logger logger)
+        {
             bool result = false;
 
             try
             {
-                if (msgProcessor.Initialize() && clientHandler.Initialize())
+                this.logger = logger;
+
+                SaveLog($"[Info] User Service Version: {version}");
+
+                clientHandler = new ClientHandler("/User");
+
+                if (MessageProcessor.Instance.Initialize(logger) && clientHandler.Initialize(logger, MessageProcessor.Instance.AddQueue) &&
+                    DataBaseConnect.Instance.Initialize(logger) && DataBaseConnect.Instance.Connect() && 
+                    RedisConnect.Instance.Initialize(logger) && RedisConnect.Instance.Connect())
                 {
                     result = true;
 
@@ -69,7 +100,10 @@ namespace Service.Source
             return result;
         }
 
-        // 銷毀
+        /// <summary>
+        /// 銷毀
+        /// </summary>
+        /// <returns> 是否成功銷毀 </returns>
         public bool Destroy()
         {
             bool result = true;
@@ -77,16 +111,12 @@ namespace Service.Source
             return result;
         }
 
-        // 儲存Log
-        public void SaveLog(string msg)
+        private void SaveLog(string msg)
         {
-            lock (logLock)
+            if (logger != null)
             {
-                log.SaveLog(msg);
-
-                form.updateTextBox(msg);
+                logger.AddLog(msg);
             }
-
         }
     }
 }

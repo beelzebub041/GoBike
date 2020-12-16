@@ -8,9 +8,13 @@ using System.Runtime.InteropServices;
 using StackExchange.Redis;
 using System.Reflection;
 
+using Tools;
 
 namespace Connect
-{
+{   
+    /// <summary>
+    /// Redis 資料庫的索引
+    /// </summary>
     public enum RedisDB : int
     {
         emRedisDB_RideGroup = 0,
@@ -36,36 +40,78 @@ namespace Connect
         [DllImport("kernel32")]
         private static extern int GetPrivateProfileString(string section, string key, string def, StringBuilder retVal, int size, string filePath);
 
-        // ==================== Delegate ==================== //
-
-        public delegate void LogDelegate(string msg);
-
-        private LogDelegate SaveLog = null;
-
         // ============================================ //
 
+        /// <summary>
+        /// RedisConnect的實例
+        /// </summary>
+        private static RedisConnect instance = null;
+
+        /// <summary>
+        /// 連線IP
+        /// </summary>
         private string ip = "";
 
+        /// <summary>
+        /// 連線Port
+        /// </summary>
         private int port = -1;
 
+        /// <summary>
+        /// 
+        /// </summary>
         ConnectionMultiplexer redis = null;
 
-        public RedisConnect(LogDelegate log)
+        /// <summary>
+        /// Logger物件
+        /// </summary>
+        private Logger logger = null;
+        
+        /// <summary>
+        /// 建構式
+        /// </summary>
+        public RedisConnect()
         {
-            this.SaveLog = log;
+
         }
 
+        /// <summary>
+        /// 解構式
+        /// </summary>
         ~RedisConnect()
         {
 
         }
 
-        public bool Initialize()
+        /// <summary>
+        /// 取得 RedisConnect的實例
+        /// </summary>
+        public static RedisConnect Instance
+        {
+            get
+            {
+                if (instance == null)
+                {
+                    instance = new RedisConnect();
+                }
+
+                return instance;
+            }
+        }
+
+        /// <summary>
+        /// 初始化
+        /// </summary>
+        /// <param name="logger"> Logger物件 </param>
+        /// <returns> 是否成功初始化</returns>
+        public bool Initialize(Logger logger)
         {
             bool ret = false;
 
             if (LoadConfig())
             {
+                this.logger = logger;
+                
                 ret = true;
             }
             else
@@ -76,9 +122,22 @@ namespace Connect
             return ret;
         }
 
-        /**
-         * 讀取Config
-         */
+        /// <summary>
+        /// 儲存Log
+        /// </summary>
+        /// <param name="msg"> 訊息 </param>
+        private void SaveLog(string msg)
+        {
+            if (logger != null)
+            {
+                logger.AddLog(msg);
+            }
+        }
+
+        /// <summary>
+        /// 讀取Config
+        /// </summary>
+        /// <returns> 是否成功讀取 </returns>
         private bool LoadConfig()
         {
             bool ret = true;
@@ -120,9 +179,10 @@ namespace Connect
             return ret;
         }
 
-        /**
-         * 建立連線
-         */
+        /// <summary>
+        /// 建立連線
+        /// </summary>
+        /// <returns> 是否成功連線 </returns>
         public bool Connect()
         {
             bool ret = false;
@@ -145,9 +205,10 @@ namespace Connect
             return ret;
         }
 
-        /**
-         * TODO 關閉連線
-         */
+        /// <summary>
+        /// 關閉連線
+        /// </summary>
+        /// <returns> 是否成功關閉連線 </returns>
         public bool Disconnect()
         {
             bool ret = false;
@@ -155,6 +216,7 @@ namespace Connect
             try
             {
                 // 關閉連線
+                redis.Close();
 
                 ret = true;
 
@@ -169,6 +231,11 @@ namespace Connect
             return ret;
         }
 
+        /// <summary>
+        /// 取得 Redis資料庫物件
+        /// </summary>
+        /// <param name="dbIdx"> 資料庫鎖引</param>
+        /// <returns> 資料庫物件 </returns>
         public IDatabase GetRedis(int dbIdx)
         {
             IDatabase db = null;

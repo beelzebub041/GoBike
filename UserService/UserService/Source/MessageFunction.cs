@@ -6,17 +6,17 @@ using System.Threading.Tasks;
 using System.Runtime.InteropServices;
 using System.Collections.Concurrent;
 
-using WebSocketSharp;
-using WebSocketSharp.Server;
-
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
+using Tools;
 using Tools.WeekProcess;
 using Tools.RedisHashTransfer;
 
 using DataBaseDef;
 using Connect;
+using SqlSugar;
+using StackExchange.Redis;
 
 using UserPacket.ClientToServer;
 using UserPacket.ServerToClient;
@@ -25,83 +25,104 @@ namespace Service.Source
 {
     class MessageFunction
     {
-        // ==================== Delegate ==================== //
+        /// <summary>
+        /// hash 轉換器
+        /// </summary>
+        private RedisHashTransfer hashTransfer = null;
 
-        public delegate void LogDelegate(string msg);
+        /// <summary>
+        /// 週時間處理
+        /// </summary>
+        private WeekProcess weekProcess = null;
 
-        private LogDelegate log = null;
+        /// <summary>
+        /// Logger 物件
+        /// </summary>
+        private Logger logger = null;
 
-        // ============================================ //
-
-        private DataBaseConnect db = null;
-
-        RedisConnect redis = null;
-
-        RedisHashTransfer hashTransfer = null;
-
-        WeekProcess weekProcess = null;
-
-        public MessageFunction(LogDelegate log)
+        /// <summary>
+        /// 建構式
+        /// </summary>
+        public MessageFunction()
         {
-            this.log = log;
-
-            db = new DataBaseConnect(SaveLog);
-
-            redis = new RedisConnect(SaveLog);
-
             hashTransfer = new RedisHashTransfer();
 
             weekProcess = new WeekProcess();
-
         }
 
+        /// <summary>
+        /// 解構式
+        /// </summary>
         ~MessageFunction()
         {
 
         }
 
-        public void SaveLog(string msg)
+        /// <summary>
+        ///  初始化
+        /// </summary>
+        /// <returns> 是否成功初始化 </returns>
+        public bool Initialize(Logger logger)
         {
-            log?.Invoke(msg);
-        }
+            bool ret = false;
 
-        public bool Initialize()
-        {
-            bool ret = true;
+            this.logger = logger;
 
-            if (db.Initialize() && db.Connect() 
-                && redis.Initialize() && redis.Connect())
-            {
-                ret = true;
+            ret = true;
 
-                SaveLog("[Info] MessageFcunction::Initialize, Initialize Success");
-            }
-            else
-            {
-                SaveLog("[Error] MessageFcunction::Initialize, Initialize Fail");
-            }
+            SaveLog("[Info] MessageFcunction::Initialize, Initialize Success");
 
             return ret;
         }
 
+        /// <summary>
+        /// 銷毀
+        /// </summary>
+        /// <returns> 是否成功銷毀 </returns>
         public bool Destory()
         {
             bool ret = true;
 
-            if (db != null)
-            {
-                db.Disconnect();
-            }
-
-            if (redis != null)
-            {
-                redis.Disconnect();
-            }
-
             return ret;
 
         }
 
+        /// <summary>
+        /// 儲存Log
+        /// </summary>
+        /// <param name="msg"> 訊息 </param>
+        private void SaveLog(string msg)
+        {
+            if (logger != null)
+            {
+                logger.AddLog(msg);
+            }
+        }
+
+        /// <summary>
+        /// 取得 Sql物件
+        /// </summary>
+        /// <returns> Sql物件 </returns>
+        private SqlSugarClient GetSql()
+        {
+            return DataBaseConnect.Instance.GetSql();
+        }
+
+        /// <summary>
+        /// 取得Redis 物件
+        /// </summary>
+        /// <param name="idx"> Redis資料庫索引</param>
+        /// <returns> Redis物件 </returns>
+        private IDatabase GetRedis(int idx)
+        {
+            return RedisConnect.Instance.GetRedis(idx);
+        }
+
+        /// <summary>
+        /// 建立新帳號
+        /// </summary>
+        /// <param name="data"> 封包資料 </param>
+        /// <returns> 結果 </returns>
         public string OnCreateNewAccount(string data)
         {
             string ret = "";
@@ -119,7 +140,7 @@ namespace Service.Source
             {
                 try
                 {
-                    UserAccount account = db.GetSql().Queryable<UserAccount>().With(SqlSugar.SqlWith.RowLock).Where(it => it.Email == packet.Email).Single();
+                    UserAccount account = GetSql().Queryable<UserAccount>().With(SqlSugar.SqlWith.RowLock).Where(it => it.Email == packet.Email).Single();
 
                     // 未包含該Email
                     if (account == null)
@@ -172,15 +193,15 @@ namespace Service.Source
                         curWeek.WeekDistance = 0;
 
                         // 設定DB 交易的起始點
-                        db.GetSql().BeginTran();
+                        GetSql().BeginTran();
 
                         // 寫入資料庫
-                        if (db.GetSql().Insertable(newAccount).With(SqlSugar.SqlWith.TabLockX).ExecuteCommand() > 0)
+                        if (GetSql().Insertable(newAccount).With(SqlSugar.SqlWith.TabLockX).ExecuteCommand() > 0)
                         {
 
-                            if (db.GetSql().Insertable(info).With(SqlSugar.SqlWith.TabLockX).ExecuteCommand() > 0 
-                                && db.GetSql().Insertable(rideData).With(SqlSugar.SqlWith.TabLockX).ExecuteCommand() > 0
-                                && db.GetSql().Insertable(curWeek).With(SqlSugar.SqlWith.TabLockX).ExecuteCommand() > 0)
+                            if (GetSql().Insertable(info).With(SqlSugar.SqlWith.TabLockX).ExecuteCommand() > 0 
+                                && GetSql().Insertable(rideData).With(SqlSugar.SqlWith.TabLockX).ExecuteCommand() > 0
+                                && GetSql().Insertable(curWeek).With(SqlSugar.SqlWith.TabLockX).ExecuteCommand() > 0)
                             {
                                 rData.Result = (int)UserRegisteredResult.ResultDefine.emResult_Success;
 
@@ -228,19 +249,19 @@ namespace Service.Source
 
             if (rData.Result == (int)UserRegisteredResult.ResultDefine.emResult_Success)
             {
-                redis.GetRedis((int)Connect.RedisDB.emRedisDB_User).HashSet($"UserAccount_" + newAccount.Email, hashTransfer.TransToHashEntryArray(newAccount));
-                redis.GetRedis((int)Connect.RedisDB.emRedisDB_User).HashSet($"UserInfo_" + info.MemberID, hashTransfer.TransToHashEntryArray(info));
-                redis.GetRedis((int)Connect.RedisDB.emRedisDB_Ride).HashSet($"RideData_" + rideData.MemberID, hashTransfer.TransToHashEntryArray(rideData));
-                redis.GetRedis((int)Connect.RedisDB.emRedisDB_Ride).HashSet($"RideData_" + rideData.MemberID, hashTransfer.TransToHashEntryArray(rideData));
-                redis.GetRedis((int)Connect.RedisDB.emRedisDB_Ride).HashSet($"CurWeekRideData_" + newAccount.MemberID, hashTransfer.TransToHashEntryArray(curWeek));
+                GetRedis((int)Connect.RedisDB.emRedisDB_User).HashSet($"UserAccount_" + newAccount.Email, hashTransfer.TransToHashEntryArray(newAccount));
+                GetRedis((int)Connect.RedisDB.emRedisDB_User).HashSet($"UserInfo_" + info.MemberID, hashTransfer.TransToHashEntryArray(info));
+                GetRedis((int)Connect.RedisDB.emRedisDB_Ride).HashSet($"RideData_" + rideData.MemberID, hashTransfer.TransToHashEntryArray(rideData));
+                GetRedis((int)Connect.RedisDB.emRedisDB_Ride).HashSet($"RideData_" + rideData.MemberID, hashTransfer.TransToHashEntryArray(rideData));
+                GetRedis((int)Connect.RedisDB.emRedisDB_Ride).HashSet($"CurWeekRideData_" + newAccount.MemberID, hashTransfer.TransToHashEntryArray(curWeek));
 
                 // DB 交易提交
-                db.GetSql().CommitTran();
+                GetSql().CommitTran();
             }
             else
             {
                 // DB 交易失敗, 啟動Rollback
-                db.GetSql().RollbackTran();
+                GetSql().RollbackTran();
             }
 
             JObject jsMain = new JObject();
@@ -252,6 +273,11 @@ namespace Service.Source
             return ret;
         }
 
+        /// <summary>
+        /// 使用者登入
+        /// </summary>
+        /// <param name="data"> 封包資料 </param>
+        /// <returns> 結果 </returns>
         public string OnUserLogin(string data)
         {
             string ret = "";
@@ -262,14 +288,14 @@ namespace Service.Source
 
             try
             {
-                UserAccount account = db.GetSql().Queryable<UserAccount>().Where(it => it.Email == packet.Email && it.Password == packet.Password).Single();
+                UserAccount account = GetSql().Queryable<UserAccount>().Where(it => it.Email == packet.Email && it.Password == packet.Password).Single();
 
                 // 有找到帳號
                 if (account != null)
                 {
                     if (account.Password == packet.Password)
                     {
-                        List<UserInfo> infoList = db.GetSql().Queryable<UserInfo>().Where(it => it.MemberID == account.MemberID).ToList();
+                        List<UserInfo> infoList = GetSql().Queryable<UserInfo>().Where(it => it.MemberID == account.MemberID).ToList();
 
                         // 有找到會員
                         if (infoList.Count() == 1)
@@ -312,6 +338,11 @@ namespace Service.Source
             return ret;
         }
 
+        /// <summary>
+        /// 更新使用者資料
+        /// </summary>
+        /// <param name="data"> 封包資料 </param>
+        /// <returns> 結果 </returns>
         public string OnUpdateUserInfo(string data)
         {
             string ret = "";
@@ -322,7 +353,7 @@ namespace Service.Source
 
             try
             {
-                UserInfo userInfo = db.GetSql().Queryable<UserInfo>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).Single();
+                UserInfo userInfo = GetSql().Queryable<UserInfo>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).Single();
 
                 // 有找到資料
                 if (userInfo != null)
@@ -340,16 +371,16 @@ namespace Service.Source
                     userInfo.SpecificationModel = packet.UpdateData.SpecificationModel == null ? userInfo.SpecificationModel : packet.UpdateData.SpecificationModel;
 
                     // 設定DB 交易的起始點
-                    db.GetSql().BeginTran();
+                    GetSql().BeginTran();
 
-                    if (db.GetSql().Updateable<UserInfo>(userInfo).With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).ExecuteCommand() > 0)
+                    if (GetSql().Updateable<UserInfo>(userInfo).With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).ExecuteCommand() > 0)
                     {
                         rData.Result = (int)UpdateUserInfoResult.ResultDefine.emResult_Success;
 
-                        redis.GetRedis((int)Connect.RedisDB.emRedisDB_User).HashSet($"UserInfo_" + userInfo.MemberID, hashTransfer.TransToHashEntryArray(userInfo));
+                        GetRedis((int)Connect.RedisDB.emRedisDB_User).HashSet($"UserInfo_" + userInfo.MemberID, hashTransfer.TransToHashEntryArray(userInfo));
 
                         // DB 交易提交
-                        db.GetSql().CommitTran();
+                        GetSql().CommitTran();
 
                         SaveLog($"[Info] MessageFcunction::OnUpdateUserInfo Update User: {packet.MemberID} Info Success");
                     }
@@ -379,7 +410,7 @@ namespace Service.Source
             // DB 交易失敗, 啟動Rollback
             if (rData.Result != (int)UpdateUserInfoResult.ResultDefine.emResult_Success)
             {
-                db.GetSql().RollbackTran();
+                GetSql().RollbackTran();
             }
 
             JObject jsMain = new JObject();
@@ -391,6 +422,11 @@ namespace Service.Source
             return ret;
         }
         
+        /// <summary>
+        /// 更新密碼
+        /// </summary>
+        /// <param name="data"> 封包資料 </param>
+        /// <returns> 結果 </returns>
         public string OnUpdatePassword(string data)
         {
             string ret = "";
@@ -402,7 +438,7 @@ namespace Service.Source
 
             try
             {
-                UserAccount account = db.GetSql().Queryable<UserAccount>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).Single();
+                UserAccount account = GetSql().Queryable<UserAccount>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).Single();
 
                 // 有找到帳號
                 if (account != null)
@@ -435,12 +471,12 @@ namespace Service.Source
 
                     if (canUpdate)
                     {
-                        if (db.GetSql().Updateable<UserAccount>().SetColumns(it => new UserAccount() { Password = packet.NewPassword }).With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).ExecuteCommand() > 0)
+                        if (GetSql().Updateable<UserAccount>().SetColumns(it => new UserAccount() { Password = packet.NewPassword }).With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).ExecuteCommand() > 0)
                         {
                             rData.Result = (int)UpdatePasswordResult.ResultDefine.emResult_Success;
 
                             account.Password = packet.NewPassword;
-                            redis.GetRedis((int)Connect.RedisDB.emRedisDB_User).HashSet($"UserAccount_" + account.Email, hashTransfer.TransToHashEntryArray(account));
+                            GetRedis((int)Connect.RedisDB.emRedisDB_User).HashSet($"UserAccount_" + account.Email, hashTransfer.TransToHashEntryArray(account));
 
                             SaveLog($"[Warning] MessageFcunction::OnUpdateUserInfo Member:{packet.MemberID} Update Password Success ");
                         }
@@ -483,6 +519,11 @@ namespace Service.Source
             return ret;
         }
         
+        /// <summary>
+        /// 更新好友列表
+        /// </summary>
+        /// <param name="data"> 封包資料 </param>
+        /// <returns> 結果 </returns>
         public string OnUpdateFriendList(string data)
         {
             string ret = "";
@@ -497,12 +538,12 @@ namespace Service.Source
                 // 不能為同一人
                 if (packet.MemberID != packet.FriendID)
                 {
-                    UserInfo userInfo = db.GetSql().Queryable<UserInfo>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).Single();
+                    UserInfo userInfo = GetSql().Queryable<UserInfo>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).Single();
 
                     // 有找到會員資料
                     if (userInfo != null)
                     {
-                        UserInfo friendInfo = db.GetSql().Queryable<UserInfo>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.FriendID).Single();
+                        UserInfo friendInfo = GetSql().Queryable<UserInfo>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.FriendID).Single();
 
                         // 有找到好友的會員資料
                         if (friendInfo != null)
@@ -546,12 +587,12 @@ namespace Service.Source
                             {
                                 JArray jsNew = JArray.FromObject(idList);
 
-                                if (db.GetSql().Updateable<UserInfo>().SetColumns(it => new UserInfo() { FriendList = jsNew.ToString() }).With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).ExecuteCommand() > 0)
+                                if (GetSql().Updateable<UserInfo>().SetColumns(it => new UserInfo() { FriendList = jsNew.ToString() }).With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).ExecuteCommand() > 0)
                                 {
                                     rData.Result = (int)UpdateFriendListResult.ResultDefine.emResult_Success;
 
                                     userInfo.FriendList = jsNew.ToString();
-                                    redis.GetRedis((int)Connect.RedisDB.emRedisDB_User).HashSet($"UserInfo_" + userInfo.MemberID, hashTransfer.TransToHashEntryArray(userInfo));
+                                    GetRedis((int)Connect.RedisDB.emRedisDB_User).HashSet($"UserInfo_" + userInfo.MemberID, hashTransfer.TransToHashEntryArray(userInfo));
 
                                     SaveLog($"[Error] MessageFcunction::OnUpdateFriendList Member: {packet.MemberID} Update FriendList Success");
 
@@ -602,7 +643,12 @@ namespace Service.Source
 
             return ret;
         }
-        
+
+        /// <summary>
+        /// 更新黑名單列表
+        /// </summary>
+        /// <param name="data"> 封包資料 </param>
+        /// <returns> 結果 </returns>
         public string OnUpdateBlackList(string data)
         {
             string ret = "";
@@ -618,12 +664,12 @@ namespace Service.Source
             {
                 if (packet.MemberID != packet.BlackID)
                 {
-                    userInfo = db.GetSql().Queryable<UserInfo>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).Single();
+                    userInfo = GetSql().Queryable<UserInfo>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).Single();
 
                     // 有找到會員
                     if (userInfo != null)
                     {
-                        UserInfo blackInfo = db.GetSql().Queryable<UserInfo>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).Single();
+                        UserInfo blackInfo = GetSql().Queryable<UserInfo>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).Single();
 
                         if (blackInfo != null)
                         {
@@ -666,9 +712,9 @@ namespace Service.Source
                                 JArray jsNew = JArray.FromObject(idList);
 
                                 // 設定DB 交易的起始點
-                                db.GetSql().BeginTran();
+                                GetSql().BeginTran();
 
-                                if (db.GetSql().Updateable<UserInfo>().SetColumns(it => new UserInfo() { BlackList = jsNew.ToString() }).With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).ExecuteCommand() > 0)
+                                if (GetSql().Updateable<UserInfo>().SetColumns(it => new UserInfo() { BlackList = jsNew.ToString() }).With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).ExecuteCommand() > 0)
                                 {
                                     rData.Result = (int)UpdateBlackListResult.ResultDefine.emResult_Success;
 
@@ -688,7 +734,7 @@ namespace Service.Source
 
                                             JArray jsFriendNew = JArray.FromObject(friendList);
 
-                                            if (db.GetSql().Updateable<UserInfo>().SetColumns(it => new UserInfo() { FriendList = jsFriendNew.ToString() }).With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).ExecuteCommand() > 0)
+                                            if (GetSql().Updateable<UserInfo>().SetColumns(it => new UserInfo() { FriendList = jsFriendNew.ToString() }).With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).ExecuteCommand() > 0)
                                             {
                                                 rData.Result = (int)UpdateBlackListResult.ResultDefine.emResult_Success;
 
@@ -749,14 +795,14 @@ namespace Service.Source
             if (rData.Result == (int)UpdateBlackListResult.ResultDefine.emResult_Success)
             {
                 // DB 交易提交
-                db.GetSql().CommitTran();
+                GetSql().CommitTran();
 
-                redis.GetRedis((int)Connect.RedisDB.emRedisDB_User).HashSet($"UserInfo_" + userInfo.MemberID, hashTransfer.TransToHashEntryArray(userInfo));
+                GetRedis((int)Connect.RedisDB.emRedisDB_User).HashSet($"UserInfo_" + userInfo.MemberID, hashTransfer.TransToHashEntryArray(userInfo));
             }
             else
             {
                 // DB 交易失敗, 啟動Rollback
-                db.GetSql().RollbackTran();
+                GetSql().RollbackTran();
             }
 
             JObject jsMain = new JObject();
@@ -768,6 +814,11 @@ namespace Service.Source
             return ret;
         }
 
+        /// <summary>
+        /// 更新推播Token
+        /// </summary>
+        /// <param name="data"> 封包資料 </param>
+        /// <returns> 結果 </returns>
         public string OnUpdateNotifyToken(string data)
         {
             string ret = "";
@@ -778,17 +829,17 @@ namespace Service.Source
 
             try
             {
-                UserAccount account = db.GetSql().Queryable<UserAccount>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).Single();
+                UserAccount account = GetSql().Queryable<UserAccount>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).Single();
 
                 // 有找到資料
                 if (account != null)
                 {
-                    if (db.GetSql().Updateable<UserAccount>().SetColumns(it => new UserAccount() { NotifyToken = packet.NotifyToken }).With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).ExecuteCommand() > 0)
+                    if (GetSql().Updateable<UserAccount>().SetColumns(it => new UserAccount() { NotifyToken = packet.NotifyToken }).With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).ExecuteCommand() > 0)
                     {
                         rData.Result = (int)UpdateNotifyTokenResult.ResultDefine.emResult_Success;
 
                         account.NotifyToken = packet.NotifyToken;
-                        redis.GetRedis((int)Connect.RedisDB.emRedisDB_User).HashSet($"UserAccount_" + account.MemberID, hashTransfer.TransToHashEntryArray(account));
+                        GetRedis((int)Connect.RedisDB.emRedisDB_User).HashSet($"UserAccount_" + account.MemberID, hashTransfer.TransToHashEntryArray(account));
 
                         SaveLog($"[Info] MessageFcunction::OnUpdateNotifyToken Update User: {packet.MemberID} Info Success");
 
