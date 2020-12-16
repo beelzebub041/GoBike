@@ -6,18 +6,18 @@ using System.Threading.Tasks;
 using System.Runtime.InteropServices;
 using System.Collections.Concurrent;
 
-using WebSocketSharp;
-using WebSocketSharp.Server;
-
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
+using Tools;
 using Tools.RedisHashTransfer;
 using Tools.WeekProcess;
 using Tools.NotifyMessage;
 
 using DataBaseDef;
 using Connect;
+using SqlSugar;
+using StackExchange.Redis;
 
 using TeamPacket.ClientToServer;
 using TeamPacket.ServerToClient;
@@ -26,57 +26,58 @@ namespace Service.Source
 {
     class MessageFunction
     {
-        // ==================== Delegate ==================== //
-
-        public delegate void LogDelegate(string msg);
-
-        private LogDelegate log = null;
-
-        // ============================================ //
-
-        private DataBaseConnect db = null;
-
-        RedisConnect redis = null;
-
+        /// <summary>
+        /// hash 轉換器
+        /// </summary>
         RedisHashTransfer hashTransfer = null;
 
+        /// <summary>
+        /// 週時間處理
+        /// </summary>
         private WeekProcess weekProcess = null;
 
+        /// <summary>
+        /// 推播訊息
+        /// </summary>
         private NotifyMessage ntMsg = null;
 
-        public MessageFunction(LogDelegate log)
+        /// <summary>
+        /// Logger 物件
+        /// </summary>
+        private Logger logger = null;
+
+        /// <summary>
+        /// 建構式
+        /// </summary>
+        public MessageFunction()
         {
-            this.log = log;
-
-            db = new DataBaseConnect(SaveLog);
-
-            redis = new RedisConnect(SaveLog);
-
             hashTransfer = new RedisHashTransfer();
 
             weekProcess = new WeekProcess();
 
-            ntMsg = new NotifyMessage(SaveLog);
+            ntMsg = new NotifyMessage();
 
         }
 
+        /// <summary>
+        /// 解構式
+        /// </summary>
         ~MessageFunction()
         {
 
         }
 
-        public void SaveLog(string msg)
-        {
-            log?.Invoke(msg);
-        }
-
-        public bool Initialize()
+        /// <summary>
+        ///  初始化
+        /// </summary>
+        /// <returns> 是否成功初始化 </returns>
+        public bool Initialize(Logger logger)
         {
             bool ret = true;
 
-            if (db.Initialize() && db.Connect() 
-                && redis.Initialize() && redis.Connect()
-                && ntMsg.Initialize())
+            this.logger = logger;
+
+            if (ntMsg.Initialize(logger))
             {
                 ret = true;
 
@@ -94,18 +95,39 @@ namespace Service.Source
         {
             bool ret = true;
 
-            if (db != null)
-            {
-                db.Disconnect();
-            }
-
-            if (redis != null)
-            {
-                redis.Disconnect();
-            }
-
             return ret;
 
+        }
+
+        /// <summary>
+        /// 儲存Log
+        /// </summary>
+        /// <param name="msg"> 訊息 </param>
+        private void SaveLog(string msg)
+        {
+            if (logger != null)
+            {
+                logger.AddLog(msg);
+            }
+        }
+
+        /// <summary>
+        /// 取得 Sql物件
+        /// </summary>
+        /// <returns> Sql物件 </returns>
+        private SqlSugarClient GetSql()
+        {
+            return DataBaseConnect.Instance.GetSql();
+        }
+
+        /// <summary>
+        /// 取得Redis 物件
+        /// </summary>
+        /// <param name="idx"> Redis資料庫索引</param>
+        /// <returns> Redis物件 </returns>
+        private IDatabase GetRedis(int idx)
+        {
+            return RedisConnect.Instance.GetRedis(idx);
         }
 
         /**
@@ -142,7 +164,7 @@ namespace Service.Source
             bool success = false;
 
             // 更新UserInfo的車隊資料
-            UserInfo userInfo = db.GetSql().Queryable<UserInfo>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == memberID).Single();
+            UserInfo userInfo = GetSql().Queryable<UserInfo>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == memberID).Single();
 
             // 有找到會員
             if (userInfo != null)
@@ -189,10 +211,10 @@ namespace Service.Source
                 {
                     JArray jsNew = JArray.FromObject(idList);
 
-                    if (db.GetSql().Updateable<UserInfo>().SetColumns(it => new UserInfo() { TeamList = jsNew.ToString() }).With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == memberID).ExecuteCommand() > 0)
+                    if (GetSql().Updateable<UserInfo>().SetColumns(it => new UserInfo() { TeamList = jsNew.ToString() }).With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == memberID).ExecuteCommand() > 0)
                     {
                         userInfo.TeamList = jsNew.ToString();
-                        redis.GetRedis((int)Connect.RedisDB.emRedisDB_User).HashSet($"UserInfo_" + userInfo.MemberID, hashTransfer.TransToHashEntryArray(userInfo));
+                        GetRedis((int)Connect.RedisDB.emRedisDB_User).HashSet($"UserInfo_" + userInfo.MemberID, hashTransfer.TransToHashEntryArray(userInfo));
 
                         SaveLog($"[Warning] MessageFunction::UpdateUserTeamList, Update User:{memberID} Team List Success");
                     }
@@ -220,7 +242,7 @@ namespace Service.Source
 
             try
             {
-                TeamData teamData = db.GetSql().Queryable<TeamData>().With(SqlSugar.SqlWith.RowLock).Where(it => it.TeamID == teamID).Single();
+                TeamData teamData = GetSql().Queryable<TeamData>().With(SqlSugar.SqlWith.RowLock).Where(it => it.TeamID == teamID).Single();
 
                 // 有找到車隊
                 if (teamData != null)
@@ -277,12 +299,12 @@ namespace Service.Source
                     {
                         JArray jsNew = JArray.FromObject(idMemberList);
 
-                        if (db.GetSql().Updateable<TeamData>().SetColumns(it => new TeamData() { TeamMemberIDs = jsNew.ToString() }).With(SqlSugar.SqlWith.RowLock).Where(it => it.TeamID == teamID).ExecuteCommand() > 0)
+                        if (GetSql().Updateable<TeamData>().SetColumns(it => new TeamData() { TeamMemberIDs = jsNew.ToString() }).With(SqlSugar.SqlWith.RowLock).Where(it => it.TeamID == teamID).ExecuteCommand() > 0)
                         {
                             success = true;
 
                             teamData.TeamMemberIDs = jsNew.ToString();
-                            redis.GetRedis((int)Connect.RedisDB.emRedisDB_Team).HashSet($"TeamData_" + teamData.TeamID, hashTransfer.TransToHashEntryArray(teamData));
+                            GetRedis((int)Connect.RedisDB.emRedisDB_Team).HashSet($"TeamData_" + teamData.TeamID, hashTransfer.TransToHashEntryArray(teamData));
 
                             SaveLog($"[Info] MessageFunction::OnUpdateTeamMemberList, Update Team Member:{memberID} Success");
 
@@ -331,7 +353,7 @@ namespace Service.Source
 
             try
             {
-                TeamData teamData = db.GetSql().Queryable<TeamData>().With(SqlSugar.SqlWith.RowLock).Where(it => it.TeamID == teamID).Single();
+                TeamData teamData = GetSql().Queryable<TeamData>().With(SqlSugar.SqlWith.RowLock).Where(it => it.TeamID == teamID).Single();
 
                 // 有找到車隊
                 if (teamData != null)
@@ -392,12 +414,12 @@ namespace Service.Source
                             {
                                 JArray jsNew = JArray.FromObject(idList);
 
-                                if (db.GetSql().Updateable<TeamData>().SetColumns(it => new TeamData() { TeamViceLeaderIDs = jsNew.ToString() }).With(SqlSugar.SqlWith.RowLock).Where(it => it.TeamID == teamID).ExecuteCommand() > 0)
+                                if (GetSql().Updateable<TeamData>().SetColumns(it => new TeamData() { TeamViceLeaderIDs = jsNew.ToString() }).With(SqlSugar.SqlWith.RowLock).Where(it => it.TeamID == teamID).ExecuteCommand() > 0)
                                 {
                                     success = true;
 
                                     teamData.TeamViceLeaderIDs = jsNew.ToString();
-                                    redis.GetRedis((int)Connect.RedisDB.emRedisDB_Team).HashSet($"TeamData_" + teamData.TeamID, hashTransfer.TransToHashEntryArray(teamData));
+                                    GetRedis((int)Connect.RedisDB.emRedisDB_Team).HashSet($"TeamData_" + teamData.TeamID, hashTransfer.TransToHashEntryArray(teamData));
 
                                     SaveLog($"[Info] MessageFunction::OnUpdateViceLeaderList, Update Vice Leader:{memberID} Success");
 
@@ -469,9 +491,9 @@ namespace Service.Source
 
             try
             {
-                TeamData teamData = db.GetSql().Queryable<TeamData>().With(SqlSugar.SqlWith.RowLock).Where(it => it.TeamName == packet.TeamName).Single();
+                TeamData teamData = GetSql().Queryable<TeamData>().With(SqlSugar.SqlWith.RowLock).Where(it => it.TeamName == packet.TeamName).Single();
 
-                List<TeamData> sameLeaderTeamList = db.GetSql().Queryable<TeamData>().With(SqlSugar.SqlWith.RowLock).Where(it => it.Leader == packet.MemberID).ToList();
+                List<TeamData> sameLeaderTeamList = GetSql().Queryable<TeamData>().With(SqlSugar.SqlWith.RowLock).Where(it => it.Leader == packet.MemberID).ToList();
 
                 // 未包含該車隊
                 if (teamData == null)
@@ -501,9 +523,9 @@ namespace Service.Source
                         newTeamData.ApplyJoinList = "[]";
 
                         // 設定DB 交易的起始點
-                        db.GetSql().BeginTran();
+                        GetSql().BeginTran();
 
-                        if (db.GetSql().Insertable(newTeamData).With(SqlSugar.SqlWith.RowLock).ExecuteCommand() > 0)
+                        if (GetSql().Insertable(newTeamData).With(SqlSugar.SqlWith.RowLock).ExecuteCommand() > 0)
                         {
                             SaveLog($"[Info] MessageFunction::OnCreateNewTeam, Create Team Success, TeamID:{rData.TeamID}");
 
@@ -555,15 +577,15 @@ namespace Service.Source
             }
 
             // DB 交易成功, 提交交易
-            db.GetSql().CommitTran();
+            GetSql().CommitTran();
             if (rData.Result == (int)CreateNewTeamResult.ResultDefine.emResult_Success)
             {
-                redis.GetRedis((int)Connect.RedisDB.emRedisDB_Team).HashSet($"TeamData_" + newTeamData.TeamID, hashTransfer.TransToHashEntryArray(newTeamData));
+                GetRedis((int)Connect.RedisDB.emRedisDB_Team).HashSet($"TeamData_" + newTeamData.TeamID, hashTransfer.TransToHashEntryArray(newTeamData));
             }
             // DB 交易失敗, 啟動Rollback
             else
             {
-                db.GetSql().RollbackTran();
+                GetSql().RollbackTran();
             }
 
             JObject jsMain = new JObject();
@@ -590,7 +612,7 @@ namespace Service.Source
 
             try
             {
-                teamData = db.GetSql().Queryable<TeamData>().With(SqlSugar.SqlWith.RowLock).Where(it => it.TeamID == packet.TeamID).Single();
+                teamData = GetSql().Queryable<TeamData>().With(SqlSugar.SqlWith.RowLock).Where(it => it.TeamID == packet.TeamID).Single();
 
                 // 有找到車隊
                 if (teamData != null)
@@ -610,9 +632,9 @@ namespace Service.Source
                         teamData.ExamineStatus = packet.ExamineStatus == 0 ? teamData.ExamineStatus : packet.ExamineStatus;
 
                         // 設定DB 交易的起始點
-                        db.GetSql().BeginTran();
+                        GetSql().BeginTran();
 
-                        if (db.GetSql().Updateable<TeamData>(teamData).With(SqlSugar.SqlWith.RowLock).Where(it => it.TeamID == packet.TeamID).ExecuteCommand() > 0)
+                        if (GetSql().Updateable<TeamData>(teamData).With(SqlSugar.SqlWith.RowLock).Where(it => it.TeamID == packet.TeamID).ExecuteCommand() > 0)
                         {
                             rData.Result = (int)UpdateTeamDataResult.ResultDefine.emResult_Success;
 
@@ -643,15 +665,15 @@ namespace Service.Source
             
             if (rData.Result == (int)UpdateTeamDataResult.ResultDefine.emResult_Success)
             {
-                redis.GetRedis((int)Connect.RedisDB.emRedisDB_Team).HashSet($"TeamData_" + teamData.TeamID, hashTransfer.TransToHashEntryArray(teamData));
+                GetRedis((int)Connect.RedisDB.emRedisDB_Team).HashSet($"TeamData_" + teamData.TeamID, hashTransfer.TransToHashEntryArray(teamData));
 
                 // DB 交易提交
-                db.GetSql().CommitTran();
+                GetSql().CommitTran();
             }
             else
             {
                 // DB 交易失敗, 啟動Rollback
-                db.GetSql().RollbackTran();
+                GetSql().RollbackTran();
             }
 
             JObject jsMain = new JObject();
@@ -678,9 +700,9 @@ namespace Service.Source
 
             try
             {
-                teamData = db.GetSql().Queryable<TeamData>().With(SqlSugar.SqlWith.RowLock).Where(it => it.TeamID == packet.TeamID).Single();
+                teamData = GetSql().Queryable<TeamData>().With(SqlSugar.SqlWith.RowLock).Where(it => it.TeamID == packet.TeamID).Single();
 
-                List<TeamData> LeaderList = db.GetSql().Queryable<TeamData>().With(SqlSugar.SqlWith.RowLock).Where(it => it.Leader == packet.MemberID).ToList();
+                List<TeamData> LeaderList = GetSql().Queryable<TeamData>().With(SqlSugar.SqlWith.RowLock).Where(it => it.Leader == packet.MemberID).ToList();
 
                 // 有找到車隊 
                 if (teamData != null)
@@ -729,7 +751,7 @@ namespace Service.Source
 
                                         teamData.TeamMemberIDs = JArray.FromObject(memberList).ToString();
 
-                                        if (db.GetSql().Updateable<TeamData>(teamData).With(SqlSugar.SqlWith.RowLock).Where(it => it.TeamID == packet.TeamID).ExecuteCommand() > 0)
+                                        if (GetSql().Updateable<TeamData>(teamData).With(SqlSugar.SqlWith.RowLock).Where(it => it.TeamID == packet.TeamID).ExecuteCommand() > 0)
                                         {
                                             rData.Result = (int)ChangeLanderResult.ResultDefine.emResult_Success;
 
@@ -795,10 +817,10 @@ namespace Service.Source
             // 有找到車隊資料 且 判斷成功
             if (teamData != null && rData.Result == (int)ChangeLanderResult.ResultDefine.emResult_Success)
             {
-                redis.GetRedis((int)Connect.RedisDB.emRedisDB_Team).HashSet($"TeamData_" + teamData.TeamID, hashTransfer.TransToHashEntryArray(teamData));
+                GetRedis((int)Connect.RedisDB.emRedisDB_Team).HashSet($"TeamData_" + teamData.TeamID, hashTransfer.TransToHashEntryArray(teamData));
 
-                UserInfo oldLeaderInfo = db.GetSql().Queryable<UserInfo>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == teamData.Leader).Single();
-                UserInfo newLeaderInfo = db.GetSql().Queryable<UserInfo>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).Single();
+                UserInfo oldLeaderInfo = GetSql().Queryable<UserInfo>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == teamData.Leader).Single();
+                UserInfo newLeaderInfo = GetSql().Queryable<UserInfo>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).Single();
 
                 List<string> notifyTargetList = GetAllMemberID(teamData);
                 notifyTargetList.Remove(teamData.Leader);
@@ -807,7 +829,7 @@ namespace Service.Source
                 {
                     string targetID = notifyTargetList[idx];
 
-                    UserAccount account = db.GetSql().Queryable<UserAccount>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == targetID).Single();
+                    UserAccount account = GetSql().Queryable<UserAccount>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == targetID).Single();
 
                     if (account != null && oldLeaderInfo != null && newLeaderInfo != null)
                     {
@@ -822,7 +844,7 @@ namespace Service.Source
             }
             else
             {
-                db.GetSql().RollbackTran();
+                GetSql().RollbackTran();
 
                 SaveLog($"[Warning] MessageFunction::OnChangeLander, Change Fail, Result:{rData.Result}");
 
@@ -851,7 +873,7 @@ namespace Service.Source
 
             try
             {
-                TeamData teamData = db.GetSql().Queryable<TeamData>().With(SqlSugar.SqlWith.RowLock).Where(it => it.TeamID == packet.TeamID).Single();
+                TeamData teamData = GetSql().Queryable<TeamData>().With(SqlSugar.SqlWith.RowLock).Where(it => it.TeamID == packet.TeamID).Single();
 
                 // 有找到車隊
                 if (teamData != null)
@@ -860,7 +882,7 @@ namespace Service.Source
                     if (teamData.Leader == packet.LeaderID)
                     {
                         // 設定DB 交易的起始點
-                        db.GetSql().BeginTran();
+                        GetSql().BeginTran();
 
                         if (UpdateViceLeaderList(packet.LeaderID, packet.MemberID, packet.TeamID, packet.Action))
                         {
@@ -869,7 +891,7 @@ namespace Service.Source
                             rData.Result = (int)UpdateViceLeaderListResult.ResultDefine.emResult_Success;
 
                             // DB 交易提交
-                            db.GetSql().CommitTran();
+                            GetSql().CommitTran();
                         }
                         else
                         {
@@ -904,7 +926,7 @@ namespace Service.Source
             // DB 交易失敗, 啟動Rollback
             if (rData.Result != (int)UpdateViceLeaderListResult.ResultDefine.emResult_Success)
             {
-                db.GetSql().RollbackTran();
+                GetSql().RollbackTran();
             }
 
             JObject jsMain = new JObject();
@@ -930,13 +952,13 @@ namespace Service.Source
 
         //    try
         //    {
-        //        TeamData teamData = db.GetSql().Queryable<TeamData>().With(SqlSugar.SqlWith.RowLock).Where(it => it.TeamID == packet.TeamID).Single();
+        //        TeamData teamData = GetSql().Queryable<TeamData>().With(SqlSugar.SqlWith.RowLock).Where(it => it.TeamID == packet.TeamID).Single();
 
         //        // 有找到車隊
         //        if (teamData != null)
         //        {
         //            // 設定DB 交易的起始點
-        //            db.GetSql().BeginTran();
+        //            GetSql().BeginTran();
 
         //            if (UpdateTeamMemberList(packet.MemberID, packet.TeamID, packet.Action))
         //            {
@@ -945,7 +967,7 @@ namespace Service.Source
         //                rData.Result = (int)UpdateTeamMemberListResult.ResultDefine.emResult_Success;
 
         //                // DB 交易提交
-        //                db.GetSql().CommitTran();
+        //                GetSql().CommitTran();
         //            }
         //            else
         //            {
@@ -973,7 +995,7 @@ namespace Service.Source
         //    // DB 交易失敗, 啟動Rollback
         //    if (rData.Result != 1)
         //    {
-        //        db.GetSql().RollbackTran();
+        //        GetSql().RollbackTran();
         //    }
 
         //    JObject jsMain = new JObject();
@@ -997,7 +1019,7 @@ namespace Service.Source
             UpdateApplyJoinListResult rData = new UpdateApplyJoinListResult();
             rData.Action = packet.Action;
 
-            TeamData teamData = db.GetSql().Queryable<TeamData>().With(SqlSugar.SqlWith.RowLock).Where(it => it.TeamID == packet.TeamID).Single();
+            TeamData teamData = GetSql().Queryable<TeamData>().With(SqlSugar.SqlWith.RowLock).Where(it => it.TeamID == packet.TeamID).Single();
 
             try
             {
@@ -1005,7 +1027,7 @@ namespace Service.Source
                 if (teamData != null)
                 {
                     // 設定DB 交易的起始點
-                    db.GetSql().BeginTran();
+                    GetSql().BeginTran();
 
                     // 有開啟審核
                     if (teamData.ExamineStatus == 1)
@@ -1055,7 +1077,7 @@ namespace Service.Source
                         {
                             JArray jsNew = JArray.FromObject(applyJoinList);
 
-                            if (db.GetSql().Updateable<TeamData>().SetColumns(it => new TeamData() { ApplyJoinList = jsNew.ToString() }).With(SqlSugar.SqlWith.RowLock).Where(it => it.TeamID == packet.TeamID).ExecuteCommand() > 0)
+                            if (GetSql().Updateable<TeamData>().SetColumns(it => new TeamData() { ApplyJoinList = jsNew.ToString() }).With(SqlSugar.SqlWith.RowLock).Where(it => it.TeamID == packet.TeamID).ExecuteCommand() > 0)
                             {
                                 rData.Result = (int)UpdateApplyJoinListResult.ResultDefine.emResult_Success;
 
@@ -1126,11 +1148,11 @@ namespace Service.Source
             if (rData.Result == (int)UpdateApplyJoinListResult.ResultDefine.emResult_Success)
             {
                 // DB 交易提交
-                db.GetSql().CommitTran();
+                GetSql().CommitTran();
 
-                redis.GetRedis((int)Connect.RedisDB.emRedisDB_Team).HashSet($"TeamData_" + teamData.TeamID, hashTransfer.TransToHashEntryArray(teamData));
+                GetRedis((int)Connect.RedisDB.emRedisDB_Team).HashSet($"TeamData_" + teamData.TeamID, hashTransfer.TransToHashEntryArray(teamData));
 
-                UserInfo userInfo = db.GetSql().Queryable<UserInfo>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).Single();
+                UserInfo userInfo = GetSql().Queryable<UserInfo>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).Single();
 
                 JArray jsViceLeader = JArray.Parse(teamData.TeamViceLeaderIDs);
                 List<string> notifyTargrtList = jsViceLeader.ToObject<List<string>>();
@@ -1140,7 +1162,7 @@ namespace Service.Source
                 {
                     string targetID = notifyTargrtList[idx];
 
-                    UserAccount account = db.GetSql().Queryable<UserAccount>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == targetID).Single();
+                    UserAccount account = GetSql().Queryable<UserAccount>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == targetID).Single();
 
                     if (account != null && userInfo != null)
                     {
@@ -1159,7 +1181,7 @@ namespace Service.Source
             else
             {
                 // DB 交易失敗, 啟動Rollback
-                db.GetSql().RollbackTran();
+                GetSql().RollbackTran();
             }
 
             JObject jsMain = new JObject();
@@ -1195,17 +1217,17 @@ namespace Service.Source
                 // 新增
                 if (packet.Action == (int)UpdateBulletin.ActionDefine.emResult_Add)
                 {
-                    teamData = db.GetSql().Queryable<TeamData>().With(SqlSugar.SqlWith.RowLock).Where(it => it.TeamID == packet.TeamID).Single();
+                    teamData = GetSql().Queryable<TeamData>().With(SqlSugar.SqlWith.RowLock).Where(it => it.TeamID == packet.TeamID).Single();
                 }
                 // 修改公告 或 刪除公告
                 else if (packet.Action == (int)UpdateBulletin.ActionDefine.emResult_Modify 
                     || packet.Action == (int)UpdateBulletin.ActionDefine.emResult_Delete)
                 {
-                    bulletin = db.GetSql().Queryable<TeamBulletin>().With(SqlSugar.SqlWith.RowLock).Where(it => it.BulletinID == packet.BulletinID).Single();
+                    bulletin = GetSql().Queryable<TeamBulletin>().With(SqlSugar.SqlWith.RowLock).Where(it => it.BulletinID == packet.BulletinID).Single();
 
                     if (bulletin != null)
                     {
-                        teamData = db.GetSql().Queryable<TeamData>().Where(it => it.TeamID == bulletin.TeamID).Single();
+                        teamData = GetSql().Queryable<TeamData>().Where(it => it.TeamID == bulletin.TeamID).Single();
                     }
                     else
                     {
@@ -1240,7 +1262,7 @@ namespace Service.Source
                             newBulletin.Content = packet.Content;
                             newBulletin.Day = packet.Day;
 
-                            if (db.GetSql().Insertable(newBulletin).With(SqlSugar.SqlWith.TabLockX).ExecuteCommand() > 0)
+                            if (GetSql().Insertable(newBulletin).With(SqlSugar.SqlWith.TabLockX).ExecuteCommand() > 0)
                             {
                                 rData.Result = (int)UpdateBulletinResult.ResultDefine.emResult_Success;
 
@@ -1264,7 +1286,7 @@ namespace Service.Source
                                 // 刪除公告
                                 if (packet.Action == (int)UpdateBulletin.ActionDefine.emResult_Delete)
                                 {
-                                    if (db.GetSql().Deleteable<TeamBulletin>().With(SqlSugar.SqlWith.TabLockX).Where(it => it.BulletinID == packet.BulletinID).ExecuteCommand() > 0)
+                                    if (GetSql().Deleteable<TeamBulletin>().With(SqlSugar.SqlWith.TabLockX).Where(it => it.BulletinID == packet.BulletinID).ExecuteCommand() > 0)
                                     {
                                         rData.Result = (int)UpdateBulletinResult.ResultDefine.emResult_Success;
 
@@ -1284,7 +1306,7 @@ namespace Service.Source
                                     bulletin.Content = packet.Content == null ? bulletin.Content : packet.Content;
                                     bulletin.Day = packet.Day == 0 ? bulletin.Day : packet.Day;
 
-                                    if (db.GetSql().Updateable<TeamBulletin>(bulletin).With(SqlSugar.SqlWith.RowLock).Where(it => it.BulletinID == packet.BulletinID).ExecuteCommand() > 0)
+                                    if (GetSql().Updateable<TeamBulletin>(bulletin).With(SqlSugar.SqlWith.RowLock).Where(it => it.BulletinID == packet.BulletinID).ExecuteCommand() > 0)
                                     {
                                         rData.Result = (int)UpdateBulletinResult.ResultDefine.emResult_Success;
 
@@ -1341,9 +1363,9 @@ namespace Service.Source
             {
                 if (newBulletin != null && rData.Action == (int)UpdateBulletin.ActionDefine.emResult_Add)
                 {
-                    redis.GetRedis((int)Connect.RedisDB.emRedisDB_Team).HashSet($"TeamBulletin_" + newBulletin.BulletinID, hashTransfer.TransToHashEntryArray(newBulletin));
+                    GetRedis((int)Connect.RedisDB.emRedisDB_Team).HashSet($"TeamBulletin_" + newBulletin.BulletinID, hashTransfer.TransToHashEntryArray(newBulletin));
 
-                    redis.GetRedis((int)Connect.RedisDB.emRedisDB_Team).HashSet($"BulletinIdList_" + packet.TeamID, newBulletin.BulletinID, newBulletin.BulletinID);
+                    GetRedis((int)Connect.RedisDB.emRedisDB_Team).HashSet($"BulletinIdList_" + packet.TeamID, newBulletin.BulletinID, newBulletin.BulletinID);
 
                     List<string> notifyTargetList = GetAllMemberID(teamData);
                     notifyTargetList.Remove(packet.MemberID);
@@ -1352,7 +1374,7 @@ namespace Service.Source
                     {
                         string targetID = notifyTargetList[idx];
 
-                        UserAccount account = db.GetSql().Queryable<UserAccount>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == targetID).Single();
+                        UserAccount account = GetSql().Queryable<UserAccount>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == targetID).Single();
 
                         if (account != null)
                         {
@@ -1367,16 +1389,16 @@ namespace Service.Source
                 }
                 else if (rData.Action == (int)UpdateBulletin.ActionDefine.emResult_Delete)
                 {
-                    if (redis.GetRedis((int)Connect.RedisDB.emRedisDB_Team).KeyExists($"TeamBulletin_" + packet.BulletinID))
+                    if (GetRedis((int)Connect.RedisDB.emRedisDB_Team).KeyExists($"TeamBulletin_" + packet.BulletinID))
                     {
-                        redis.GetRedis((int)Connect.RedisDB.emRedisDB_Team).KeyDelete($"TeamBulletin_" + packet.BulletinID);
+                        GetRedis((int)Connect.RedisDB.emRedisDB_Team).KeyDelete($"TeamBulletin_" + packet.BulletinID);
 
-                        redis.GetRedis((int)Connect.RedisDB.emRedisDB_Team).HashDelete($"BulletinIdList_" + packet.TeamID, packet.BulletinID);
+                        GetRedis((int)Connect.RedisDB.emRedisDB_Team).HashDelete($"BulletinIdList_" + packet.TeamID, packet.BulletinID);
                     }
                 }
                 else if (bulletin != null && rData.Action == (int)UpdateBulletin.ActionDefine.emResult_Modify)
                 {
-                    redis.GetRedis((int)Connect.RedisDB.emRedisDB_Team).HashSet($"TeamBulletin_" + bulletin.BulletinID, hashTransfer.TransToHashEntryArray(bulletin));
+                    GetRedis((int)Connect.RedisDB.emRedisDB_Team).HashSet($"TeamBulletin_" + bulletin.BulletinID, hashTransfer.TransToHashEntryArray(bulletin));
                 }
                 else
                 {
@@ -1417,18 +1439,18 @@ namespace Service.Source
                 // 新增活動
                 if (packet.Action == (int)UpdateActivity.ActionDefine.emResult_Add)
                 {
-                    teamData = db.GetSql().Queryable<TeamData>().With(SqlSugar.SqlWith.RowLock).Where(it => it.TeamID == packet.TeamID).Single();
+                    teamData = GetSql().Queryable<TeamData>().With(SqlSugar.SqlWith.RowLock).Where(it => it.TeamID == packet.TeamID).Single();
                 }
                 // 修改活動 或 刪除活動
                 else if (packet.Action == (int)UpdateActivity.ActionDefine.emResult_Modify 
                     || packet.Action == (int)UpdateActivity.ActionDefine.emResult_Delete)
                 {
-                    teamAct = db.GetSql().Queryable<TeamActivity>().With(SqlSugar.SqlWith.RowLock).Where(it => it.ActID == packet.ActID).Single();
+                    teamAct = GetSql().Queryable<TeamActivity>().With(SqlSugar.SqlWith.RowLock).Where(it => it.ActID == packet.ActID).Single();
 
                     // 有找到活動
                     if (teamAct != null)
                     {
-                        teamData = db.GetSql().Queryable<TeamData>().With(SqlSugar.SqlWith.RowLock).Where(it => it.TeamID == packet.TeamID).Single();
+                        teamData = GetSql().Queryable<TeamData>().With(SqlSugar.SqlWith.RowLock).Where(it => it.TeamID == packet.TeamID).Single();
                     }
                     else
                     {
@@ -1468,7 +1490,7 @@ namespace Service.Source
                             newTeamAct.MaxAltitude = packet.MaxAltitude;
                             newTeamAct.Route = packet.Route;
 
-                            if (db.GetSql().Insertable(newTeamAct).With(SqlSugar.SqlWith.TabLockX).ExecuteCommand() > 0)
+                            if (GetSql().Insertable(newTeamAct).With(SqlSugar.SqlWith.TabLockX).ExecuteCommand() > 0)
                             {
                                 rData.Result = (int)UpdateActivityResult.ResultDefine.emResult_Success;
 
@@ -1496,7 +1518,7 @@ namespace Service.Source
                                     // 刪除活動
                                     if (packet.Action == (int)UpdateActivity.ActionDefine.emResult_Delete)
                                     {
-                                        if (db.GetSql().Deleteable<TeamActivity>().With(SqlSugar.SqlWith.TabLockX).Where(it => it.ActID == packet.ActID).ExecuteCommand() > 0)
+                                        if (GetSql().Deleteable<TeamActivity>().With(SqlSugar.SqlWith.TabLockX).Where(it => it.ActID == packet.ActID).ExecuteCommand() > 0)
                                         {
                                             rData.Result = (int)UpdateActivityResult.ResultDefine.emResult_Success;
 
@@ -1521,7 +1543,7 @@ namespace Service.Source
                                         teamAct.MaxAltitude = packet.MaxAltitude == 0 ? teamAct.MaxAltitude : packet.MaxAltitude;
                                         teamAct.Route = packet.Route == null ? teamAct.Route : packet.Route;
 
-                                        if (db.GetSql().Updateable<TeamActivity>(teamAct).With(SqlSugar.SqlWith.RowLock).Where(it => it.ActID == packet.ActID).ExecuteCommand() > 0)
+                                        if (GetSql().Updateable<TeamActivity>(teamAct).With(SqlSugar.SqlWith.RowLock).Where(it => it.ActID == packet.ActID).ExecuteCommand() > 0)
                                         {
                                             rData.Result = (int)UpdateActivityResult.ResultDefine.emResult_Success;
 
@@ -1589,22 +1611,22 @@ namespace Service.Source
             {
                 if (newTeamAct != null && packet.Action == (int)UpdateActivity.ActionDefine.emResult_Add)
                 {
-                    redis.GetRedis((int)Connect.RedisDB.emRedisDB_Team).HashSet($"TeamActivity_" + newTeamAct.ActID, hashTransfer.TransToHashEntryArray(newTeamAct));
+                    GetRedis((int)Connect.RedisDB.emRedisDB_Team).HashSet($"TeamActivity_" + newTeamAct.ActID, hashTransfer.TransToHashEntryArray(newTeamAct));
 
-                    redis.GetRedis((int)Connect.RedisDB.emRedisDB_Team).HashSet($"ActIdList_" + packet.TeamID, newTeamAct.ActID, newTeamAct.ActID);
+                    GetRedis((int)Connect.RedisDB.emRedisDB_Team).HashSet($"ActIdList_" + packet.TeamID, newTeamAct.ActID, newTeamAct.ActID);
 
                     List<string> notifyTargetList = GetAllMemberID(teamData);
                     notifyTargetList.Remove(packet.MemberID);
 
                     // 活動發起人
-                    UserInfo userInfo = db.GetSql().Queryable<UserInfo>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).Single();
+                    UserInfo userInfo = GetSql().Queryable<UserInfo>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).Single();
 
                     for (int idx = 0; idx < notifyTargetList.Count(); idx++)
                     {
                         string targetID = notifyTargetList[idx];
 
                         // 收到公告的人
-                        UserAccount account = db.GetSql().Queryable<UserAccount>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == targetID).Single();
+                        UserAccount account = GetSql().Queryable<UserAccount>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == targetID).Single();
 
                         if (userInfo != null && account != null)
                         {
@@ -1619,16 +1641,16 @@ namespace Service.Source
                 }
                 else if (packet.Action == (int)UpdateActivity.ActionDefine.emResult_Delete)
                 {
-                    if (redis.GetRedis((int)Connect.RedisDB.emRedisDB_Team).KeyExists($"TeamActivity_" + packet.ActID))
+                    if (GetRedis((int)Connect.RedisDB.emRedisDB_Team).KeyExists($"TeamActivity_" + packet.ActID))
                     {
-                        redis.GetRedis((int)Connect.RedisDB.emRedisDB_Team).KeyDelete($"TeamActivity_" + packet.ActID);
+                        GetRedis((int)Connect.RedisDB.emRedisDB_Team).KeyDelete($"TeamActivity_" + packet.ActID);
 
-                        redis.GetRedis((int)Connect.RedisDB.emRedisDB_Team).HashDelete($"ActIdList_" + packet.TeamID, packet.ActID);
+                        GetRedis((int)Connect.RedisDB.emRedisDB_Team).HashDelete($"ActIdList_" + packet.TeamID, packet.ActID);
                     }
                 }
                 else if (teamAct != null && packet.Action == (int)UpdateActivity.ActionDefine.emResult_Modify)
                 {
-                    redis.GetRedis((int)Connect.RedisDB.emRedisDB_Team).HashSet($"TeamActivity_" + teamAct.ActID, hashTransfer.TransToHashEntryArray(teamAct));
+                    GetRedis((int)Connect.RedisDB.emRedisDB_Team).HashSet($"TeamActivity_" + teamAct.ActID, hashTransfer.TransToHashEntryArray(teamAct));
 
                     List<string> notifyTargetList = GetAllMemberID(teamData);
                     notifyTargetList.Remove(packet.MemberID);
@@ -1638,7 +1660,7 @@ namespace Service.Source
                         string targetID = notifyTargetList[idx];
 
                         // 收到公告的人
-                        UserAccount account = db.GetSql().Queryable<UserAccount>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == targetID).Single();
+                        UserAccount account = GetSql().Queryable<UserAccount>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == targetID).Single();
 
                         if (account != null)
                         {
@@ -1679,7 +1701,7 @@ namespace Service.Source
 
             try
             {
-                TeamData teamData = db.GetSql().Queryable<TeamData>().With(SqlSugar.SqlWith.RowLock).Where(it => it.TeamID == packet.TeamID).Single();
+                TeamData teamData = GetSql().Queryable<TeamData>().With(SqlSugar.SqlWith.RowLock).Where(it => it.TeamID == packet.TeamID).Single();
 
                 // 有找到車隊
                 if (teamData != null)
@@ -1705,14 +1727,14 @@ namespace Service.Source
                         stroge.StorageDate = DateTime.UtcNow.ToString("yyyy-MM-dd");
 
                         // 設定DB 交易的起始點
-                        db.GetSql().BeginTran();
+                        GetSql().BeginTran();
 
-                        if (db.GetSql().Insertable(stroge).With(SqlSugar.SqlWith.TabLockX).ExecuteCommand() > 0)
+                        if (GetSql().Insertable(stroge).With(SqlSugar.SqlWith.TabLockX).ExecuteCommand() > 0)
                         {
                             // 刪除車隊
-                            if (db.GetSql().Deleteable<TeamData>().With(SqlSugar.SqlWith.TabLockX).Where(it => it.TeamID == packet.TeamID).ExecuteCommand() > 0)
+                            if (GetSql().Deleteable<TeamData>().With(SqlSugar.SqlWith.TabLockX).Where(it => it.TeamID == packet.TeamID).ExecuteCommand() > 0)
                             {
-                                redis.GetRedis((int)Connect.RedisDB.emRedisDB_Team).KeyDelete($"TeamData_" + packet.TeamID);
+                                GetRedis((int)Connect.RedisDB.emRedisDB_Team).KeyDelete($"TeamData_" + packet.TeamID);
 
                                 // 變更車隊成員的車隊列表
                                 List<string> idList = GetAllMemberID(teamData);
@@ -1726,7 +1748,7 @@ namespace Service.Source
                                 rData.Result = (int)DeleteTeamResult.ResultDefine.emResult_Success;
 
                                 // DB 交易提交
-                                db.GetSql().CommitTran();
+                                GetSql().CommitTran();
 
                                 SaveLog($"[Info] MessageFunction::OnDeleteTeam, Remove Team:{packet.TeamID} Success");
                             }
@@ -1770,7 +1792,7 @@ namespace Service.Source
             // DB 交易失敗, 啟動Rollback
             if (rData.Result != (int)DeleteTeamResult.ResultDefine.emResult_Success)
             {
-                db.GetSql().RollbackTran();
+                GetSql().RollbackTran();
             }
 
             JObject jsMain = new JObject();
@@ -1798,12 +1820,12 @@ namespace Service.Source
 
             try
             {
-                TeamData teamData = db.GetSql().Queryable<TeamData>().With(SqlSugar.SqlWith.RowLock).Where(it => it.TeamID == packet.TeamID).Single();
+                TeamData teamData = GetSql().Queryable<TeamData>().With(SqlSugar.SqlWith.RowLock).Where(it => it.TeamID == packet.TeamID).Single();
 
                 // 有找到車隊
                 if (teamData != null)
                 {
-                    teamAct = db.GetSql().Queryable<TeamActivity>().Where(it => it.ActID == packet.ActID).Single();
+                    teamAct = GetSql().Queryable<TeamActivity>().Where(it => it.ActID == packet.ActID).Single();
 
                     // 有該活動
                     if (teamAct != null)
@@ -1871,9 +1893,9 @@ namespace Service.Source
                                 JArray jsNew = JArray.FromObject(actMemberList);
 
                                 // 設定DB 交易的起始點
-                                db.GetSql().BeginTran();
+                                GetSql().BeginTran();
 
-                                if (db.GetSql().Updateable<TeamActivity>().SetColumns(it => new TeamActivity() { MemberList = jsNew.ToString() }).With(SqlSugar.SqlWith.RowLock).Where(it => it.ActID == packet.ActID).ExecuteCommand() > 0)
+                                if (GetSql().Updateable<TeamActivity>().SetColumns(it => new TeamActivity() { MemberList = jsNew.ToString() }).With(SqlSugar.SqlWith.RowLock).Where(it => it.ActID == packet.ActID).ExecuteCommand() > 0)
                                 {
                                     rData.Result = (int)JoinOrLeaveTeamActivityResult.ResultDefine.emResult_Success;
 
@@ -1887,7 +1909,7 @@ namespace Service.Source
                                         SaveLog($"[Info] MessageFunction::OnJoinOrLeaveTeamActivity, Leave Member: {packet.MemberID} is Activity Member: {teamAct.MemberID}");
 
                                         // 刪除活動
-                                        if (db.GetSql().Deleteable<TeamActivity>().With(SqlSugar.SqlWith.TabLockX).Where(it => it.ActID == packet.ActID).ExecuteCommand() > 0)
+                                        if (GetSql().Deleteable<TeamActivity>().With(SqlSugar.SqlWith.TabLockX).Where(it => it.ActID == packet.ActID).ExecuteCommand() > 0)
                                         {
                                             rData.Result = (int)JoinOrLeaveTeamActivityResult.ResultDefine.emResult_Success;
 
@@ -1943,15 +1965,15 @@ namespace Service.Source
 
             if (teamAct != null && rData.Result == (int)JoinOrLeaveTeamActivityResult.ResultDefine.emResult_Success)
             {
-                redis.GetRedis((int)Connect.RedisDB.emRedisDB_Team).HashSet($"TeamActivity_" + teamAct.ActID, hashTransfer.TransToHashEntryArray(teamAct));
+                GetRedis((int)Connect.RedisDB.emRedisDB_Team).HashSet($"TeamActivity_" + teamAct.ActID, hashTransfer.TransToHashEntryArray(teamAct));
 
                 // DB 交易提交
-                db.GetSql().CommitTran();
+                GetSql().CommitTran();
             }
             // DB 交易失敗, 啟動Rollback
             else
             {
-                db.GetSql().RollbackTran();
+                GetSql().RollbackTran();
             }
 
             JObject jsMain = new JObject();
@@ -1981,16 +2003,16 @@ namespace Service.Source
 
             try
             {
-                teamData = db.GetSql().Queryable<TeamData>().With(SqlSugar.SqlWith.RowLock).Where(it => it.TeamID == packet.TeamID).Single();
+                teamData = GetSql().Queryable<TeamData>().With(SqlSugar.SqlWith.RowLock).Where(it => it.TeamID == packet.TeamID).Single();
 
                 // 加入或離開的玩家資訊
-                userInfo = db.GetSql().Queryable<UserInfo>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).Single();
+                userInfo = GetSql().Queryable<UserInfo>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).Single();
 
                 // 有找到車隊
                 if (teamData != null)
                 {
                     // 設定DB 交易的起始點
-                    db.GetSql().BeginTran();
+                    GetSql().BeginTran();
 
                     if (packet.Action == (int)JoinOrLeaveTeam.ActionDefine.emResult_Add)
                     {
@@ -2002,7 +2024,7 @@ namespace Service.Source
                         {
                             ApplyList.Remove(packet.MemberID);
 
-                            if (db.GetSql().Updateable<TeamData>().SetColumns(it => new TeamData() { ApplyJoinList = JArray.FromObject(ApplyList).ToString() }).With(SqlSugar.SqlWith.RowLock).Where(it => it.TeamID == packet.TeamID).ExecuteCommand() > 0)
+                            if (GetSql().Updateable<TeamData>().SetColumns(it => new TeamData() { ApplyJoinList = JArray.FromObject(ApplyList).ToString() }).With(SqlSugar.SqlWith.RowLock).Where(it => it.TeamID == packet.TeamID).ExecuteCommand() > 0)
                             {
                                 rData.Result = (int)JoinOrLeaveTeamResult.ResultDefine.emResult_Success;
 
@@ -2041,7 +2063,7 @@ namespace Service.Source
 
                                 JArray jsNew = JArray.FromObject(MemberList);
 
-                                if (db.GetSql().Updateable<TeamData>().SetColumns(it => new TeamData() { TeamMemberIDs = jsNew.ToString() }).With(SqlSugar.SqlWith.RowLock).Where(it => it.TeamID == packet.TeamID).ExecuteCommand() > 0)
+                                if (GetSql().Updateable<TeamData>().SetColumns(it => new TeamData() { TeamMemberIDs = jsNew.ToString() }).With(SqlSugar.SqlWith.RowLock).Where(it => it.TeamID == packet.TeamID).ExecuteCommand() > 0)
                                 {
                                     teamData.TeamMemberIDs = jsNew.ToString();
 
@@ -2088,7 +2110,7 @@ namespace Service.Source
 
                             JArray jsNew = JArray.FromObject(MemberList);
 
-                            if (db.GetSql().Updateable<TeamData>().SetColumns(it => new TeamData() { TeamMemberIDs = jsNew.ToString() }).With(SqlSugar.SqlWith.RowLock).Where(it => it.TeamID == packet.TeamID).ExecuteCommand() > 0)
+                            if (GetSql().Updateable<TeamData>().SetColumns(it => new TeamData() { TeamMemberIDs = jsNew.ToString() }).With(SqlSugar.SqlWith.RowLock).Where(it => it.TeamID == packet.TeamID).ExecuteCommand() > 0)
                             {
                                 rData.Result = (int)JoinOrLeaveTeamResult.ResultDefine.emResult_Success;
 
@@ -2146,9 +2168,9 @@ namespace Service.Source
             if (rData.Result == (int)JoinOrLeaveTeamResult.ResultDefine.emResult_Success)
             {
                 // DB 交易提交
-                db.GetSql().CommitTran();
+                GetSql().CommitTran();
 
-                redis.GetRedis((int)Connect.RedisDB.emRedisDB_Team).HashSet($"TeamData_" + teamData.TeamID, hashTransfer.TransToHashEntryArray(teamData));
+                GetRedis((int)Connect.RedisDB.emRedisDB_Team).HashSet($"TeamData_" + teamData.TeamID, hashTransfer.TransToHashEntryArray(teamData));
 
                 if (packet.Action == (int)JoinOrLeaveTeam.ActionDefine.emResult_Add)
                 {
@@ -2163,7 +2185,7 @@ namespace Service.Source
                         string targetID = notifyTargetList[idx];
 
                         // 收到公告的人
-                        UserAccount account = db.GetSql().Queryable<UserAccount>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == targetID).Single();
+                        UserAccount account = GetSql().Queryable<UserAccount>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == targetID).Single();
 
                         if (account != null)
                         {
@@ -2195,7 +2217,7 @@ namespace Service.Source
                         string targetID = notifyTargetList[idx];
 
                         // 收到公告的人
-                        UserAccount account = db.GetSql().Queryable<UserAccount>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == targetID).Single();
+                        UserAccount account = GetSql().Queryable<UserAccount>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == targetID).Single();
 
                         if (account != null)
                         {
@@ -2219,7 +2241,7 @@ namespace Service.Source
             else
             {
                 // DB 交易失敗, 啟動Rollback
-                db.GetSql().RollbackTran();
+                GetSql().RollbackTran();
             }
 
             JObject jsMain = new JObject();
@@ -2249,7 +2271,7 @@ namespace Service.Source
 
             try
             {
-                teamData = db.GetSql().Queryable<TeamData>().With(SqlSugar.SqlWith.RowLock).Where(it => it.TeamID == packet.TeamID).Single();
+                teamData = GetSql().Queryable<TeamData>().With(SqlSugar.SqlWith.RowLock).Where(it => it.TeamID == packet.TeamID).Single();
 
                 // 有找到車隊
                 if (teamData != null)
@@ -2285,7 +2307,7 @@ namespace Service.Source
                         if (checkSuccess)
                         {
                             // 設定DB 交易的起始點
-                            db.GetSql().BeginTran();
+                            GetSql().BeginTran();
 
                             for (int idx = 0; idx < idList.Count(); idx++)
                             {
@@ -2338,7 +2360,7 @@ namespace Service.Source
                             teamData.TeamViceLeaderIDs = JArray.FromObject(viceLeaderList).ToString();
                             teamData.TeamMemberIDs = JArray.FromObject(memberList).ToString();
 
-                            if (db.GetSql().Updateable<TeamData>(teamData).With(SqlSugar.SqlWith.RowLock).Where(it => it.TeamID == packet.TeamID).ExecuteCommand() > 0)
+                            if (GetSql().Updateable<TeamData>(teamData).With(SqlSugar.SqlWith.RowLock).Where(it => it.TeamID == packet.TeamID).ExecuteCommand() > 0)
                             {
                                 rData.Result = (int)KickTeamMemberResult.ResultDefine.emResult_Success;
                             }
@@ -2382,18 +2404,18 @@ namespace Service.Source
             if (rData.Result == (int)KickTeamMemberResult.ResultDefine.emResult_Success)
             {
                 // DB 交易提交
-                db.GetSql().CommitTran();
+                GetSql().CommitTran();
 
-                redis.GetRedis((int)Connect.RedisDB.emRedisDB_Team).HashSet($"TeamData_" + teamData.TeamID, hashTransfer.TransToHashEntryArray(teamData));
+                GetRedis((int)Connect.RedisDB.emRedisDB_Team).HashSet($"TeamData_" + teamData.TeamID, hashTransfer.TransToHashEntryArray(teamData));
 
                 for (int idx = 0; idx < idList.Count(); idx++)
                 {
                     string targetID = idList[idx];
 
                     // 收到公告的人
-                    UserInfo info = db.GetSql().Queryable<UserInfo>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == targetID).Single();
+                    UserInfo info = GetSql().Queryable<UserInfo>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == targetID).Single();
 
-                    UserAccount account = db.GetSql().Queryable<UserAccount>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == targetID).Single();
+                    UserAccount account = GetSql().Queryable<UserAccount>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == targetID).Single();
 
                     if (info!= null && account != null)
                     {
@@ -2409,7 +2431,7 @@ namespace Service.Source
             else
             {
                 // DB 交易失敗, 啟動Rollback
-                db.GetSql().RollbackTran();
+                GetSql().RollbackTran();
             }
 
             JObject jsMain = new JObject();

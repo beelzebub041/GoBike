@@ -10,14 +10,46 @@ using System.Windows.Forms;
 
 using Service.Source;
 
+using Tools;
+
 namespace Service
 {
     public partial class Form1 : Form
     {
-
-        // 定義Dalegate(委派)方法 (參數部分需與帶入的方法所用之參數相同)
+        /// <summary>
+        /// TextBox的委派函式
+        /// </summary>
+        /// <param name="s"></param>
         public delegate void TextBoxDalegate(string s);
 
+        /// <summary>
+        /// TextBox的委派物件
+        /// </summary>
+        public TextBoxDalegate tbDalegate = null;
+
+        /// <summary>
+        /// Queue Lock 
+        /// </summary>
+        private static object qLock = null;
+
+        /// <summary>
+        /// Process Queue的Tmer
+        /// </summary>
+        private System.Timers.Timer timer = null;
+
+        /// <summary>
+        /// Msg Queue
+        /// </summary>
+        private Queue<string> msgQ = null;
+
+        /// <summary>
+        /// Logger物件
+        /// </summary>
+        private Logger logger = null;
+
+        /// <summary>
+        /// 建構式
+        /// </summary>
         public Form1()
         {
             InitializeComponent();
@@ -25,59 +57,114 @@ namespace Service
             // 添加Close事件
             this.FormClosing += new System.Windows.Forms.FormClosingEventHandler(this.Form1_FormClosing);
 
-            Initialize();
+            // 添加讀取完成事件
+            this.Load += new EventHandler(Form1_Load);
+
+            qLock = new object();
+
         }
 
+        /// <summary>
+        /// 解構式
+        /// </summary>
         ~Form1()
         {
+            if (timer != null)
+            {
+                timer.Stop();
+                timer.Close();
+            }
 
+            ControlCenter.Instance.Destroy();
         }
 
+        /// <summary>
+        /// 初始化
+        /// </summary>
         void Initialize()
         {
-            ControlCenter ctrl = new ControlCenter(this);
+            this.tbDalegate = new TextBoxDalegate(UpdateTextBox);
 
-            if (ctrl.Initialize())
-            {
+            this.msgQ = new Queue<string>();
 
-            }
-            else
-            {
+            this.timer = new System.Timers.Timer();
+            this.timer.AutoReset = false;
+            this.timer.Interval = 100;
+            this.timer.Enabled = true;
+            this.timer.Elapsed += ProcessQueue;
 
-            }
+            logger = new Logger();
+            logger.SetForm(this);
+
+            ControlCenter.Instance.Initialize(logger);
+
         }
 
-        public void updateTextBox(string msg)
+        /// <summary>
+        /// 處理Queue中的資料
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        private void ProcessQueue(Object sender, EventArgs e)
         {
-            // 有調用需求
-            if (this.InvokeRequired)
+            timer.Stop();
+
+            if (msgQ.Any())
             {
-                // 建立Dalegate 物件
-                /*
-                 建立委派物件(TextBoxDalegate)並委派使用"updateTextBox"方法
-                 */
-                TextBoxDalegate TBDalegate = new TextBoxDalegate(updateTextBox);
-
-                // 調用委派的方法
-                this.Invoke(TBDalegate, msg);
-
-            }
-            else
-            {
-                int lineCount = ConsoleTextBox.GetLineFromCharIndex(ConsoleTextBox.Text.Length);
-
-                if (lineCount >= 100)
+                try
                 {
-                    ConsoleTextBox.Text = ConsoleTextBox.Text.Remove(0, (ConsoleTextBox.Lines[0].Length + Environment.NewLine.Length));
+                    this.Invoke(tbDalegate, msgQ.Dequeue());
+                }
+                catch (Exception ex)
+                {
+                    this.Invoke(tbDalegate, $"[Erorr] Form1 Timer_Elapsed, Catch Error, msg:{ex.Message}");
                 }
 
-                ConsoleTextBox.Text += msg;
-                ConsoleTextBox.Text += Environment.NewLine;
-                ConsoleTextBox.SelectionStart = ConsoleTextBox.Text.Length;
-                ConsoleTextBox.ScrollToCaret();
             }
+
+            timer.Start();
         }
 
+        /// <summary>
+        /// 新增訊息至TextBox的Queue中
+        /// </summary>
+        /// <param name="msg"></param>
+        public void AddTextBoxQueue(string msg)
+        {
+            lock (qLock)
+            {
+                if (msgQ != null)
+                {
+                    msgQ.Enqueue(msg);
+                }
+            }
+
+        }
+
+        /// <summary>
+        /// 更新 TextBox
+        /// </summary>
+        /// <param name="msg"></param>
+        private void UpdateTextBox(string msg)
+        {
+            int lineCount = this.ConsoleTextBox.GetLineFromCharIndex(ConsoleTextBox.Text.Length);
+
+            // 大於100行
+            if (lineCount > 100)
+            {
+                this.ConsoleTextBox.Text = this.ConsoleTextBox.Text.Remove(0, (this.ConsoleTextBox.Lines[0].Length + Environment.NewLine.Length));
+            }
+
+            this.ConsoleTextBox.Text += msg + Environment.NewLine;
+            this.ConsoleTextBox.SelectionStart = this.ConsoleTextBox.Text.Length;
+            this.ConsoleTextBox.ScrollToCaret();
+        }
+
+        /// <summary>
+        /// 視窗關閉前的事件處理
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
         private void Form1_FormClosing(object sender, FormClosingEventArgs e)
         {
             /// if the close button in the title bar is clicked
@@ -96,6 +183,16 @@ namespace Service
                     //accountService.StopProcess();
                 }
             }
+        }
+
+        /// <summary>
+        /// 視窗讀取完畢後的事件處理
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        private void Form1_Load(object sender, EventArgs e)
+        {
+            Initialize();
         }
     }
 }

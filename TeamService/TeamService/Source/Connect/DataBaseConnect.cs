@@ -7,6 +7,8 @@ using System.Runtime.InteropServices;
 
 using SqlSugar;
 
+using Tools;
+
 namespace Connect
 {
     class DataBaseConnect
@@ -14,38 +16,62 @@ namespace Connect
         [DllImport("kernel32")]
         private static extern int GetPrivateProfileString(string section, string key, string def, StringBuilder retVal, int size, string filePath);
 
-        // ==================== Delegate ==================== //
-
-        public delegate void LogDelegate(string msg);
-
-        private LogDelegate SaveLog = null;
-
         // ============================================ //
 
-        private string dataBaseName = "";
+        private static DataBaseConnect instance = null;         // DataBaseConnect 實例
 
-        private string ip = "";
+        private string dataBaseName = "";                       // 資料庫名稱
 
-        private int port = -1;
+        private string ip = "";                                 // 連線IP
 
-        private string account = "";
+        private int port = -1;                                  // 連線Port
 
-        private string password = "";
+        private string account = "";                            // 帳號
 
-        private SqlSugarClient sql = null;     // My SQL 連線物件
+        private string password = "";                           // 密碼
+
+        private SqlSugarClient sql = null;                      // My SQL 連線物件
+
+        private Logger logger = null;                           // Logger 物件
 
 
-        public DataBaseConnect(LogDelegate log)
+        /// <summary>
+        /// 建構式
+        /// </summary>
+        private DataBaseConnect()
         {
-            this.SaveLog = log;
+
         }
 
-        public bool Initialize()
+        /// <summary>
+        /// 取得 DataBaseConnect 實例
+        /// </summary>
+        public static DataBaseConnect Instance
+        {
+            get
+            {
+                if (instance == null)
+                {
+                    instance = new DataBaseConnect(); 
+                }
+
+                return instance;
+            }
+        }
+
+        /// <summary>
+        /// 初始化
+        /// </summary>
+        /// <param name="logger"> Logger 物件</param>
+        /// <returns> 是否成功初始化 </returns>
+        public bool Initialize(Logger logger)
         {
             bool ret = false;
 
             if (LoadConfig())
             {
+                this.logger = logger;
+
                 ConnectionConfig conConfig = new ConnectionConfig()
                 {
                     ConnectionString = $"server={ip};port={port};user={account};password={password}; database={dataBaseName};",
@@ -53,7 +79,6 @@ namespace Connect
                     IsAutoCloseConnection = true,
                     InitKeyType = InitKeyType.Attribute
                 };
-
 
                 sql = new SqlSugarClient(conConfig);
 
@@ -68,9 +93,22 @@ namespace Connect
             return ret;
         }
 
-        /**
-         * 讀取Config
-         */
+        /// <summary>
+        /// 儲存Log
+        /// </summary>
+        /// <param name="msg"></param>
+        private void SaveLog(string msg)
+        {
+            if (logger != null)
+            {
+                logger.AddLog(msg);
+            }
+        }
+
+        /// <summary>
+        /// 讀取Config
+        /// </summary>
+        /// <returns> 是否讀取成功 </returns>
         private bool LoadConfig()
         {
             bool ret = true;
@@ -142,9 +180,10 @@ namespace Connect
             return ret;
         }
 
-        /**
-         * 建立連線
-         */
+        /// <summary>
+        /// 建立連線
+        /// </summary>
+        /// <returns> 是否成功連線 </returns>
         public bool Connect()
         {
             bool ret = false;
@@ -166,9 +205,10 @@ namespace Connect
             return ret;
         }
 
-        /**
-         * 關閉連線
-         */
+        /// <summary>
+        /// 關閉連線
+        /// </summary>
+        /// <returns> 是否成功關閉連線 </returns>
         public bool Disconnect()
         {
             bool ret = false;
@@ -191,6 +231,10 @@ namespace Connect
             return ret;
         }
 
+        /// <summary>
+        /// 取得Sql連線物件
+        /// </summary>
+        /// <returns></returns>
         public SqlSugarClient GetSql()
         {
             return sql;

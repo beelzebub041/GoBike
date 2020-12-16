@@ -125,6 +125,8 @@
     <Compile Include="Source\MessageFunction.cs" />
     <Compile Include="Source\MessageProcessor.cs" />
     <Compile Include="Source\Packet\TeamPacket.cs" />
+    <Compile Include="Source\StructClass.cs" />
+    <Compile Include="Source\Tools\DoubleBuffer.cs" />
     <Compile Include="Source\Tools\Logger.cs" />
     <Compile Include="Source\Tools\NotifyMessage.cs" />
     <Compile Include="Source\Tools\RedisHashTransfer.cs" />

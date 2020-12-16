@@ -11,12 +11,27 @@ namespace Tools.RedisHashTransfer
 {
     class RedisHashTransfer
     {
+        /// <summary>
+        /// 建構式
+        /// </summary>
         public RedisHashTransfer()
         {
 
         }
 
-        // 將物件轉換成 Hash Entry Array
+        /// <summary>
+        /// 解構式
+        /// </summary>
+        ~RedisHashTransfer()
+        {
+
+        }
+
+        /// <summary>
+        /// 將物件轉換成 Hash Entry Array
+        /// </summary>
+        /// <param name="hashObject"> hash Object </param>
+        /// <returns> Hash Entry Array </returns>
         public HashEntry[] TransToHashEntryArray(object hashObject)
         {
             PropertyInfo[] properties = hashObject.GetType().GetProperties();
