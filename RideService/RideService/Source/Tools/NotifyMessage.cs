@@ -9,27 +9,36 @@ using System.Net;
 using System.IO;
 using System.Web.Script.Serialization;
 
+using Tools;
+
 namespace Tools.NotifyMessage
 {
     class NotifyMessage
     {
-        // ==================== Delegate ==================== //
+        /// <summary>
+        /// 推播 Server的 Key
+        /// </summary>
+        private string serverKey = "";
 
-        public delegate void LogDelegate(string msg);
+        /// <summary>
+        /// Sender ID
+        /// </summary>
+        private string senderId = "";
 
-        private LogDelegate SaveLog = null;
-
-        // ============================================ //
-        string serverKey = "";
-
-        string senderId = "";
+        /// <summary>
+        /// Logger 物件
+        /// </summary>
+        private Tools.Logger logger = null;
 
         [DllImport("kernel32")]
         private static extern int GetPrivateProfileString(string section, string key, string def, StringBuilder retVal, int size, string filePath);
 
-        public NotifyMessage(LogDelegate log)
+        /// <summary>
+        /// 建構式
+        /// </summary>
+        public NotifyMessage()
         {
-            this.SaveLog = log;
+            
         }
 
         ~NotifyMessage()
@@ -37,15 +46,19 @@ namespace Tools.NotifyMessage
 
         }
 
-        /**
-         * 初始化
-         */
-        public bool Initialize()
+        /// <summary>
+        /// 初始化
+        /// </summary>
+        /// <param name="logger"> Logger物件 </param>
+        /// <returns> 是否成功初始化 </returns>
+        public bool Initialize(Logger logger)
         {
             bool bReturn = true;
 
             try
             {
+                this.logger = logger;
+
                 if (LoadingConfig())
                 {
                     bReturn = true;
@@ -67,9 +80,10 @@ namespace Tools.NotifyMessage
             return bReturn;
         }
 
-        /**
-         * 讀取設定檔
-         */
+        /// <summary>
+        /// 讀取設定檔
+        /// </summary>
+        /// <returns> 是否成功讀取 </returns>
         private bool LoadingConfig()
         {
             bool bReturn = true;
@@ -111,9 +125,24 @@ namespace Tools.NotifyMessage
             return bReturn;
         }
 
-        /**
-         * 推播訊息至裝置
-         */
+        /// <summary>
+        /// 儲存Log
+        /// </summary>
+        /// <param name="msg"> 訊息 </param>
+        public void SaveLog(string msg)
+        {
+            if (logger != null)
+            {
+                logger.AddLog(msg);
+            }
+        }
+
+        /// <summary>
+        /// 推播訊息至裝置
+        /// </summary>
+        /// <param name="deviceId"> 裝置 Token </param>
+        /// <param name="tit"> 標題 </param>
+        /// <param name="msg"> 訊息 </param>
         public void NotifyMsgToDevice(string deviceId, string tit, string msg)
         {
             if (serverKey != "" && senderId != "")

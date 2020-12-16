@@ -8,25 +8,19 @@ using System.Runtime.InteropServices;
 using WebSocketSharp;
 using WebSocketSharp.Server;
 using System.Collections.Concurrent;
+using Service.Source.Define.StructClass;
 
-//using Tools.Logger;
+using Tools;
 
 namespace Service.Source
 {
-
-
-
     class ClientHandler
     {
         // ==================== Delegate ==================== //
 
-        public delegate void LogDelegate(string msg);
+        public delegate void AddQueueDelegate(MsgInfo info);
 
-        private LogDelegate log = null;
-
-        public delegate string MsgDelegate(string data);
-
-        private MsgDelegate msgProcessor = null;
+        private AddQueueDelegate AddQueue = null;
 
         // ============================================ //
         [DllImport("kernel32")]
@@ -34,17 +28,17 @@ namespace Service.Source
 
         private WebSocketServer wsServer = null;
 
-        private string serviceName = "/Ride";
+        private string serviceName = "";
 
         private string serverIp = "";
 
         private string serverPort = "";
 
-        public ClientHandler(LogDelegate log, MsgDelegate processor)
-        {
-            this.log = log;
+        private Tools.Logger logger = null;
 
-            this.msgProcessor = processor;
+        public ClientHandler(string serviceName)
+        {
+            this.serviceName = serviceName;
         }
 
         ~ClientHandler()
@@ -55,7 +49,7 @@ namespace Service.Source
         /**
          * 初始化
          */
-        public bool Initialize()
+        public bool Initialize(Tools.Logger logger, AddQueueDelegate AddQueue)
         {
             bool ret = false;
 
@@ -63,8 +57,12 @@ namespace Service.Source
             {
                 if (LoadingConfig())
                 {
+                    this.logger = logger;
+
+                    this.AddQueue = AddQueue;
+
                     wsServer = new WebSocketServer($"ws://{serverIp}:{serverPort}");
-                    wsServer.AddWebSocketService(serviceName, () => new Handler(SaveLog, MsgDispatch));
+                    wsServer.AddWebSocketService(serviceName, () => new Handler(SaveLog, AddJob));
 
                     wsServer.Start();
                     if (wsServer.IsListening)
@@ -153,12 +151,15 @@ namespace Service.Source
 
         public void SaveLog(string msg)
         {
-            log?.Invoke(msg);
+            if (logger != null)
+            {
+                logger.AddLog(msg);
+            }
         }
 
-        public string MsgDispatch(string msg)
+        public void AddJob(MsgInfo info)
         {
-            return msgProcessor?.Invoke(msg);
+            this.AddQueue.Invoke(info);
         }
 
     }
@@ -170,36 +171,38 @@ namespace Service.Source
 
         private LogDelegate SaveLog = null;
 
-        public delegate string MsgDelegate(string data);
+        public delegate void AddQueueDelegate(MsgInfo info);
 
-        private MsgDelegate MsgDispatch = null;
+        private AddQueueDelegate AddQueue = null;
 
-        public Handler(LogDelegate log, MsgDelegate MsgDispatch)
+        public Handler(LogDelegate log, AddQueueDelegate AddQueue)
         {
             this.SaveLog = log;
 
-            this.MsgDispatch = MsgDispatch;
+            this.AddQueue = AddQueue;
         }
 
         protected override void OnOpen()
         {
             base.OnOpen();
 
-            SaveLog($"Client:{ID} Connect");
+            SaveLog?.Invoke($"Client:{ID} Connect");
         }
 
         protected override void OnClose(CloseEventArgs e)
         {
             base.OnClose(e);
 
-            SaveLog($"Client:{ID} Connect Close");
+            SaveLog?.Invoke($"Client:{ID} Connect Close");
         }
 
         protected override void OnMessage(MessageEventArgs e)
         {
-            SaveLog($"Receive Client msg: {e.Data}");
+            SaveLog?.Invoke($"Receive Client msg: {e.Data}");
 
-            SendToClient(MsgDispatch(e.Data));
+            MsgInfo info = new MsgInfo(e.Data, this.SendToClient);
+
+            AddQueue?.Invoke(info);
         }
 
         public void SendToClient(string msg)
@@ -208,7 +211,7 @@ namespace Service.Source
             {
                 Send(msg);
 
-                SaveLog($"Send msg: {msg}");
+                SaveLog?.Invoke($"Send msg: {msg}");
             }
             catch
             {
