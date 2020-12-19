@@ -126,6 +126,7 @@ namespace Service.Source
             {
                 AddMsgFunc((int)C2S_CmdID.emCreateRideRecord, msgFunc.OnCreateRideRecord);
                 AddMsgFunc((int)C2S_CmdID.emUpdateRideGroup, msgFunc.OnUpdateRideGroup);
+                AddMsgFunc((int)C2S_CmdID.emUpdateInviteList, msgFunc.OnUpdateInviteList);
                 AddMsgFunc((int)C2S_CmdID.emReplyRideGroup, msgFunc.OnReplyRideGroup);
                 AddMsgFunc((int)C2S_CmdID.emUpdateCoordinate, msgFunc.OnUpdateCoordinate);
                 AddMsgFunc((int)C2S_CmdID.emNotifyRideGroupMember, msgFunc.OnNotifyRideGroupMember);
