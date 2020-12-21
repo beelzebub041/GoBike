@@ -557,6 +557,9 @@ namespace Service.Source
                         JArray jsInviteList = JArray.Parse(jsGroupData["InviteList"].ToString());
                         List<string> InviteList = jsInviteList.ToObject<List<string>>();
 
+                        JArray jsMemberList = JArray.Parse(jsGroupData["MemberList"].ToString());
+                        List<string> memberList = jsMemberList.ToObject<List<string>>();
+
                         JArray jsUpdateList = JArray.Parse(packet.UpdateList);
                         List<string> UpdateList = jsUpdateList.ToObject<List<string>>();
 
@@ -565,7 +568,7 @@ namespace Service.Source
                             for (int idx = 0; idx < UpdateList.Count(); idx++)
                             {
                                 // 不在邀請列表中, 則加入列表
-                                if (!InviteList.Contains(UpdateList[idx]))
+                                if (!InviteList.Contains(UpdateList[idx]) && !memberList.Contains(UpdateList[idx]))
                                 {
                                     InviteList.Add(UpdateList[idx]);
 
