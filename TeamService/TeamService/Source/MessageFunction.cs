@@ -2103,8 +2103,45 @@ namespace Service.Source
                         JArray jsMemberList = JArray.Parse(teamData.TeamMemberIDs);
                         List<string> MemberList = jsMemberList.ToObject<List<string>>();
 
+                        JArray jsmViceLeaderList = JArray.Parse(teamData.TeamViceLeaderIDs);
+                        List<string> ViceLeaderList = jsmViceLeaderList.ToObject<List<string>>();
+
+                        if (ViceLeaderList.Contains(packet.MemberID))
+                        {
+                            ViceLeaderList.Remove(packet.MemberID);
+
+                            JArray jsNew = JArray.FromObject(ViceLeaderList);
+
+                            if (GetSql().Updateable<TeamData>().SetColumns(it => new TeamData() { TeamViceLeaderIDs = jsNew.ToString() }).With(SqlSugar.SqlWith.RowLock).Where(it => it.TeamID == packet.TeamID).ExecuteCommand() > 0)
+                            {
+                                rData.Result = (int)JoinOrLeaveTeamResult.ResultDefine.emResult_Success;
+
+                                teamData.TeamViceLeaderIDs = jsNew.ToString();
+
+                                // 更新新加入會員的車隊列表
+                                if (UpdateUserTeamList(packet.MemberID, packet.TeamID, -1))
+                                {
+                                    rData.Result = (int)JoinOrLeaveTeamResult.ResultDefine.emResult_Success;
+
+                                    SaveLog($"[Info] MessageFunction::OnJoinOrLeaveTeam, Remove Member:{packet.MemberID} To Team:{packet.TeamID}'s TeamMemberIDs Success");
+                                }
+                                else
+                                {
+                                    rData.Result = (int)JoinOrLeaveTeamResult.ResultDefine.emResult_Fail;
+
+                                    SaveLog($"[Info] MessageFunction::OnJoinOrLeaveTeam, Update User:{packet.MemberID} Team List Fail");
+                                }
+                            }
+                            else
+                            {
+                                rData.Result = (int)JoinOrLeaveTeamResult.ResultDefine.emResult_Fail;
+
+                                SaveLog($"[Info] MessageFunction::OnJoinOrLeaveTeam, Remove Member:{packet.MemberID} To Team:{packet.TeamID}'s TeamMemberIDs Fail");
+                            }
+
+                        }
                         // 車隊列表有該名會員
-                        if (MemberList.Contains(packet.MemberID))
+                        else if (MemberList.Contains(packet.MemberID))
                         {
                             MemberList.Remove(packet.MemberID);
 
