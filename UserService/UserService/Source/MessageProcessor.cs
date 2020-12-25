@@ -72,7 +72,7 @@ namespace Service.Source
         /// <summary>
         /// 建構式
         /// </summary>
-        public MessageProcessor()
+        private MessageProcessor()
         {
             msgFuncList = new Dictionary<int, MsgFunction>();
 

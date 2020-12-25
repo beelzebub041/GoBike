@@ -17,6 +17,7 @@ using DataBaseDef;
 using Connect;
 using SqlSugar;
 using StackExchange.Redis;
+using Tools.NotifyMessage;
 
 using UserPacket.ClientToServer;
 using UserPacket.ServerToClient;
@@ -36,6 +37,11 @@ namespace Service.Source
         private WeekProcess weekProcess = null;
 
         /// <summary>
+        /// 推播物件
+        /// </summary>
+        private NotifyMessage ntMsg = null;
+
+        /// <summary>
         /// Logger 物件
         /// </summary>
         private Logger logger = null;
@@ -48,6 +54,8 @@ namespace Service.Source
             hashTransfer = new RedisHashTransfer();
 
             weekProcess = new WeekProcess();
+
+            ntMsg = new NotifyMessage();
         }
 
         /// <summary>
@@ -66,11 +74,25 @@ namespace Service.Source
         {
             bool ret = false;
 
-            this.logger = logger;
+            try
+            {
+                this.logger = logger;
 
-            ret = true;
+                if (ntMsg.Initialize(logger))
+                {
+                    ret = true;
 
-            SaveLog("[Info] MessageFcunction::Initialize, Initialize Success");
+                    SaveLog("[Info] MessageFcunction::Initialize, Initialize Success");
+                }
+                else
+                {
+                    SaveLog($"[Info] MessageFcunction::Initialize, Fail");
+                }
+            }
+            catch (Exception ex)
+            {
+                SaveLog($"[Error] MessageFcunction::Initialize, Catch Error, Msg:{ex.Message}");
+            }
 
             return ret;
         }
@@ -351,9 +373,11 @@ namespace Service.Source
 
             UpdateUserInfoResult rData = new UpdateUserInfoResult();
 
+            UserInfo userInfo = null;
+
             try
             {
-                UserInfo userInfo = GetSql().Queryable<UserInfo>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).Single();
+                userInfo = GetSql().Queryable<UserInfo>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).Single();
 
                 // 有找到資料
                 if (userInfo != null)
@@ -377,11 +401,6 @@ namespace Service.Source
                     {
                         rData.Result = (int)UpdateUserInfoResult.ResultDefine.emResult_Success;
 
-                        GetRedis((int)Connect.RedisDB.emRedisDB_User).HashSet($"UserInfo_" + userInfo.MemberID, hashTransfer.TransToHashEntryArray(userInfo));
-
-                        // DB 交易提交
-                        GetSql().CommitTran();
-
                         SaveLog($"[Info] MessageFcunction::OnUpdateUserInfo Update User: {packet.MemberID} Info Success");
                     }
                     else
@@ -389,7 +408,6 @@ namespace Service.Source
                         rData.Result = (int)UpdateUserInfoResult.ResultDefine.emResult_Fail;
 
                         SaveLog($"[Info] MessageFcunction::OnUpdateUserInfo Update User: {packet.MemberID} Info Fail");
-
                     }
                 }
                 else
@@ -397,7 +415,6 @@ namespace Service.Source
                     rData.Result = (int)UpdateUserInfoResult.ResultDefine.emResult_Fail;
 
                     SaveLog($"[Info] MessageFcunction::OnUpdateUserInfo Can Not Find User: {packet.MemberID}");
-
                 }
             }
             catch (Exception ex)
@@ -407,9 +424,16 @@ namespace Service.Source
                 rData.Result = (int)UpdateUserInfoResult.ResultDefine.emResult_Fail;
             }
 
-            // DB 交易失敗, 啟動Rollback
-            if (rData.Result != (int)UpdateUserInfoResult.ResultDefine.emResult_Success)
+            if (rData.Result == (int)UpdateUserInfoResult.ResultDefine.emResult_Success)
             {
+                GetRedis((int)Connect.RedisDB.emRedisDB_User).HashSet($"UserInfo_" + userInfo.MemberID, hashTransfer.TransToHashEntryArray(userInfo));
+
+                // DB 交易提交
+                GetSql().CommitTran();
+            }
+            else
+            {
+                // DB 交易失敗, 啟動Rollback
                 GetSql().RollbackTran();
             }
 
@@ -533,31 +557,37 @@ namespace Service.Source
             UpdateFriendListResult rData = new UpdateFriendListResult();
             rData.Action = packet.Action;
 
+            UserInfo userInfo_Invite = null;
+            UserInfo userInfo_Friend = null;
+
             try
             {
                 // 不能為同一人
                 if (packet.MemberID != packet.FriendID)
                 {
-                    UserInfo userInfo = GetSql().Queryable<UserInfo>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).Single();
+                    userInfo_Invite = GetSql().Queryable<UserInfo>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).Single();
 
                     // 有找到會員資料
-                    if (userInfo != null)
+                    if (userInfo_Invite != null)
                     {
-                        UserInfo friendInfo = GetSql().Queryable<UserInfo>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.FriendID).Single();
+                        userInfo_Friend = GetSql().Queryable<UserInfo>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.FriendID).Single();
 
                         // 有找到好友的會員資料
-                        if (friendInfo != null)
+                        if (userInfo_Invite != null)
                         {
-                            JArray jaData = JArray.Parse(userInfo.FriendList);
+                            JArray jaData_User = JArray.Parse(userInfo_Invite.FriendList);
+                            List<string> friendList_User = jaData_User.ToObject<List<string>>();
 
-                            List<string> idList = jaData.ToObject<List<string>>();
+                            JArray jaData_Friend = JArray.Parse(userInfo_Friend.FriendList);
+                            List<string> friendList_Friend = jaData_Friend.ToObject<List<string>>();
 
                             // 新增
                             if (packet.Action == (int)UpdateFriendList.ActionDefine.emAction_Add)
                             {
-                                if (!idList.Contains(packet.FriendID))
+                                if (!friendList_User.Contains(packet.FriendID) && !friendList_Friend.Contains(packet.MemberID))
                                 {
-                                    idList.Add(packet.FriendID);
+                                    friendList_User.Add(packet.FriendID);
+                                    friendList_Friend.Add(packet.MemberID);
 
                                     rData.Result = (int)UpdateFriendListResult.ResultDefine.emResult_Success;
 
@@ -571,9 +601,10 @@ namespace Service.Source
                             // 刪除
                             else if (packet.Action == (int)UpdateFriendList.ActionDefine.emAction_Delete)
                             {
-                                if (idList.Contains(packet.FriendID))
+                                if (friendList_User.Contains(packet.FriendID) && friendList_Friend.Contains(packet.MemberID))
                                 {
-                                    idList.Remove(packet.FriendID);
+                                    friendList_User.Remove(packet.FriendID);
+                                    friendList_Friend.Remove(packet.MemberID);
 
                                     rData.Result = (int)UpdateFriendListResult.ResultDefine.emResult_Success;
                                 }
@@ -585,17 +616,36 @@ namespace Service.Source
 
                             if (rData.Result == (int)UpdateFriendListResult.ResultDefine.emResult_Success)
                             {
-                                JArray jsNew = JArray.FromObject(idList);
+                                JArray jsUser = JArray.FromObject(friendList_User);
+                                JArray jsFriend = JArray.FromObject(friendList_Friend);
 
-                                if (GetSql().Updateable<UserInfo>().SetColumns(it => new UserInfo() { FriendList = jsNew.ToString() }).With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).ExecuteCommand() > 0)
+                                // 設定DB 交易的起始點
+                                GetSql().BeginTran();
+
+                                if (GetSql().Updateable<UserInfo>().SetColumns(it => new UserInfo() { FriendList = jsUser.ToString() }).With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).ExecuteCommand() > 0 &&
+                                    GetSql().Updateable<UserInfo>().SetColumns(it => new UserInfo() { FriendList = jsFriend.ToString() }).With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.FriendID).ExecuteCommand() > 0)
                                 {
                                     rData.Result = (int)UpdateFriendListResult.ResultDefine.emResult_Success;
 
-                                    userInfo.FriendList = jsNew.ToString();
-                                    GetRedis((int)Connect.RedisDB.emRedisDB_User).HashSet($"UserInfo_" + userInfo.MemberID, hashTransfer.TransToHashEntryArray(userInfo));
+                                    userInfo_Invite.FriendList = jsUser.ToString();
 
-                                    SaveLog($"[Error] MessageFcunction::OnUpdateFriendList Member: {packet.MemberID} Update FriendList Success");
+                                    userInfo_Friend.FriendList = jsFriend.ToString();
 
+                                    SaveLog($"[Info] MessageFcunction::OnUpdateFriendList Member: {packet.MemberID} Update FriendList Success");
+
+                                    // 發送推播通知
+                                    {
+                                        if (packet.Action == (int)UpdateFriendList.ActionDefine.emAction_Add)
+                                        {
+                                            UserAccount invitedAccount = GetSql().Queryable<UserAccount>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).Single();
+                                            
+                                            string sTitle = $"好友通知";
+
+                                            string sNotifyMsg = $"{invitedAccount.NotifyToken} 已新增您為好友";
+
+                                            ntMsg.NotifyMsgToDevice(userInfo_Friend.NickName, sTitle, sNotifyMsg);
+                                        }
+                                    }
                                 }
                                 else
                                 {
@@ -633,6 +683,20 @@ namespace Service.Source
                 SaveLog($"[Error] MessageFcunction::OnUpdateFriendList Catch Error, Msg:{ex.Message}");
 
                 rData.Result = (int)UpdateFriendListResult.ResultDefine.emResult_Fail;
+            }
+
+            if (rData.Result == (int)UpdateBlackListResult.ResultDefine.emResult_Success)
+            {
+                // DB 交易提交
+                GetSql().CommitTran();
+
+                GetRedis((int)Connect.RedisDB.emRedisDB_User).HashSet($"UserInfo_" + userInfo_Invite.MemberID, hashTransfer.TransToHashEntryArray(userInfo_Invite));
+                GetRedis((int)Connect.RedisDB.emRedisDB_User).HashSet($"UserInfo_" + userInfo_Friend.MemberID, hashTransfer.TransToHashEntryArray(userInfo_Friend));
+            }
+            else
+            {
+                // DB 交易失敗, 啟動Rollback
+                GetSql().RollbackTran();
             }
 
             JObject jsMain = new JObject();
@@ -840,6 +904,22 @@ namespace Service.Source
 
                         account.NotifyToken = packet.NotifyToken;
                         GetRedis((int)Connect.RedisDB.emRedisDB_User).HashSet($"UserAccount_" + account.MemberID, hashTransfer.TransToHashEntryArray(account));
+
+                        ////刪除其他相同的Token
+                        { 
+                            List<UserAccount> accountList = GetSql().Queryable<UserAccount>().With(SqlSugar.SqlWith.RowLock).Where(it => it.NotifyToken == packet.NotifyToken).ToList();
+
+                            for (int idx = 0; idx < accountList.Count(); idx++)
+                            {
+                                if (accountList[idx].MemberID != account.MemberID)
+                                {
+                                    GetSql().Updateable<UserAccount>().SetColumns(it => new UserAccount() { NotifyToken = "" }).With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == accountList[idx].MemberID).ExecuteCommand();
+
+                                    accountList[idx].NotifyToken = "";
+                                    GetRedis((int)Connect.RedisDB.emRedisDB_User).HashSet($"UserAccount_" + accountList[idx].MemberID, hashTransfer.TransToHashEntryArray(accountList[idx]));
+                                }
+                            }
+                        }
 
                         SaveLog($"[Info] MessageFcunction::OnUpdateNotifyToken Update User: {packet.MemberID} Info Success");
 

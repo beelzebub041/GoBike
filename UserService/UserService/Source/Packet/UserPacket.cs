@@ -296,6 +296,17 @@ namespace UserPacket.ClientToServer
             emAction_Add,                  // 1: 新增
         }
 
+        // 狀態定義
+        public enum StateDefine : int
+        {
+            emAction_None = -1,             // -1: 無狀態
+            emAction_Invite,                // 0: 邀請者
+            emAction_Invited,               // 1: 被邀請者
+        }
+
+        // 狀態
+        public int State { get; set; }
+
         // 會員ID
         public string MemberID { get; set; }
 
