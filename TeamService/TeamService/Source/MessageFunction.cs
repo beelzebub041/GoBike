@@ -476,6 +476,93 @@ namespace Service.Source
             return success;
         }
 
+        private bool DeleteTeam(TeamData teamData)
+        {
+            bool ret = false;
+
+            // 設定DB 交易的起始點
+            GetSql().BeginTran();
+
+            try
+            {
+                // 移入暫時區, 帶時間到期後刪除
+                TeamDataStorageCache stroge = new TeamDataStorageCache();
+                stroge.TeamID = teamData.TeamID;
+                stroge.CreateDate = teamData.CreateDate;
+                stroge.Leader = teamData.Leader;
+                stroge.TeamViceLeaderIDs = teamData.TeamViceLeaderIDs;
+                stroge.TeamMemberIDs = teamData.TeamMemberIDs;
+                stroge.TeamName = teamData.TeamName;
+                stroge.TeamInfo = teamData.TeamInfo;
+                stroge.Avatar = teamData.Avatar;
+                stroge.FrontCover = teamData.FrontCover;
+                stroge.County = teamData.County;
+                stroge.SearchStatus = teamData.SearchStatus;
+                stroge.ExamineStatus = teamData.ExamineStatus;
+                stroge.ApplyJoinList = teamData.ApplyJoinList;
+                stroge.StorageDate = DateTime.UtcNow.ToString("yyyy-MM-dd");
+
+                if (GetSql().Insertable(stroge).With(SqlSugar.SqlWith.TabLockX).ExecuteCommand() > 0)
+                {
+                    // 刪除車隊
+                    if (GetSql().Deleteable<TeamData>().With(SqlSugar.SqlWith.TabLockX).Where(it => it.TeamID == teamData.TeamID).ExecuteCommand() > 0)
+                    {
+                        GetRedis((int)Connect.RedisDB.emRedisDB_Team).KeyDelete($"TeamData_" + teamData.TeamID);
+
+                        // 變更車隊成員的車隊列表
+                        List<string> idList = GetAllMemberID(teamData);
+
+                        for (int idx = 0; idx < idList.Count(); idx++)
+                        {
+                            // 更新UserInfo的車隊資料
+                            UpdateUserTeamList(idList[idx], teamData.TeamID, -1);
+
+                            string targetID = idList[idx];
+
+                            // 收到公告的人
+                            UserAccount account = GetSql().Queryable<UserAccount>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == targetID).Single();
+
+                            if (account != null)
+                            {
+                                string sTitle = $"車隊公告";
+
+                                string sNotifyMsg = $"{teamData.TeamName} 已解散";
+
+                                ntMsg.NotifyMsgToDevice(targetID, account.NotifyToken, sTitle, sNotifyMsg);
+                            }
+                        }
+
+                        // DB 交易提交
+                        GetSql().CommitTran();
+
+                        ret = true;
+
+                        SaveLog($"[Info] MessageFunction::DeleteTeam, Remove Team:{teamData.TeamID} Success");
+                    }
+                    else
+                    {
+                        SaveLog($"[Info] MessageFunction::DeleteTeam, Remove Team:{teamData.TeamID} Fail");
+                    }
+                }
+                else
+                {
+                    SaveLog($"[Info] MessageFunction::DeleteTeam, Back Up Team Data Fail, Team ID:{teamData.TeamID}");
+                }
+            }
+            catch (Exception ex)
+            {
+                SaveLog($"[Error] MessageFunction::DeleteTeam Catch Error, Msg:{ex.Message}");
+            }
+
+            // DB 交易失敗, 啟動Rollback
+            if (!ret)
+            {
+                GetSql().RollbackTran();
+            }
+
+            return ret;
+        }
+
         /**
          * 建立新車隊
          */
@@ -1709,61 +1796,17 @@ namespace Service.Source
                     // 檢查解散車隊的人是否為隊長
                     if (packet.MemberID == teamData.Leader)
                     {
-                        // 移入暫時區, 帶時間到期後刪除
-                        TeamDataStorageCache stroge = new TeamDataStorageCache();
-                        stroge.TeamID = teamData.TeamID;
-                        stroge.CreateDate = teamData.CreateDate;
-                        stroge.Leader = teamData.Leader;
-                        stroge.TeamViceLeaderIDs = teamData.TeamViceLeaderIDs;
-                        stroge.TeamMemberIDs = teamData.TeamMemberIDs;
-                        stroge.TeamName = teamData.TeamName;
-                        stroge.TeamInfo = teamData.TeamInfo;
-                        stroge.Avatar = teamData.Avatar;
-                        stroge.FrontCover = teamData.FrontCover;
-                        stroge.County = teamData.County;
-                        stroge.SearchStatus = teamData.SearchStatus;
-                        stroge.ExamineStatus = teamData.ExamineStatus;
-                        stroge.ApplyJoinList = teamData.ApplyJoinList;
-                        stroge.StorageDate = DateTime.UtcNow.ToString("yyyy-MM-dd");
-
-                        // 設定DB 交易的起始點
-                        GetSql().BeginTran();
-
-                        if (GetSql().Insertable(stroge).With(SqlSugar.SqlWith.TabLockX).ExecuteCommand() > 0)
+                        if (DeleteTeam(teamData))
                         {
-                            // 刪除車隊
-                            if (GetSql().Deleteable<TeamData>().With(SqlSugar.SqlWith.TabLockX).Where(it => it.TeamID == packet.TeamID).ExecuteCommand() > 0)
-                            {
-                                GetRedis((int)Connect.RedisDB.emRedisDB_Team).KeyDelete($"TeamData_" + packet.TeamID);
+                            rData.Result = (int)DeleteTeamResult.ResultDefine.emResult_Success;
 
-                                // 變更車隊成員的車隊列表
-                                List<string> idList = GetAllMemberID(teamData);
-
-                                for (int idx = 0; idx < idList.Count(); idx++)
-                                {
-                                    // 更新UserInfo的車隊資料
-                                    UpdateUserTeamList(idList[idx], teamData.TeamID, -1);
-                                }
-
-                                rData.Result = (int)DeleteTeamResult.ResultDefine.emResult_Success;
-
-                                // DB 交易提交
-                                GetSql().CommitTran();
-
-                                SaveLog($"[Info] MessageFunction::OnDeleteTeam, Remove Team:{packet.TeamID} Success");
-                            }
-                            else
-                            {
-                                rData.Result = (int)DeleteTeamResult.ResultDefine.emResult_Fail;
-
-                                SaveLog($"[Info] MessageFunction::OnDeleteTeam, Remove Team:{packet.TeamID} Fail");
-                            }
+                            SaveLog($"[Info] MessageFunction::OnDeleteTeam, Remove Team:{packet.TeamID} Success");
                         }
                         else
                         {
                             rData.Result = (int)DeleteTeamResult.ResultDefine.emResult_Fail;
 
-                            SaveLog($"[Info] MessageFunction::OnDeleteTeam, Back Up Team Data Fail, Team ID:{packet.TeamID}");
+                            SaveLog($"[Info] MessageFunction::OnDeleteTeam, Remove Team:{packet.TeamID} Fail");
                         }
                     }
                     else
@@ -1788,13 +1831,7 @@ namespace Service.Source
 
                 rData.Result = (int)DeleteTeamResult.ResultDefine.emResult_Fail;
             }
-
-            // DB 交易失敗, 啟動Rollback
-            if (rData.Result != (int)DeleteTeamResult.ResultDefine.emResult_Success)
-            {
-                GetSql().RollbackTran();
-            }
-
+            
             JObject jsMain = new JObject();
             jsMain.Add("CmdID", (int)S2C_CmdID.emDeleteTeamResult);
             jsMain.Add("Data", JsonConvert.DeserializeObject<JObject>(JsonConvert.SerializeObject(rData)));
@@ -2106,7 +2143,22 @@ namespace Service.Source
                         JArray jsmViceLeaderList = JArray.Parse(teamData.TeamViceLeaderIDs);
                         List<string> ViceLeaderList = jsmViceLeaderList.ToObject<List<string>>();
 
-                        if (ViceLeaderList.Contains(packet.MemberID))
+                        if (packet.MemberID == teamData.Leader)
+                        {
+                            if (DeleteTeam(teamData))
+                            {
+                                rData.Result = (int)JoinOrLeaveTeamResult.ResultDefine.emResult_Success;
+
+                                SaveLog($"[Info] MessageFunction::OnJoinOrLeaveTeam, Remove Leader:{packet.MemberID} Success");
+                            }
+                            else
+                            {
+                                rData.Result = (int)JoinOrLeaveTeamResult.ResultDefine.emResult_Fail;
+
+                                SaveLog($"[Info] MessageFunction::OnJoinOrLeaveTeam, Remove Leader:{packet.MemberID} Fail");
+                            }
+                        }
+                        else if (ViceLeaderList.Contains(packet.MemberID))
                         {
                             ViceLeaderList.Remove(packet.MemberID);
 
@@ -2244,35 +2296,40 @@ namespace Service.Source
                 }
                 else if (teamData != null && packet.Action == (int)JoinOrLeaveTeam.ActionDefine.emResult_Delete)
                 {
-                    List<string> notifyTargetList = GetAllMemberID(teamData);
-                    notifyTargetList.Add(packet.MemberID);
-
-                    string userNickName = userInfo != null ? userInfo.NickName : "未定義";
-
-                    for (int idx = 0; idx < notifyTargetList.Count(); idx++)
+                    if (packet.MemberID != teamData.Leader)
                     {
-                        string targetID = notifyTargetList[idx];
+                        List<string> notifyTargetList = GetAllMemberID(teamData);
+                        notifyTargetList.Add(packet.MemberID);
 
-                        // 收到公告的人
-                        UserAccount account = GetSql().Queryable<UserAccount>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == targetID).Single();
+                        string userNickName = userInfo != null ? userInfo.NickName : "未定義";
 
-                        if (account != null)
+                        for (int idx = 0; idx < notifyTargetList.Count(); idx++)
                         {
-                            string sTitle = $"車隊公告";
+                            string targetID = notifyTargetList[idx];
 
-                            string sNotifyMsg = $"{userNickName} 離開 {teamData.TeamName}";
+                            // 收到公告的人
+                            UserAccount account = GetSql().Queryable<UserAccount>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == targetID).Single();
 
-                            if (targetID == packet.MemberID)
+                            if (account != null)
                             {
-                                sTitle = $"系統公告";
+                                string sTitle = $"車隊公告";
 
-                                sNotifyMsg = $"您已離開車隊: {teamData.TeamName}";
+                                string sNotifyMsg = $"{userNickName} 離開 {teamData.TeamName}";
+
+                                if (targetID == packet.MemberID)
+                                {
+                                    sTitle = $"系統公告";
+
+                                    sNotifyMsg = $"您已離開車隊: {teamData.TeamName}";
+                                }
+
+                                ntMsg.NotifyMsgToDevice(targetID, account.NotifyToken, sTitle, sNotifyMsg);
                             }
 
-                            ntMsg.NotifyMsgToDevice(targetID, account.NotifyToken, sTitle, sNotifyMsg);
                         }
-
                     }
+                    
+
                 }
             }
             else
