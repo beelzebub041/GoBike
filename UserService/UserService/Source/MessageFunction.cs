@@ -13,6 +13,7 @@ using Tools;
 using Tools.WeekProcess;
 using Tools.RedisHashTransfer;
 
+using Service.Source.Define;
 using DataBaseDef;
 using Connect;
 using SqlSugar;
@@ -643,7 +644,7 @@ namespace Service.Source
 
                                             string sNotifyMsg = $"{invitedAccount.NotifyToken} 已新增您為好友";
 
-                                            ntMsg.NotifyMsgToDevice(userInfo_Friend.NickName, sTitle, sNotifyMsg);
+                                            ntMsg.NotifyMsgToDevice(userInfo_Friend.NickName, sTitle, sNotifyMsg, (int)NotifyID.User_AddFriend);
                                         }
                                     }
                                 }
