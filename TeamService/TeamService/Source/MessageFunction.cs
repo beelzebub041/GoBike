@@ -14,6 +14,7 @@ using Tools.RedisHashTransfer;
 using Tools.WeekProcess;
 using Tools.NotifyMessage;
 
+using Service.Source.Define;
 using DataBaseDef;
 using Connect;
 using SqlSugar;
@@ -528,7 +529,7 @@ namespace Service.Source
 
                                 string sNotifyMsg = $"{teamData.TeamName} 已解散";
 
-                                ntMsg.NotifyMsgToDevice(targetID, account.NotifyToken, sTitle, sNotifyMsg);
+                                ntMsg.NotifyMsgToDevice(account.NotifyToken, sTitle, sNotifyMsg, (int)NotifyID.Team_DisbandTeam);
                             }
                         }
 
@@ -924,7 +925,7 @@ namespace Service.Source
 
                         string sNotifyMsg = $"{teamData.TeamName} 隊長由 {oldLeaderInfo.NickName} 更換為 {newLeaderInfo.NickName} ";
 
-                        ntMsg.NotifyMsgToDevice(targetID, account.NotifyToken, sTitle, sNotifyMsg);
+                        ntMsg.NotifyMsgToDevice(account.NotifyToken, sTitle, sNotifyMsg, (int)NotifyID.Team_ChangeLeader);
                     }
 
                 }
@@ -1259,7 +1260,9 @@ namespace Service.Source
 
                         string sNotifyMsg = $"{userInfo.NickName} {action} {teamData.TeamName}";
 
-                        ntMsg.NotifyMsgToDevice(targetID, account.NotifyToken, sTitle, sNotifyMsg);
+                        int id = teamData.ExamineStatus == 1 ? (int)NotifyID.Team_MemberJoinTeam : (int)NotifyID.Team_MemberJoined;
+
+                        ntMsg.NotifyMsgToDevice(account.NotifyToken, sTitle, sNotifyMsg, id);
                     }
 
                 }
@@ -1469,7 +1472,7 @@ namespace Service.Source
 
                             string sNotifyMsg = packet.Content;
 
-                            ntMsg.NotifyMsgToDevice(targetID, account.NotifyToken, sTitle, sNotifyMsg);
+                            ntMsg.NotifyMsgToDevice(account.NotifyToken, sTitle, sNotifyMsg, (int)NotifyID.Team_NewBulletin);
                         }
 
                     }
@@ -1721,7 +1724,7 @@ namespace Service.Source
 
                             string sNotifyMsg = $"{userInfo.NickName} 建立活動 {packet.Title}";
 
-                            ntMsg.NotifyMsgToDevice(targetID, account.NotifyToken, sTitle, sNotifyMsg);
+                            ntMsg.NotifyMsgToDevice(account.NotifyToken, sTitle, sNotifyMsg, (int)NotifyID.Team_NewActivity);
                         }
 
                     }
@@ -1755,7 +1758,7 @@ namespace Service.Source
 
                             string sNotifyMsg = $"{teamAct.Title} 已更新內容";
 
-                            ntMsg.NotifyMsgToDevice(targetID, account.NotifyToken, sTitle, sNotifyMsg);
+                            ntMsg.NotifyMsgToDevice(account.NotifyToken, sTitle, sNotifyMsg, (int)NotifyID.Team_ModifyActivityContent);
                         }
 
                     }
@@ -2282,14 +2285,18 @@ namespace Service.Source
 
                             string sNotifyMsg = $"{userNickName} 加入 {teamData.TeamName}";
 
+                            int id = (int)NotifyID.Team_MemberJoinTeam;
+
                             if (targetID == packet.MemberID)
                             {
                                 sTitle = $"系統公告";
 
                                 sNotifyMsg = $"您已加入車隊: {teamData.TeamName}";
+
+                                id = (int)NotifyID.Team_MemberJoined;
                             }
 
-                            ntMsg.NotifyMsgToDevice(targetID, account.NotifyToken, sTitle, sNotifyMsg);
+                            ntMsg.NotifyMsgToDevice(account.NotifyToken, sTitle, sNotifyMsg, id);
                         }
 
                     }
@@ -2316,14 +2323,18 @@ namespace Service.Source
 
                                 string sNotifyMsg = $"{userNickName} 離開 {teamData.TeamName}";
 
+                                int id = (int)NotifyID.Team_MemberLeaveTeam;
+
                                 if (targetID == packet.MemberID)
                                 {
                                     sTitle = $"系統公告";
 
                                     sNotifyMsg = $"您已離開車隊: {teamData.TeamName}";
+
+                                    id = (int)NotifyID.Team_MemberLeaved;
                                 }
 
-                                ntMsg.NotifyMsgToDevice(targetID, account.NotifyToken, sTitle, sNotifyMsg);
+                                ntMsg.NotifyMsgToDevice(account.NotifyToken, sTitle, sNotifyMsg, id);
                             }
 
                         }
@@ -2517,7 +2528,7 @@ namespace Service.Source
 
                         string sNotifyMsg = $"您已離開車隊: {teamData.TeamName}";
 
-                        ntMsg.NotifyMsgToDevice(targetID, account.NotifyToken, sTitle, sNotifyMsg);
+                        ntMsg.NotifyMsgToDevice(account.NotifyToken, sTitle, sNotifyMsg, (int)NotifyID.Team_MemberLeaved);
                     }
                 }
                 

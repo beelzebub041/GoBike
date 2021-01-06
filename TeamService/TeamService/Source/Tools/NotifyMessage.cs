@@ -9,8 +9,7 @@ using System.Net;
 using System.IO;
 using System.Web.Script.Serialization;
 
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
+using Tools;
 
 namespace Tools.NotifyMessage
 {
@@ -75,6 +74,7 @@ namespace Tools.NotifyMessage
             catch (Exception ex)
             {
                 SaveLog($"[Error] NotifyMessage::Initialize, Catch Error Msg:{ex.Message}");
+
             }
 
             return bReturn;
@@ -83,7 +83,7 @@ namespace Tools.NotifyMessage
         /// <summary>
         /// 讀取設定檔
         /// </summary>
-        /// <returns> 回傳是否讀取成功 </returns>
+        /// <returns> 是否成功讀取 </returns>
         private bool LoadingConfig()
         {
             bool bReturn = true;
@@ -140,35 +140,15 @@ namespace Tools.NotifyMessage
         /// <summary>
         /// 推播訊息至裝置
         /// </summary>
-        /// <param name="memberId"> 會員 ID </param>
-        /// <param name="deviceId"> 裝置 ID </param>
+        /// <param name="deviceId"> 裝置 Token </param>
         /// <param name="tit"> 標題 </param>
-        /// <param name="msg"> 內容 </param>
-        public void NotifyMsgToDevice(string memberId, string deviceId, string tit, string msg)
+        /// <param name="msg"> 訊息 </param>
+        public void NotifyMsgToDevice(string deviceId, string tit, string msg, int id)
         {
             if (serverKey != "" && senderId != "")
             {
                 try
                 {
-                    //JObject jsBody = new JObject();
-                    //jsBody.Add("Owner", memberId);
-                    //jsBody.Add("Content", msg);
-
-                    //WebRequest tRequest = WebRequest.Create("https://fcm.googleapis.com/fcm/send");
-                    //tRequest.Method = "post";
-                    //tRequest.ContentType = "application/json";
-                    //var data = new
-                    //{
-                    //    to = deviceId,
-                    //    notification = new
-                    //    {
-                    //        body = jsBody.ToString(),
-                    //        title = tit,
-                    //        sound = "Enabled"
-
-                    //    }
-                    //};
-
                     WebRequest tRequest = WebRequest.Create("https://fcm.googleapis.com/fcm/send");
                     tRequest.Method = "post";
                     tRequest.ContentType = "application/json";
@@ -180,9 +160,12 @@ namespace Tools.NotifyMessage
                             body = msg,
                             title = tit,
                             sound = "Enabled"
+                        },
+                        data = new
+                        {
+                            id = Convert.ToString(id)
                         }
                     };
-
                     var serializer = new JavaScriptSerializer();
                     var json = serializer.Serialize(data);
                     Byte[] byteArray = Encoding.UTF8.GetBytes(json);
@@ -217,6 +200,5 @@ namespace Tools.NotifyMessage
             }
 
         }
-        
     }
 }
