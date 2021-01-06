@@ -38,7 +38,7 @@ namespace Tools.NotifyMessage
         /// </summary>
         public NotifyMessage()
         {
-            
+
         }
 
         ~NotifyMessage()
@@ -143,7 +143,7 @@ namespace Tools.NotifyMessage
         /// <param name="deviceId"> 裝置 Token </param>
         /// <param name="tit"> 標題 </param>
         /// <param name="msg"> 訊息 </param>
-        public void NotifyMsgToDevice(string deviceId, string tit, string msg)
+        public void NotifyMsgToDevice(string deviceId, string tit, string msg, int id)
         {
             if (serverKey != "" && senderId != "")
             {
@@ -160,6 +160,10 @@ namespace Tools.NotifyMessage
                             body = msg,
                             title = tit,
                             sound = "Enabled"
+                        },
+                        data = new
+                        {
+                            id = Convert.ToString(id)
                         }
                     };
                     var serializer = new JavaScriptSerializer();

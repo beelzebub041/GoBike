@@ -15,6 +15,7 @@ using Tools.RedisHashTransfer;
 using Tools.WeekProcess;
 using Tools.NotifyMessage;
 
+using Service.Source.Define;
 using DataBaseDef;
 using Connect;
 using SqlSugar;
@@ -396,7 +397,7 @@ namespace Service.Source
 
                                                 string sNotifyMsg = $"{userInfo.NickName} 邀請您組隊";
 
-                                                ntMsg.NotifyMsgToDevice(notifyAccount.NotifyToken, sTitle, sNotifyMsg);
+                                                ntMsg.NotifyMsgToDevice(notifyAccount.NotifyToken, sTitle, sNotifyMsg, (int)NotifyID.Ride_RideGroupInvite);
                                             }
                                             else
                                             {
@@ -595,7 +596,7 @@ namespace Service.Source
 
                                                 string sNotifyMsg = $"{userInfo.NickName} 邀請您組隊";
 
-                                                ntMsg.NotifyMsgToDevice(notifyAccount.NotifyToken, sTitle, sNotifyMsg);
+                                                ntMsg.NotifyMsgToDevice(notifyAccount.NotifyToken, sTitle, sNotifyMsg, (int)NotifyID.Ride_RideGroupInvite);
                                             }
                                             else
                                             {
@@ -985,7 +986,9 @@ namespace Service.Source
 
                             string sNotifyMsg = $"{replyMemberNickName} 已{sAction}";
 
-                            ntMsg.NotifyMsgToDevice(notifyAccount.NotifyToken, sTitle, sNotifyMsg);
+                            int notifyID = packet.Action == -1 ? (int)NotifyID.Ride_RefuseRideGroup : packet.Action == 1 ? (int)NotifyID.Ride_JoinRideGroup : packet.Action == 2 ? (int)NotifyID.Ride_LeaveRideGroup : -1;
+
+                            ntMsg.NotifyMsgToDevice(notifyAccount.NotifyToken, sTitle, sNotifyMsg, notifyID);
                         }
                         else
                         {
@@ -1159,7 +1162,9 @@ namespace Service.Source
 
                                             string sNotifyMsg = $"{userInfo.NickName} {sAction} 緊急狀況";
 
-                                            ntMsg.NotifyMsgToDevice(notifyAccount.NotifyToken, sTitle, sNotifyMsg);
+                                            int notifyID = packet.Action == (int)NotifyRideGroupMember.ActionDefine.emAction_Add ? (int)NotifyID.Ride_NotifyWarning : packet.Action == (int)NotifyRideGroupMember.ActionDefine.emAction_Delete ? (int)NotifyID.Ride_CancelNotifyWarning : -1;
+
+                                            ntMsg.NotifyMsgToDevice(notifyAccount.NotifyToken, sTitle, sNotifyMsg, notifyID);
 
                                             // 推播通知
                                             if (packet.Action == (int)NotifyRideGroupMember.ActionDefine.emAction_None)
