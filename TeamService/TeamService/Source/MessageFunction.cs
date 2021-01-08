@@ -1546,7 +1546,7 @@ namespace Service.Source
                     {
                         rData.Result = (int)UpdateActivityResult.ResultDefine.emResult_Fail;
 
-                        SaveLog($"[Info] MessageFunction::OnUpdateBulletin, Update Team Bulletin Fail, BulletinID:{rData.ActID}");
+                        SaveLog($"[Info] MessageFunction::OnUpdateActivity, Update Team Activity Fail, ActivityID:{rData.ActID}");
                     }
                 }
 
@@ -1561,39 +1561,49 @@ namespace Service.Source
                         // 新增活動
                         if (packet.Action == (int)UpdateActivity.ActionDefine.emResult_Add)
                         {
-                            string dateTime = DateTime.UtcNow.ToString("yyyy-MM-dd hh:mm:ss");
-
-                            string guidAll = Guid.NewGuid().ToString();
-
-                            string[] guidList = guidAll.Split('-');
-
-                            newTeamAct = new TeamActivity();
-                            newTeamAct.ActID = "DbAct-" + guidList[0];        // 取GUID前8碼,
-                            newTeamAct.CreateDate = dateTime;
-                            newTeamAct.TeamID = packet.TeamID;
-                            newTeamAct.MemberID = packet.MemberID;
-                            newTeamAct.MemberList = packet.MemberList == null ? "[]" : packet.MemberList;
-                            newTeamAct.ActDate = packet.ActDate;
-                            newTeamAct.Title = packet.Title;
-                            newTeamAct.MeetTime = packet.MeetTime;
-                            newTeamAct.TotalDistance = packet.TotalDistance;
-                            newTeamAct.MaxAltitude = packet.MaxAltitude;
-                            newTeamAct.Route = packet.Route;
-
-                            if (GetSql().Insertable(newTeamAct).With(SqlSugar.SqlWith.TabLockX).ExecuteCommand() > 0)
+                            if (DateTime.Now < DateTime.Parse(packet.ActDate) && DateTime.Now < DateTime.Parse(packet.MeetTime))
                             {
-                                rData.Result = (int)UpdateActivityResult.ResultDefine.emResult_Success;
+                                string dateTime = DateTime.UtcNow.ToString("yyyy-MM-dd hh:mm:ss");
 
-                                rData.ActID = newTeamAct.ActID;
+                                string guidAll = Guid.NewGuid().ToString();
 
-                                SaveLog($"[Info] MessageFunction::OnUpdateActivity, Create Team Activity Success, ActID:{rData.ActID}");
+                                string[] guidList = guidAll.Split('-');
+
+                                newTeamAct = new TeamActivity();
+                                newTeamAct.ActID = "DbAct-" + guidList[0];        // 取GUID前8碼,
+                                newTeamAct.CreateDate = dateTime;
+                                newTeamAct.TeamID = packet.TeamID;
+                                newTeamAct.MemberID = packet.MemberID;
+                                newTeamAct.MemberList = packet.MemberList == null ? "[]" : packet.MemberList;
+                                newTeamAct.ActDate = packet.ActDate;
+                                newTeamAct.Title = packet.Title;
+                                newTeamAct.MeetTime = packet.MeetTime;
+                                newTeamAct.TotalDistance = packet.TotalDistance;
+                                newTeamAct.MaxAltitude = packet.MaxAltitude;
+                                newTeamAct.Route = packet.Route;
+
+                                if (GetSql().Insertable(newTeamAct).With(SqlSugar.SqlWith.TabLockX).ExecuteCommand() > 0)
+                                {
+                                    rData.Result = (int)UpdateActivityResult.ResultDefine.emResult_Success;
+
+                                    rData.ActID = newTeamAct.ActID;
+
+                                    SaveLog($"[Info] MessageFunction::OnUpdateActivity, Create Team Activity Success, ActID:{rData.ActID}");
+
+                                }
+                                else
+                                {
+                                    rData.Result = (int)UpdateActivityResult.ResultDefine.emResult_Fail;
+
+                                    SaveLog($"[Warning] MessageFunction::OnUpdateActivity, Create Team Activity Fail, Data Base Can Not Inseart");
+                                }
 
                             }
                             else
                             {
                                 rData.Result = (int)UpdateActivityResult.ResultDefine.emResult_Fail;
 
-                                SaveLog($"[Warning] MessageFunction::OnUpdateActivity, Create Team Activity Fail, Data Base Can Not Inseart");
+                                SaveLog($"[Warning] MessageFunction::OnUpdateActivity, Create Team Activity Fail, Act Time Below Current Time");
                             }
                         }
                         // 修改活動 或 刪除活動
@@ -1624,29 +1634,38 @@ namespace Service.Source
                                     // 修改活動
                                     else if (packet.Action == (int)UpdateActivity.ActionDefine.emResult_Modify)
                                     {
-
-                                        teamAct.MemberList = packet.MemberList == null ? teamAct.MemberList : packet.MemberList;
-                                        teamAct.ActDate = packet.ActDate == null ? teamAct.ActDate : packet.ActDate;
-                                        teamAct.Title = packet.Title == null ? teamAct.Title : packet.Title;
-                                        teamAct.MeetTime = packet.MeetTime == null ? teamAct.MeetTime : packet.MeetTime;
-                                        teamAct.TotalDistance = packet.TotalDistance == 0 ? teamAct.TotalDistance : packet.TotalDistance;
-                                        teamAct.MaxAltitude = packet.MaxAltitude == 0 ? teamAct.MaxAltitude : packet.MaxAltitude;
-                                        teamAct.Route = packet.Route == null ? teamAct.Route : packet.Route;
-
-                                        if (GetSql().Updateable<TeamActivity>(teamAct).With(SqlSugar.SqlWith.RowLock).Where(it => it.ActID == packet.ActID).ExecuteCommand() > 0)
+                                        if (DateTime.Now < DateTime.Parse(packet.ActDate) && DateTime.Now < DateTime.Parse(packet.MeetTime))
                                         {
-                                            rData.Result = (int)UpdateActivityResult.ResultDefine.emResult_Success;
+                                            teamAct.MemberList = packet.MemberList == null ? teamAct.MemberList : packet.MemberList;
+                                            teamAct.ActDate = packet.ActDate == null ? teamAct.ActDate : packet.ActDate;
+                                            teamAct.Title = packet.Title == null ? teamAct.Title : packet.Title;
+                                            teamAct.MeetTime = packet.MeetTime == null ? teamAct.MeetTime : packet.MeetTime;
+                                            teamAct.TotalDistance = packet.TotalDistance == 0 ? teamAct.TotalDistance : packet.TotalDistance;
+                                            teamAct.MaxAltitude = packet.MaxAltitude == 0 ? teamAct.MaxAltitude : packet.MaxAltitude;
+                                            teamAct.Route = packet.Route == null ? teamAct.Route : packet.Route;
 
-                                            SaveLog($"[Info] MessageFunction::OnUpdateActivity, Update Team Activity Success, ActID:{rData.ActID}");
+                                            if (GetSql().Updateable<TeamActivity>(teamAct).With(SqlSugar.SqlWith.RowLock).Where(it => it.ActID == packet.ActID).ExecuteCommand() > 0)
+                                            {
+                                                rData.Result = (int)UpdateActivityResult.ResultDefine.emResult_Success;
+
+                                                SaveLog($"[Info] MessageFunction::OnUpdateActivity, Update Team Activity Success, ActID:{rData.ActID}");
+
+                                            }
+                                            else
+                                            {
+                                                rData.Result = (int)UpdateActivityResult.ResultDefine.emResult_Fail;
+
+                                                SaveLog($"[Info] MessageFunction::OnUpdateActivity, Update Team Activity Fail, ActID:{rData.ActID}");
+                                            }
 
                                         }
                                         else
                                         {
                                             rData.Result = (int)UpdateActivityResult.ResultDefine.emResult_Fail;
 
-                                            SaveLog($"[Info] MessageFunction::OnUpdateActivity, Update Team Activity Fail, ActID:{rData.ActID}");
+                                            SaveLog($"[Warning] MessageFunction::OnUpdateActivity, Create Team Activity Fail, Act Time Below Current Time");
                                         }
-
+                                    
                                     }
                                     else
                                     {
