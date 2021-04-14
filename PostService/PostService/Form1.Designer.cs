@@ -51,7 +51,7 @@
             this.ClientSize = new System.Drawing.Size(482, 207);
             this.Controls.Add(this.ConsoleTextBox);
             this.Name = "Form1";
-            this.Text = "User Service";
+            this.Text = "Post Service";
             this.ResumeLayout(false);
             this.PerformLayout();
 

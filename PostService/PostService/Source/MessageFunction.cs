@@ -146,6 +146,96 @@ namespace Service.Source
         }
 
         /// <summary>
+        /// 更新會員好友的塗鴉牆列表
+        /// </summary>
+        /// <param name="memeberID"></param>
+        /// <param name="post"></param>
+        private bool AddFriendPost(string memeberID, string postID)
+        {
+            bool ret = false;
+
+            try
+            {
+                UserInfo userInfo = GetSql().Queryable<UserInfo>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == memeberID).Single();
+
+                if (userInfo != null)
+                {
+                    JArray jsData = JArray.Parse(userInfo.FriendList);
+
+                    List<string> friendList = jsData.ToObject<List<string>>();
+
+                    for (int idx = 0; idx < friendList.Count(); idx++)
+                    {
+                        string sKey = $"PostShowList_" + memeberID;
+
+                        if (GetRedis((int)Connect.RedisDB.emRedisDB_Post).KeyExists(sKey))
+                        {
+                            string postShowListInfo = GetRedis((int)Connect.RedisDB.emRedisDB_RideGroup).StringGet(sKey);
+                            JObject jsInfo = JObject.Parse(postShowListInfo);
+
+                            if (jsInfo.ContainsKey("PostList"))
+                            {
+                                JArray jsPostList = JArray.Parse(jsInfo["PostList"].ToString());
+                                List<string> showList = jsPostList.ToObject<List<string>>();
+
+                                showList.Add(postID);
+
+                                jsInfo["PostList"] = JArray.FromObject(showList);
+
+                                if (GetRedis((int)Connect.RedisDB.emRedisDB_Post).StringSet(sKey, jsPostList.ToString()))
+                                {
+                                    ret = true;
+
+                                    SaveLog($"[Info] MessageFcunction::AddFriendPost Add Post List Success");
+
+                                }
+                                else
+                                {
+                                    SaveLog($"[Warning] MessageFcunction::AddFriendPost Add Post List Fail");
+                                }
+
+                            }
+
+                        }
+                        else
+                        {
+
+                            List<string> showList = new List<string>();
+                            showList.Add(postID);
+
+                            JObject jsPostList = new JObject();
+                            jsPostList.Add("PostList", JArray.FromObject(showList));
+
+                            if (GetRedis((int)Connect.RedisDB.emRedisDB_Post).StringSet(sKey, jsPostList.ToString()))
+                            {
+                                ret = true;
+
+                                SaveLog($"[Info] MessageFcunction::AddFriendPost Create Post Show List Success");
+
+                            }
+                            else
+                            {
+                                SaveLog($"[Warning] MessageFcunction::AddFriendPost Create Post Show List Fail");
+                            }
+
+                        }
+                    }
+                }
+                else
+                {
+                    SaveLog($"[Info] MessageFcunction::AddFriendPost Can Not Find Member:{memeberID}");
+                }
+
+            }
+            catch (Exception ex)
+            {
+                SaveLog($"[Error] MessageFcunction::AddFriendPost Catch Error Msg:{ex.Message}");
+            }
+
+            return ret;
+        }
+
+        /// <summary>
         /// 建立新貼文
         /// </summary>
         /// <param name="data"> 封包資料 </param>
@@ -174,8 +264,8 @@ namespace Service.Source
                     string[] guidList = guidAll.Split('-');
 
                     // 建立貼文
-                    newPost.MemberID   = "DbPst-" + guidList[0];        // 取GUID前8碼
-                    newPost.Place      = packet.Place;
+                    newPost.PostID     = "DbPst-" + guidList[0];        // 取GUID前8碼
+                    newPost.MemberID = packet.MemberID;
                     newPost.Photo      = packet.Photo;
                     newPost.Content    = packet.Content;
                     newPost.LikeList   = "[]";
@@ -225,7 +315,9 @@ namespace Service.Source
                 GetRedis((int)Connect.RedisDB.emRedisDB_Post).HashSet($"PostInfo_" + newPost.PostID, hashTransfer.TransToHashEntryArray(newPost));
 
                 // 建立Redis 會員的貼文ID列表
-                GetRedis((int)Connect.RedisDB.emRedisDB_Post).HashSet($"PostIdList_" + newPost.MemberID, newPost.PostID, newPost.PostID);
+                GetRedis((int)Connect.RedisDB.emRedisDB_Post).HashSet($"PostList_" + newPost.MemberID, newPost.PostID, newPost.PostID);
+
+                AddFriendPost(newPost.MemberID, newPost.PostID);
 
             }
             else
@@ -268,7 +360,6 @@ namespace Service.Source
                     // 貼文所有者
                     if (post.MemberID == packet.MemberID)
                     {
-                        post.Place = packet.Place == null ? post.Place : packet.Place;
                         post.Photo = packet.Photo == null ? post.Photo : packet.Photo;
                         post.Content = packet.Content == null ? post.Content : packet.Content;
 
@@ -316,7 +407,7 @@ namespace Service.Source
                 GetSql().CommitTran();
 
                 // 更新Redis 會員貼文
-                GetRedis((int)Connect.RedisDB.emRedisDB_Post).HashSet($"PostInfo_" + post.MemberID, hashTransfer.TransToHashEntryArray(post));
+                GetRedis((int)Connect.RedisDB.emRedisDB_Post).HashSet($"PostInfo_" + post.PostID, hashTransfer.TransToHashEntryArray(post));
             }
             else
             {
@@ -402,7 +493,7 @@ namespace Service.Source
                 GetSql().CommitTran();
 
                 // 刪除Redus 會員的貼文
-                GetRedis((int)Connect.RedisDB.emRedisDB_Post).KeyDelete($"PostInfo" + packet.PostID);
+                GetRedis((int)Connect.RedisDB.emRedisDB_Post).KeyDelete($"PostInfo_" + packet.PostID);
 
                 // 刪除Redis 會員的貼文列表
                 GetRedis((int)Connect.RedisDB.emRedisDB_Post).HashDelete($"PostList_" + packet.MemberID, packet.PostID);
@@ -500,7 +591,7 @@ namespace Service.Source
                 GetSql().CommitTran();
 
                 // 更新Redis 會員貼文
-                GetRedis((int)Connect.RedisDB.emRedisDB_Post).HashSet($"PostInfo_" + post.MemberID, hashTransfer.TransToHashEntryArray(post));
+                GetRedis((int)Connect.RedisDB.emRedisDB_Post).HashSet($"PostInfo_" + post.PostID, hashTransfer.TransToHashEntryArray(post));
             }
             else
             {
@@ -594,7 +685,7 @@ namespace Service.Source
                 GetSql().CommitTran();
 
                 // 更新Redis 會員貼文
-                GetRedis((int)Connect.RedisDB.emRedisDB_Post).HashSet($"PostInfo_" + post.MemberID, hashTransfer.TransToHashEntryArray(post));
+                GetRedis((int)Connect.RedisDB.emRedisDB_Post).HashSet($"PostInfo_" + post.PostID, hashTransfer.TransToHashEntryArray(post));
             }
             else
             {

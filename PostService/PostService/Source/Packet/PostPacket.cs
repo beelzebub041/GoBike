@@ -106,9 +106,6 @@ namespace PostPacket.ClientToServer
         // 會員ID
         public string MemberID { get; set; }
 
-        // 地點
-        public string Place { get; set; }
-
         // 圖片
         public string Photo { get; set; }
 
@@ -127,9 +124,6 @@ namespace PostPacket.ClientToServer
 
         // 貼文ID
         public string PostID { get; set; }
-
-        // 地點
-        public string Place { get; set; }
 
         // 圖片
         public string Photo { get; set; }

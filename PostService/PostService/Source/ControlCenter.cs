@@ -75,9 +75,9 @@ namespace Service.Source
             {
                 this.logger = logger;
 
-                SaveLog($"[Info] User Service Version: {version}");
+                SaveLog($"[Info] Post Service Version: {version}");
 
-                clientHandler = new ClientHandler("/User");
+                clientHandler = new ClientHandler("/Post");
 
                 if (MessageProcessor.Instance.Initialize(logger) && clientHandler.Initialize(logger, MessageProcessor.Instance.AddQueue) &&
                     DataBaseConnect.Instance.Initialize(logger) && DataBaseConnect.Instance.Connect() && 
