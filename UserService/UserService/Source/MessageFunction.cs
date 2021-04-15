@@ -12,6 +12,7 @@ using Newtonsoft.Json.Linq;
 using Tools;
 using Tools.WeekProcess;
 using Tools.RedisHashTransfer;
+using Tools.FireBaseHandler;
 
 using Service.Source.Define;
 using DataBaseDef;
@@ -22,6 +23,7 @@ using Tools.NotifyMessage;
 
 using UserPacket.ClientToServer;
 using UserPacket.ServerToClient;
+using FirebaseAdmin.Auth;
 
 namespace Service.Source
 {
@@ -82,6 +84,8 @@ namespace Service.Source
                 if (ntMsg.Initialize(logger))
                 {
                     ret = true;
+
+                    FireBaseHandler.Instance.SetLogger(logger);
 
                     SaveLog("[Info] MessageFcunction::Initialize, Initialize Success");
                 }
@@ -311,39 +315,47 @@ namespace Service.Source
 
             try
             {
-                UserAccount account = GetSql().Queryable<UserAccount>().Where(it => it.Email == packet.Email && it.Password == packet.Password).Single();
-
-                // 有找到帳號
-                if (account != null)
+                if (packet.Email == "token")
                 {
-                    if (account.Password == packet.Password)
-                    {
-                        List<UserInfo> infoList = GetSql().Queryable<UserInfo>().Where(it => it.MemberID == account.MemberID).ToList();
+                    rData = OnUserLogin_Temp(data);
+                }
+                else
+                {
+                    UserAccount account = GetSql().Queryable<UserAccount>().Where(it => it.Email == packet.Email && it.Password == packet.Password).Single();
 
-                        // 有找到會員
-                        if (infoList.Count() == 1)
+                    // 有找到帳號
+                    if (account != null)
+                    {
+                        if (account.Password == packet.Password)
                         {
-                            rData.Result = (int)UserLoginResult.ResultDefine.emResult_Success;
-                            rData.MemberID = account.MemberID;
+                            List<UserInfo> infoList = GetSql().Queryable<UserInfo>().Where(it => it.MemberID == account.MemberID).ToList();
+
+                            // 有找到會員
+                            if (infoList.Count() == 1)
+                            {
+                                rData.Result = (int)UserLoginResult.ResultDefine.emResult_Success;
+                                rData.MemberID = account.MemberID;
+                            }
+                            else
+                            {
+                                SaveLog("[Warning] MessageFcunction::OnUserLogin Can't Find User Info");
+
+                                rData.Result = (int)UserLoginResult.ResultDefine.emResult_Fail;
+                            }
                         }
                         else
                         {
-                            SaveLog("[Warning] MessageFcunction::OnUserLogin Can't Find User Info");
+                            rData.Result = (int)UserLoginResult.ResultDefine.emResult_PwdError;
 
-                            rData.Result = (int)UserLoginResult.ResultDefine.emResult_Fail;
+                            SaveLog("[Info] MessageFcunction::OnUserLogin Can't Password Error");
                         }
                     }
                     else
                     {
-                        rData.Result = (int)UserLoginResult.ResultDefine.emResult_PwdError;
-
-                        SaveLog("[Info] MessageFcunction::OnUserLogin Can't Password Error");
+                        rData.Result = (int)UserLoginResult.ResultDefine.emResult_AccountError;
                     }
                 }
-                else
-                {
-                    rData.Result = (int)UserLoginResult.ResultDefine.emResult_AccountError;
-                }
+
             }
             catch (Exception ex)
             {
@@ -359,6 +371,332 @@ namespace Service.Source
             ret = jsMain.ToString();
 
             return ret;
+        }
+
+
+        public string OnUserLogin_New(string data)
+        {
+            string ret = "";
+
+            UserLogin packet = JsonConvert.DeserializeObject<UserLogin>(data);
+
+            UserLoginResult rData = new UserLoginResult();
+
+            try
+            {
+                string uUID = FireBaseHandler.Instance.CheckFireBaseUserToken(packet.Password).Result;
+
+                if (uUID != "")
+                {
+                    UserAccount_New account = GetSql().Queryable<UserAccount_New>().Where(it => it.UUID == uUID).Single();
+
+                    // 有找到帳號
+                    if (account != null)
+                    {
+                        UserInfo userInfo = GetSql().Queryable<UserInfo>().Where(it => it.MemberID == account.MemberID).Single();
+
+                        // 有找到會員
+                        if (userInfo != null)
+                        {
+                            rData.Result = (int)UserLoginResult.ResultDefine.emResult_Success;
+                            rData.MemberID = account.MemberID;
+                        }
+                        else
+                        {
+                            SaveLog("[Warning] MessageFcunction::OnUserLogin Can't Find User Info");
+
+                            rData.Result = (int)UserLoginResult.ResultDefine.emResult_Fail;
+                        }
+
+                    }
+                    else
+                    {
+                        //rData.Result = (int)UserLoginResult.ResultDefine.emResult_AccountError;
+
+                        string dateTime = DateTime.UtcNow.ToString("yyyy-MM-dd hh:mm:ss");
+
+                        string guidAll = Guid.NewGuid().ToString();
+
+                        string[] guidList = guidAll.Split('-');
+
+                        UserAccount_New newAccount = new UserAccount_New();
+
+                        // 建立新帳號
+                        newAccount.UUID = uUID;
+                        newAccount.MemberID = "Dblha-" + guidList[0];        // 取GUID前8碼
+                        newAccount.Token = packet.Password;
+                        newAccount.NotifyToken = "";
+                        newAccount.RegisterDate = dateTime;
+
+                        UserInfo newInfo = new UserInfo();
+
+                        // 新增使用者資訊
+                        newInfo.MemberID = newAccount.MemberID;
+                        newInfo.NickName = "";
+                        newInfo.Birthday = "";
+                        newInfo.BodyHeight = 0;
+                        newInfo.BodyWeight = 0;
+                        newInfo.FrontCover = "";
+                        newInfo.Avatar = "";
+                        newInfo.Photo = "";
+                        newInfo.Mobile = "";
+                        newInfo.County = -1;
+                        newInfo.TeamList = "[]";
+                        newInfo.FriendList = "[]";
+                        newInfo.BlackList = "[]";
+                        newInfo.SpecificationModel = "";
+
+
+                        RideData rideData = new RideData();
+
+                        // 新增騎乘資料
+                        rideData.MemberID = newAccount.MemberID;
+                        rideData.TotalDistance = 0;
+                        rideData.TotalAltitude = 0;
+                        rideData.TotalRideTime = 0;
+
+                        WeekRideData curWeek = new WeekRideData();
+
+                        // 新增本週騎乘資料
+                        string firsDay = weekProcess.GetWeekFirstDay(DateTime.UtcNow);
+                        string lastDay = weekProcess.GetWeekLastDay(DateTime.UtcNow);
+
+                        curWeek.MemberID = newAccount.MemberID;
+                        curWeek.WeekFirstDay = firsDay;
+                        curWeek.WeekLastDay = lastDay;
+                        curWeek.WeekDistance = 0;
+
+                        // 設定DB 交易的起始點
+                        GetSql().BeginTran();
+
+                        // 寫入資料庫
+                        if (GetSql().Insertable(newAccount).With(SqlSugar.SqlWith.TabLockX).ExecuteCommand() > 0)
+                        {
+
+                            if (GetSql().Insertable(newInfo).With(SqlSugar.SqlWith.TabLockX).ExecuteCommand() > 0
+                                && GetSql().Insertable(rideData).With(SqlSugar.SqlWith.TabLockX).ExecuteCommand() > 0
+                                && GetSql().Insertable(curWeek).With(SqlSugar.SqlWith.TabLockX).ExecuteCommand() > 0)
+                            {
+                                rData.Result = (int)UserLoginResult.ResultDefine.emResult_Success;
+
+                                GetRedis((int)Connect.RedisDB.emRedisDB_User).HashSet($"UserAccount_" + newAccount.UUID, hashTransfer.TransToHashEntryArray(newAccount));
+                                GetRedis((int)Connect.RedisDB.emRedisDB_User).HashSet($"UserInfo_" + newInfo.MemberID, hashTransfer.TransToHashEntryArray(newInfo));
+                                GetRedis((int)Connect.RedisDB.emRedisDB_Ride).HashSet($"RideData_" + rideData.MemberID, hashTransfer.TransToHashEntryArray(rideData));
+                                GetRedis((int)Connect.RedisDB.emRedisDB_Ride).HashSet($"RideData_" + rideData.MemberID, hashTransfer.TransToHashEntryArray(rideData));
+                                GetRedis((int)Connect.RedisDB.emRedisDB_Ride).HashSet($"CurWeekRideData_" + newAccount.MemberID, hashTransfer.TransToHashEntryArray(curWeek));
+
+                                SaveLog($"[Info] MessageFcunction::OnCreateNewAccount Create New Account Success");
+
+                                // DB 交易提交
+                                GetSql().CommitTran();
+                            }
+                            else
+                            {
+                                rData.Result = (int)UserLoginResult.ResultDefine.emResult_Fail;
+
+                                SaveLog($"[Warning] MessageFcunction::OnCreateNewAccount Can Not Inseart User Info Or Ride Data");
+                            }
+                        }
+                        else
+                        {
+                            rData.Result = (int)UserLoginResult.ResultDefine.emResult_Fail;
+
+                            SaveLog($"[Warning] MessageFcunction::OnCreateNewAccount Email: {packet.Email} Repeat");
+                        }
+
+
+
+                    }
+                }
+                else
+                {
+
+                }
+            }
+            catch (Exception ex)
+            {
+                SaveLog($"[Error] MessageFcunction::OnUserLogin Catch Error, Msg:{ex.Message}");
+
+                rData.Result = (int)UserLoginResult.ResultDefine.emResult_Fail;
+            }
+
+            // DB 交易失敗, 啟動Rollback
+            if (rData.Result != (int)UserLoginResult.ResultDefine.emResult_Success)
+            {
+                GetSql().RollbackTran();
+            }
+
+            JObject jsMain = new JObject();
+            jsMain.Add("CmdID", (int)S2C_CmdID.emUserLoginResult);
+            jsMain.Add("Data", JsonConvert.DeserializeObject<JObject>(JsonConvert.SerializeObject(rData)));
+
+            ret = jsMain.ToString();
+
+            return ret;
+        }
+
+        public UserLoginResult OnUserLogin_Temp(string data)
+        {
+            UserLogin packet = JsonConvert.DeserializeObject<UserLogin>(data);
+
+            UserLoginResult rData = new UserLoginResult();
+
+            try
+            {
+                string uUID = FireBaseHandler.Instance.CheckFireBaseUserToken(packet.Password).Result;
+
+                if (uUID != "")
+                {
+                    UserAccount account = GetSql().Queryable<UserAccount>().Where(it => it.GoogleToken == uUID).Single();
+
+                    // 有找到帳號
+                    if (account != null)
+                    {
+                        UserInfo userInfo = GetSql().Queryable<UserInfo>().Where(it => it.MemberID == account.MemberID).Single();
+
+                        // 有找到會員
+                        if (userInfo != null)
+                        {
+                            rData.Result = (int)UserLoginResult.ResultDefine.emResult_Success;
+                            rData.MemberID = account.MemberID;
+                        }
+                        else
+                        {
+                            SaveLog("[Warning] MessageFcunction::OnUserLogin_Temp Can't Find User Info");
+
+                            rData.Result = (int)UserLoginResult.ResultDefine.emResult_Fail;
+                        }
+
+                    }
+                    else
+                    {
+                        //rData.Result = (int)UserLoginResult.ResultDefine.emResult_AccountError;
+
+                        string dateTime = DateTime.UtcNow.ToString("yyyy-MM-dd hh:mm:ss");
+
+                        string guidAll = Guid.NewGuid().ToString();
+
+                        string[] guidList = guidAll.Split('-');
+
+                        UserAccount newAccount = new UserAccount();
+
+                        // 建立新帳號
+                        newAccount.MemberID = "Dblha-" + guidList[0];        // 取GUID前8碼
+                        newAccount.Email = DateTime.UtcNow.ToString("hhmmss") + "@hotmail.com";
+                        newAccount.Password = "";
+                        newAccount.FBToken = "";
+                        newAccount.GoogleToken = uUID;
+                        newAccount.NotifyToken = "";
+                        newAccount.RegisterSource = 0;
+                        newAccount.RegisterDate = dateTime;
+
+                        rData.MemberID = newAccount.MemberID;
+
+                        UserInfo newInfo = new UserInfo();
+
+                        // 新增使用者資訊
+                        newInfo.MemberID = newAccount.MemberID;
+                        newInfo.NickName = "";
+                        newInfo.Birthday = "";
+                        newInfo.BodyHeight = 0;
+                        newInfo.BodyWeight = 0;
+                        newInfo.FrontCover = "";
+                        newInfo.Avatar = "";
+                        newInfo.Photo = "";
+                        newInfo.Mobile = "";
+                        newInfo.County = -1;
+                        newInfo.TeamList = "[]";
+                        newInfo.FriendList = "[]";
+                        newInfo.BlackList = "[]";
+                        newInfo.SpecificationModel = "";
+
+
+                        RideData rideData = new RideData();
+
+                        // 新增騎乘資料
+                        rideData.MemberID = newAccount.MemberID;
+                        rideData.TotalDistance = 0;
+                        rideData.TotalAltitude = 0;
+                        rideData.TotalRideTime = 0;
+
+                        WeekRideData curWeek = new WeekRideData();
+
+                        // 新增本週騎乘資料
+                        string firsDay = weekProcess.GetWeekFirstDay(DateTime.UtcNow);
+                        string lastDay = weekProcess.GetWeekLastDay(DateTime.UtcNow);
+
+                        curWeek.MemberID = newAccount.MemberID;
+                        curWeek.WeekFirstDay = firsDay;
+                        curWeek.WeekLastDay = lastDay;
+                        curWeek.WeekDistance = 0;
+
+                        // 設定DB 交易的起始點
+                        GetSql().BeginTran();
+
+                        // 寫入資料庫
+                        if (GetSql().Insertable(newAccount).With(SqlSugar.SqlWith.TabLockX).ExecuteCommand() > 0)
+                        {
+
+                            if (GetSql().Insertable(newInfo).With(SqlSugar.SqlWith.TabLockX).ExecuteCommand() > 0
+                                && GetSql().Insertable(rideData).With(SqlSugar.SqlWith.TabLockX).ExecuteCommand() > 0
+                                && GetSql().Insertable(curWeek).With(SqlSugar.SqlWith.TabLockX).ExecuteCommand() > 0)
+                            {
+                                rData.Result = (int)UserLoginResult.ResultDefine.emResult_Success;
+
+                                GetRedis((int)Connect.RedisDB.emRedisDB_User).HashSet($"UserAccount_" + newAccount.Email, hashTransfer.TransToHashEntryArray(newAccount));
+                                GetRedis((int)Connect.RedisDB.emRedisDB_User).HashSet($"UserInfo_" + newInfo.MemberID, hashTransfer.TransToHashEntryArray(newInfo));
+                                GetRedis((int)Connect.RedisDB.emRedisDB_Ride).HashSet($"RideData_" + rideData.MemberID, hashTransfer.TransToHashEntryArray(rideData));
+                                GetRedis((int)Connect.RedisDB.emRedisDB_Ride).HashSet($"RideData_" + rideData.MemberID, hashTransfer.TransToHashEntryArray(rideData));
+                                GetRedis((int)Connect.RedisDB.emRedisDB_Ride).HashSet($"CurWeekRideData_" + newAccount.MemberID, hashTransfer.TransToHashEntryArray(curWeek));
+
+                                SaveLog($"[Info] MessageFcunction::OnUserLogin_Temp Create New Account Success");
+
+                                // DB 交易提交
+                                GetSql().CommitTran();
+                            }
+                            else
+                            {
+                                rData.Result = (int)UserLoginResult.ResultDefine.emResult_Fail;
+
+                                SaveLog($"[Warning] MessageFcunction::OnUserLogin_Temp Can Not Inseart User Info Or Ride Data");
+                            }
+                        }
+                        else
+                        {
+                            rData.Result = (int)UserLoginResult.ResultDefine.emResult_Fail;
+
+                            SaveLog($"[Warning] MessageFcunction::OnUserLogin_Temp Email: {newAccount.Email} Repeat");
+                        }
+
+
+
+                    }
+                }
+                else
+                {
+
+                }
+            }
+            catch (Exception ex)
+            {
+                SaveLog($"[Error] MessageFcunction::OnUserLogin_Temp Catch Error, Msg:{ex.Message}");
+
+                rData.Result = (int)UserLoginResult.ResultDefine.emResult_Fail;
+            }
+
+            // DB 交易失敗, 啟動Rollback
+            if (rData.Result != (int)UserLoginResult.ResultDefine.emResult_Success)
+            {
+                GetSql().RollbackTran();
+            }
+
+            //JObject jsMain = new JObject();
+            //jsMain.Add("CmdID", (int)S2C_CmdID.emUserLoginResult);
+            //jsMain.Add("Data", JsonConvert.DeserializeObject<JObject>(JsonConvert.SerializeObject(rData)));
+
+            //ret = jsMain.ToString();
+
+            return rData;
         }
 
         /// <summary>
