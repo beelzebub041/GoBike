@@ -47,6 +47,7 @@ namespace RidePacket.ServerToClient
             emResult_Fail = 0,          // 0: 失敗
             emResult_Success,           // 1: 成功
             emResult_RideGroupRepeat,   // 2: 組隊已存在
+            emResult_InOtherGroup,      // 3: 為其他組隊成員
         }
 
         /**

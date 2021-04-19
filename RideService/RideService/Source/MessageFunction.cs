@@ -345,94 +345,107 @@ namespace Service.Source
                 if (account != null && userInfo != null)
                 {
                     string sRideGroupKey = $"RideGroup_{packet.MemberID}";
+                    string sGroupMemberKey = $"GroupMember_{packet.MemberID}";
 
                     if (packet.Action == (int)UpdateRideGroup.ActionDefine.emAction_Add)
                     {
-                        // 該組隊不存在
-                        if (!GetRedis((int)Connect.RedisDB.emRedisDB_RideGroup).KeyExists(sRideGroupKey))
+                        // 建立組隊的人非其他組隊成員
+                        if (!GetRedis((int)Connect.RedisDB.emRedisDB_RideGroup).KeyExists(sGroupMemberKey))
                         {
-                            JArray jsInviteList = JArray.Parse(packet.InviteList);
-                            List<string> InviteList = jsInviteList.ToObject<List<string>>();
-
-                            List<string> MemberList = new List<string>();
-
-                            JObject jsGroupData = new JObject();
-                            jsGroupData.Add("Leader", packet.MemberID);
-                            jsGroupData.Add("InviteList", jsInviteList);
-                            jsGroupData.Add("MemberList", new JArray());
-
-                            if (GetRedis((int)Connect.RedisDB.emRedisDB_RideGroup).StringSet(sRideGroupKey, jsGroupData.ToString()))
+                            // 該組隊不存在
+                            if (!GetRedis((int)Connect.RedisDB.emRedisDB_RideGroup).KeyExists(sRideGroupKey))
                             {
-                                SaveLog($"[Info] Controller::OnUpdateRideGroup Create Ride Group: {sRideGroupKey} Success");
+                                JArray jsInviteList = JArray.Parse(packet.InviteList);
+                                List<string> InviteList = jsInviteList.ToObject<List<string>>();
 
-                                string sLeaderKey = $"GroupMember_{packet.MemberID}";
+                                List<string> MemberList = new List<string>();
 
-                                JObject jsMemberData = new JObject();
-                                jsMemberData.Add("RideGroupKey", sRideGroupKey);
-                                jsMemberData.Add("CoordinateX", "");
-                                jsMemberData.Add("CoordinateY", "");
+                                JObject jsGroupData = new JObject();
+                                jsGroupData.Add("Leader", packet.MemberID);
+                                jsGroupData.Add("InviteList", jsInviteList);
+                                jsGroupData.Add("MemberList", new JArray());
 
-                                // 建立成員的Redis資料
-                                if (GetRedis((int)Connect.RedisDB.emRedisDB_RideGroup).StringSet(sLeaderKey, jsMemberData.ToString()))
+                                if (GetRedis((int)Connect.RedisDB.emRedisDB_RideGroup).StringSet(sRideGroupKey, jsGroupData.ToString()))
                                 {
-                                    rData.Result = (int)UpdateRideGroupResult.ResultDefine.emResult_Success;
+                                    SaveLog($"[Info] Controller::OnUpdateRideGroup Create Ride Group: {sRideGroupKey} Success");
 
-                                    SaveLog($"[Info] Controller::OnUpdateRideGroup Create Ride Group: {sRideGroupKey}'s Member:{packet.MemberID} Success");
+                                    string sLeaderKey = $"GroupMember_{packet.MemberID}";
 
-                                    for (int idx = 0; idx < InviteList.Count(); idx++)
+                                    JObject jsMemberData = new JObject();
+                                    jsMemberData.Add("RideGroupKey", sRideGroupKey);
+                                    jsMemberData.Add("CoordinateX", "");
+                                    jsMemberData.Add("CoordinateY", "");
+
+                                    // 建立成員的Redis資料
+                                    if (GetRedis((int)Connect.RedisDB.emRedisDB_RideGroup).StringSet(sLeaderKey, jsMemberData.ToString()))
                                     {
-                                        UserAccount notifyAccount = GetSql().Queryable<UserAccount>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == InviteList[idx]).Single();
-                                        UserInfo notifyUserInfo = GetSql().Queryable<UserInfo>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == InviteList[idx]).Single();
+                                        rData.Result = (int)UpdateRideGroupResult.ResultDefine.emResult_Success;
 
-                                        // 有找對會員
-                                        if (notifyAccount != null && notifyUserInfo != null)
+                                        SaveLog($"[Info] Controller::OnUpdateRideGroup Create Ride Group: {sRideGroupKey}'s Member:{packet.MemberID} Success");
+
+                                        for (int idx = 0; idx < InviteList.Count(); idx++)
                                         {
-                                            string sMemberKey = $"GroupMember_{InviteList[idx]}";
+                                            UserAccount notifyAccount = GetSql().Queryable<UserAccount>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == InviteList[idx]).Single();
+                                            UserInfo notifyUserInfo = GetSql().Queryable<UserInfo>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == InviteList[idx]).Single();
 
-                                            // 建立成員的Redis資料
-                                            if (GetRedis((int)Connect.RedisDB.emRedisDB_RideGroup).StringSet(sMemberKey, jsMemberData.ToString()))
+                                            // 有找對會員
+                                            if (notifyAccount != null && notifyUserInfo != null)
                                             {
-                                                // 發送推播通知
-                                                string sTitle = $"騎乘邀請";
+                                                string sMemberKey = $"GroupMember_{InviteList[idx]}";
 
-                                                string sNotifyMsg = $"{userInfo.NickName} 邀請您組隊";
+                                                // 建立成員的Redis資料
+                                                if (GetRedis((int)Connect.RedisDB.emRedisDB_RideGroup).StringSet(sMemberKey, jsMemberData.ToString()))
+                                                {
+                                                    // 發送推播通知
+                                                    string sTitle = $"騎乘邀請";
 
-                                                ntMsg.NotifyMsgToDevice(notifyAccount.NotifyToken, sTitle, sNotifyMsg, (int)NotifyID.Ride_RideGroupInvite);
+                                                    string sNotifyMsg = $"{userInfo.NickName} 邀請您組隊";
+
+                                                    ntMsg.NotifyMsgToDevice(notifyAccount.NotifyToken, sTitle, sNotifyMsg, (int)NotifyID.Ride_RideGroupInvite);
+                                                }
+                                                else
+                                                {
+                                                    SaveLog($"[Info] Controller::OnUpdateRideGroup Create Ride Group: {sRideGroupKey}'s Member:{InviteList[idx]} Fail");
+                                                }
                                             }
                                             else
                                             {
-                                                SaveLog($"[Info] Controller::OnUpdateRideGroup Create Ride Group: {sRideGroupKey}'s Member:{InviteList[idx]} Fail");
+                                                SaveLog($"[Warning] Controller::OnUpdateRideGroup Can Not Find Notify Member: {notifyAccount.MemberID}");
                                             }
-                                        }
-                                        else
-                                        {
-                                            SaveLog($"[Warning] Controller::OnUpdateRideGroup Can Not Find Notify Member: {notifyAccount.MemberID}");
-                                        }
 
+                                        }
                                     }
+                                    else
+                                    {
+                                        rData.Result = (int)UpdateRideGroupResult.ResultDefine.emResult_Fail;
+
+                                        SaveLog($"[Info] Controller::OnUpdateRideGroup Create Ride Group: {sRideGroupKey}'s Member:{packet.MemberID} Fail");
+                                    }
+
                                 }
                                 else
                                 {
                                     rData.Result = (int)UpdateRideGroupResult.ResultDefine.emResult_Fail;
 
-                                    SaveLog($"[Info] Controller::OnUpdateRideGroup Create Ride Group: {sRideGroupKey}'s Member:{packet.MemberID} Fail");
+                                    SaveLog($"[Warning] Controller::OnUpdateRideGroup Create Ride Group: {sRideGroupKey} Fail");
                                 }
 
                             }
                             else
                             {
-                                rData.Result = (int)UpdateRideGroupResult.ResultDefine.emResult_Fail;
+                                rData.Result = (int)UpdateRideGroupResult.ResultDefine.emResult_RideGroupRepeat;
 
-                                SaveLog($"[Warning] Controller::OnUpdateRideGroup Create Ride Group: {sRideGroupKey} Fail");
+                                SaveLog($"[Warning] Controller::OnUpdateRideGroup Create {packet.MemberID}'s Ride Group, The Group Repeat");
                             }
-
                         }
                         else
                         {
-                            rData.Result = (int)UpdateRideGroupResult.ResultDefine.emResult_RideGroupRepeat;
+                            rData.Result = (int)UpdateRideGroupResult.ResultDefine.emResult_InOtherGroup;
 
-                            SaveLog($"[Warning] Controller::OnUpdateRideGroup Create {packet.MemberID}'s Ride Group, The Group Repeat");
+                            SaveLog($"[Warning] Controller::OnUpdateRideGroup Create {packet.MemberID}'s Ride Group, In Other Group");
                         }
+
+
                     }
                     else if (packet.Action == (int)UpdateRideGroup.ActionDefine.emAction_Delete)
                     {
@@ -546,134 +559,154 @@ namespace Service.Source
                 // 有找到帳號
                 if (account != null && userInfo != null)
                 {
-                    string sRideGroupKey = $"RideGroup_{packet.MemberID}";
+                    string sGroupMemberKey = $"GroupMember_{packet.MemberID}";
 
-                    // 組隊存在
-                    if (GetRedis((int)Connect.RedisDB.emRedisDB_RideGroup).KeyExists(sRideGroupKey))
+                    // 組隊成員資料存在
+                    if (GetRedis((int)Connect.RedisDB.emRedisDB_RideGroup).KeyExists(sGroupMemberKey))
                     {
-                        string GroupData = GetRedis((int)Connect.RedisDB.emRedisDB_RideGroup).StringGet(sRideGroupKey);
+                        string MemberData = GetRedis((int)Connect.RedisDB.emRedisDB_RideGroup).StringGet(sGroupMemberKey);
 
-                        JObject jsGroupData = JObject.Parse(GroupData);
+                        JObject jsInvitedMemberData = JObject.Parse(MemberData);
 
-                        JArray jsInviteList = JArray.Parse(jsGroupData["InviteList"].ToString());
-                        List<string> InviteList = jsInviteList.ToObject<List<string>>();
+                        string sRideGroupKey = jsInvitedMemberData["RideGroupKey"].ToString();
 
-                        JArray jsMemberList = JArray.Parse(jsGroupData["MemberList"].ToString());
-                        List<string> memberList = jsMemberList.ToObject<List<string>>();
-
-                        JArray jsUpdateList = JArray.Parse(packet.UpdateList);
-                        List<string> UpdateList = jsUpdateList.ToObject<List<string>>();
-
-                        if (packet.Action == (int)UpdateRideGroup.ActionDefine.emAction_Add)
+                        // 組隊存在
+                        if (GetRedis((int)Connect.RedisDB.emRedisDB_RideGroup).KeyExists(sRideGroupKey))
                         {
-                            for (int idx = 0; idx < UpdateList.Count(); idx++)
+                            string GroupData = GetRedis((int)Connect.RedisDB.emRedisDB_RideGroup).StringGet(sRideGroupKey);
+
+                            JObject jsGroupData = JObject.Parse(GroupData);
+
+                            JArray jsInviteList = JArray.Parse(jsGroupData["InviteList"].ToString());
+                            List<string> InviteList = jsInviteList.ToObject<List<string>>();
+
+                            JArray jsMemberList = JArray.Parse(jsGroupData["MemberList"].ToString());
+                            List<string> memberList = jsMemberList.ToObject<List<string>>();
+
+                            JArray jsUpdateList = JArray.Parse(packet.UpdateList);
+                            List<string> UpdateList = jsUpdateList.ToObject<List<string>>();
+
+                            if (packet.Action == (int)UpdateRideGroup.ActionDefine.emAction_Add)
                             {
-                                // 不在邀請列表中, 則加入列表
-                                if (!InviteList.Contains(UpdateList[idx]) && !memberList.Contains(UpdateList[idx]))
+                                for (int idx = 0; idx < UpdateList.Count(); idx++)
                                 {
-                                    InviteList.Add(UpdateList[idx]);
-
-                                    // 建立Redis資料
+                                    // 不在邀請列表中 且 非其他組隊的成員, 則加入列表
+                                    if (!InviteList.Contains(UpdateList[idx]) && !memberList.Contains(UpdateList[idx])
+                                        && !GetRedis((int)Connect.RedisDB.emRedisDB_RideGroup).KeyExists($"GroupMember_{UpdateList[idx]}"))
                                     {
-                                        UserAccount notifyAccount = GetSql().Queryable<UserAccount>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == UpdateList[idx]).Single();
-                                        UserInfo notifyUserInfo = GetSql().Queryable<UserInfo>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == UpdateList[idx]).Single();
+                                        InviteList.Add(UpdateList[idx]);
 
-                                        // 有找對會員
-                                        if (notifyAccount != null && notifyUserInfo != null)
+                                        // 建立Redis資料
                                         {
-                                            string sMemberKey = $"GroupMember_{UpdateList[idx]}";
+                                            UserAccount notifyAccount = GetSql().Queryable<UserAccount>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == UpdateList[idx]).Single();
+                                            UserInfo notifyUserInfo = GetSql().Queryable<UserInfo>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == UpdateList[idx]).Single();
 
-                                            JObject jsMemberData = new JObject();
-                                            jsMemberData.Add("RideGroupKey", sRideGroupKey);
-                                            jsMemberData.Add("CoordinateX", "");
-                                            jsMemberData.Add("CoordinateY", "");
-
-                                            // 建立成員的Redis資料
-                                            if (GetRedis((int)Connect.RedisDB.emRedisDB_RideGroup).StringSet(sMemberKey, jsMemberData.ToString()))
+                                            // 有找對會員
+                                            if (notifyAccount != null && notifyUserInfo != null)
                                             {
-                                                // 發送推播通知
-                                                string sTitle = $"騎乘邀請";
+                                                string sMemberKey = $"GroupMember_{UpdateList[idx]}";
 
-                                                string sNotifyMsg = $"{userInfo.NickName} 邀請您組隊";
+                                                JObject jsMemberData = new JObject();
+                                                jsMemberData.Add("RideGroupKey", sRideGroupKey);
+                                                jsMemberData.Add("CoordinateX", "");
+                                                jsMemberData.Add("CoordinateY", "");
 
-                                                ntMsg.NotifyMsgToDevice(notifyAccount.NotifyToken, sTitle, sNotifyMsg, (int)NotifyID.Ride_RideGroupInvite);
+                                                // 建立成員的Redis資料
+                                                if (GetRedis((int)Connect.RedisDB.emRedisDB_RideGroup).StringSet(sMemberKey, jsMemberData.ToString()))
+                                                {
+                                                    // 發送推播通知
+                                                    string sTitle = $"騎乘邀請";
+
+                                                    string sNotifyMsg = $"{userInfo.NickName} 邀請您組隊";
+
+                                                    ntMsg.NotifyMsgToDevice(notifyAccount.NotifyToken, sTitle, sNotifyMsg, (int)NotifyID.Ride_RideGroupInvite);
+                                                }
+                                                else
+                                                {
+                                                    SaveLog($"[Info] Controller::OnUpdateInviteList Create Ride Group: {sRideGroupKey}'s Member:{InviteList[idx]} Fail");
+                                                }
                                             }
                                             else
                                             {
-                                                SaveLog($"[Info] Controller::OnUpdateInviteList Create Ride Group: {sRideGroupKey}'s Member:{InviteList[idx]} Fail");
+                                                SaveLog($"[Warning] Controller::OnUpdateInviteList Can Not Find Notify Member: {notifyAccount.MemberID}");
                                             }
                                         }
-                                        else
-                                        {
-                                            SaveLog($"[Warning] Controller::OnUpdateInviteList Can Not Find Notify Member: {notifyAccount.MemberID}");
-                                        }
-                                    }
-                                }
-                            }
-
-                            rData.Result = (int)UpdateInviteListResult.ResultDefine.emResult_Success;
-
-                        }
-                        else if (packet.Action == (int)UpdateInviteList.ActionDefine.emAction_Delete)
-                        {
-                            for (int idx = 0; idx < UpdateList.Count(); idx++)
-                            {
-                                // 在邀請列表中, 則從列表中刪除
-                                if (InviteList.Contains(UpdateList[idx]))
-                                {
-                                    InviteList.Remove(UpdateList[idx]);
-
-                                    string sMemberKey = $"GroupMember_{UpdateList[idx]}";
-
-                                    // 刪除Redis資料
-                                    if (GetRedis((int)Connect.RedisDB.emRedisDB_RideGroup).KeyDelete(sMemberKey))
-                                    {
-                                        SaveLog($"[Info] Controller::OnUpdateInviteList Remove Group Member Temp Data: {sMemberKey} Success");
                                     }
                                     else
                                     {
-                                        SaveLog($"[Warning] Controller::OnUpdateInviteList Remove Group Member Temp Data: {sMemberKey} Fail");
+                                        SaveLog($"[Warning] Controller::OnUpdateInviteList Member: {UpdateList[idx]} Already in List Or In Orther Group");
                                     }
                                 }
-                            }
 
-                            rData.Result = (int)UpdateInviteListResult.ResultDefine.emResult_Success;
-                        }
-                        else
-                        {
-                            rData.Result = (int)UpdateInviteListResult.ResultDefine.emResult_Fail;
-
-                            SaveLog($"[Warning] Controller::OnUpdateInviteList MemberID:{packet.MemberID}'s Action: 0");
-                        }
-
-                        if (rData.Result == (int)UpdateInviteListResult.ResultDefine.emResult_Success)
-                        {
-                            jsGroupData["InviteList"] = JArray.FromObject(InviteList);
-
-                            if (GetRedis((int)Connect.RedisDB.emRedisDB_RideGroup).StringSet(sRideGroupKey, jsGroupData.ToString()))
-                            {
                                 rData.Result = (int)UpdateInviteListResult.ResultDefine.emResult_Success;
 
-                                SaveLog($"[Info] Controller::OnUpdateInviteList Update Invite List Success");
+                            }
+                            else if (packet.Action == (int)UpdateInviteList.ActionDefine.emAction_Delete)
+                            {
+                                for (int idx = 0; idx < UpdateList.Count(); idx++)
+                                {
+                                    // 在邀請列表中, 則從列表中刪除
+                                    if (InviteList.Contains(UpdateList[idx]))
+                                    {
+                                        InviteList.Remove(UpdateList[idx]);
 
+                                        string sMemberKey = $"GroupMember_{UpdateList[idx]}";
+
+                                        // 刪除Redis資料
+                                        if (GetRedis((int)Connect.RedisDB.emRedisDB_RideGroup).KeyDelete(sMemberKey))
+                                        {
+                                            SaveLog($"[Info] Controller::OnUpdateInviteList Remove Group Member Temp Data: {sMemberKey} Success");
+                                        }
+                                        else
+                                        {
+                                            SaveLog($"[Warning] Controller::OnUpdateInviteList Remove Group Member Temp Data: {sMemberKey} Fail");
+                                        }
+                                    }
+                                }
+
+                                rData.Result = (int)UpdateInviteListResult.ResultDefine.emResult_Success;
                             }
                             else
                             {
                                 rData.Result = (int)UpdateInviteListResult.ResultDefine.emResult_Fail;
 
-                                SaveLog($"[Warning] Controller::OnUpdateInviteList Update Invite List Fail");
-
+                                SaveLog($"[Warning] Controller::OnUpdateInviteList MemberID:{packet.MemberID}'s Action: 0");
                             }
+
+                            if (rData.Result == (int)UpdateInviteListResult.ResultDefine.emResult_Success)
+                            {
+                                jsGroupData["InviteList"] = JArray.FromObject(InviteList);
+
+                                if (GetRedis((int)Connect.RedisDB.emRedisDB_RideGroup).StringSet(sRideGroupKey, jsGroupData.ToString()))
+                                {
+                                    rData.Result = (int)UpdateInviteListResult.ResultDefine.emResult_Success;
+
+                                    SaveLog($"[Info] Controller::OnUpdateInviteList Update Invite List Success");
+
+                                }
+                                else
+                                {
+                                    rData.Result = (int)UpdateInviteListResult.ResultDefine.emResult_Fail;
+
+                                    SaveLog($"[Warning] Controller::OnUpdateInviteList Update Invite List Fail");
+
+                                }
+                            }
+
                         }
-                        
+                        else
+                        {
+                            rData.Result = (int)UpdateInviteListResult.ResultDefine.emResult_Fail;
+
+                            SaveLog($"[Warning] Controller::OnUpdateInviteList, Group:{sRideGroupKey} Not Exist");
+                        }
                     }
                     else
                     {
                         rData.Result = (int)UpdateInviteListResult.ResultDefine.emResult_Fail;
 
-                        SaveLog($"[Warning] Controller::OnUpdateInviteList, Group:{sRideGroupKey} Not Exist");
+                        SaveLog($"[Warning] Controller::OnUpdateInviteList Can Not Find Member:{packet.MemberID}' Group Data");
                     }
-
                 }
                 else
                 {
