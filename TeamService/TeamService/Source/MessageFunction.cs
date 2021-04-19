@@ -1540,7 +1540,7 @@ namespace Service.Source
                     // 有找到活動
                     if (teamAct != null)
                     {
-                        teamData = GetSql().Queryable<TeamData>().With(SqlSugar.SqlWith.RowLock).Where(it => it.TeamID == packet.TeamID).Single();
+                        teamData = GetSql().Queryable<TeamData>().With(SqlSugar.SqlWith.RowLock).Where(it => it.TeamID == teamAct.TeamID).Single();
                     }
                     else
                     {
@@ -1561,7 +1561,9 @@ namespace Service.Source
                         // 新增活動
                         if (packet.Action == (int)UpdateActivity.ActionDefine.emResult_Add)
                         {
-                            if (DateTime.Now < DateTime.Parse(packet.ActDate) && DateTime.Now < DateTime.Parse(packet.MeetTime))
+                            string fullTime = packet.ActDate + " " + packet.MeetTime;
+
+                            if (DateTime.Now < DateTime.Parse(fullTime))
                             {
                                 string dateTime = DateTime.UtcNow.ToString("yyyy-MM-dd hh:mm:ss");
 
@@ -1634,16 +1636,18 @@ namespace Service.Source
                                     // 修改活動
                                     else if (packet.Action == (int)UpdateActivity.ActionDefine.emResult_Modify)
                                     {
-                                        if (DateTime.Now < DateTime.Parse(packet.ActDate) && DateTime.Now < DateTime.Parse(packet.MeetTime))
-                                        {
-                                            teamAct.MemberList = packet.MemberList == null ? teamAct.MemberList : packet.MemberList;
-                                            teamAct.ActDate = packet.ActDate == null ? teamAct.ActDate : packet.ActDate;
-                                            teamAct.Title = packet.Title == null ? teamAct.Title : packet.Title;
-                                            teamAct.MeetTime = packet.MeetTime == null ? teamAct.MeetTime : packet.MeetTime;
-                                            teamAct.TotalDistance = packet.TotalDistance == 0 ? teamAct.TotalDistance : packet.TotalDistance;
-                                            teamAct.MaxAltitude = packet.MaxAltitude == 0 ? teamAct.MaxAltitude : packet.MaxAltitude;
-                                            teamAct.Route = packet.Route == null ? teamAct.Route : packet.Route;
+                                        teamAct.MemberList = packet.MemberList == null ? teamAct.MemberList : packet.MemberList;
+                                        teamAct.ActDate = packet.ActDate == null ? teamAct.ActDate : packet.ActDate;
+                                        teamAct.Title = packet.Title == null ? teamAct.Title : packet.Title;
+                                        teamAct.MeetTime = packet.MeetTime == null ? teamAct.MeetTime : packet.MeetTime;
+                                        teamAct.TotalDistance = packet.TotalDistance == 0 ? teamAct.TotalDistance : packet.TotalDistance;
+                                        teamAct.MaxAltitude = packet.MaxAltitude == 0 ? teamAct.MaxAltitude : packet.MaxAltitude;
+                                        teamAct.Route = packet.Route == null ? teamAct.Route : packet.Route;
 
+                                        string fullTime = teamAct.ActDate + " " + teamAct.MeetTime;
+
+                                        if (DateTime.Now < DateTime.Parse(fullTime))
+                                        {
                                             if (GetSql().Updateable<TeamActivity>(teamAct).With(SqlSugar.SqlWith.RowLock).Where(it => it.ActID == packet.ActID).ExecuteCommand() > 0)
                                             {
                                                 rData.Result = (int)UpdateActivityResult.ResultDefine.emResult_Success;
