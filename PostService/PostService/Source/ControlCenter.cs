@@ -20,7 +20,7 @@ namespace Service.Source
         /// <summary>
         /// 版本號
         /// </summary>
-        private readonly string version = "Post001";
+        private readonly string version = "Post002";
 
         /// <summary>
         /// Loger 物件

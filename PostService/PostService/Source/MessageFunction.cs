@@ -162,9 +162,12 @@ namespace Service.Source
                 {
                     JArray jsData = JArray.Parse(userInfo.FriendList);
 
-                    List<string> friendList = jsData.ToObject<List<string>>();
+                    List<string> updateList = jsData.ToObject<List<string>>();
 
-                    for (int idx = 0; idx < friendList.Count(); idx++)
+                    // 需同時更新自己的塗鴉牆顯示列表
+                    updateList.Add(memeberID);
+
+                    for (int idx = 0; idx < updateList.Count(); idx++)
                     {
                         string sKey = $"PostShowList_" + memeberID;
 
