@@ -8,6 +8,7 @@ namespace PostPacket.ServerToClient
         emDeletePostResult,
         emAddLikeResult,
         emReduceLikeResult,
+        emUpdatePostShowListResult,
     }
 
     // 新增貼文結果
@@ -83,6 +84,21 @@ namespace PostPacket.ServerToClient
 
     }
 
+    // 更新塗鴉牆列表結果
+    class UpdatePostShowListResult
+    {
+        // 結果定義
+        public enum ResultDefine : int
+        {
+            emResult_Fail = 0,          // 0: 更新失敗
+            emResult_Success,           // 1: 更新成功
+        }
+
+        // 結果
+        public int Result { get; set; }
+
+    }
+
 }
 
 namespace PostPacket.ClientToServer
@@ -94,6 +110,7 @@ namespace PostPacket.ClientToServer
         emDeletePost,
         emAddLike,
         emReduceLike,
+        emUpdatePostShowList,
     }
 
     // ======================= User ======================= //
@@ -168,6 +185,16 @@ namespace PostPacket.ClientToServer
         public string PostID { get; set; }
 
         // 回覆者的會員ID
+        public string MemberID { get; set; }
+
+    }
+
+    /**
+     * 更新塗鴉牆列表
+     */
+    class UpdatePostShowList
+    {
+        // 會員ID
         public string MemberID { get; set; }
 
     }

@@ -160,6 +160,7 @@
     <Compile Include="Source\Tools\Logger.cs" />
     <Compile Include="Source\Tools\NotifyMessage.cs" />
     <Compile Include="Source\Tools\RedisHashTransfer.cs" />
+    <Compile Include="Source\Tools\PostAlgorithm.cs" />
     <Compile Include="Source\Tools\WeekProcess.cs" />
     <EmbeddedResource Include="Form1.resx">
       <DependentUpon>Form1.cs</DependentUpon>

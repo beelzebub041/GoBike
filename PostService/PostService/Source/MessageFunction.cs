@@ -13,6 +13,7 @@ using Tools;
 using Tools.WeekProcess;
 using Tools.RedisHashTransfer;
 using Tools.FireBaseHandler;
+using Tools.PostAlgorithm;
 
 using Service.Source.Define;
 using DataBaseDef;
@@ -29,6 +30,11 @@ namespace Service.Source
 {
     class MessageFunction
     {
+        /// <summary>
+        /// 貼文演算法物件
+        /// </summary>
+        private PostAlgorithm algorithm = null;
+
         /// <summary>
         /// hash 轉換器
         /// </summary>
@@ -54,6 +60,8 @@ namespace Service.Source
         /// </summary>
         public MessageFunction()
         {
+            algorithm = new PostAlgorithm();
+
             hashTransfer = new RedisHashTransfer();
 
             weekProcess = new WeekProcess();
@@ -81,7 +89,7 @@ namespace Service.Source
             {
                 this.logger = logger;
 
-                if (ntMsg.Initialize(logger))
+                if (ntMsg.Initialize(logger) && algorithm.Initialize(logger))
                 {
                     ret = true;
 
@@ -146,7 +154,7 @@ namespace Service.Source
         }
 
         /// <summary>
-        /// 更新會員好友的塗鴉牆列表
+        /// 新增會員好友的塗鴉牆列表
         /// </summary>
         /// <param name="memeberID"></param>
         /// <param name="post"></param>
@@ -169,35 +177,29 @@ namespace Service.Source
 
                     for (int idx = 0; idx < updateList.Count(); idx++)
                     {
-                        string sKey = $"PostShowList_" + memeberID;
+                        string sKey = $"PostShowList_" + updateList[idx];
 
                         if (GetRedis((int)Connect.RedisDB.emRedisDB_Post).KeyExists(sKey))
                         {
-                            string postShowListInfo = GetRedis((int)Connect.RedisDB.emRedisDB_RideGroup).StringGet(sKey);
-                            JObject jsInfo = JObject.Parse(postShowListInfo);
+                            string postShowListInfo = GetRedis((int)Connect.RedisDB.emRedisDB_Post).StringGet(sKey);
 
-                            if (jsInfo.ContainsKey("PostList"))
+                            JArray jsPostList = JArray.Parse(postShowListInfo);
+                            List<string> showList = jsPostList.ToObject<List<string>>();
+
+                            showList.Add(postID);
+
+                            if (GetRedis((int)Connect.RedisDB.emRedisDB_Post).StringSet(sKey, JArray.FromObject(showList).ToString()))
                             {
-                                JArray jsPostList = JArray.Parse(jsInfo["PostList"].ToString());
-                                List<string> showList = jsPostList.ToObject<List<string>>();
+                                ret = true;
 
-                                showList.Add(postID);
-
-                                jsInfo["PostList"] = JArray.FromObject(showList);
-
-                                if (GetRedis((int)Connect.RedisDB.emRedisDB_Post).StringSet(sKey, jsPostList.ToString()))
-                                {
-                                    ret = true;
-
-                                    SaveLog($"[Info] MessageFcunction::AddFriendPost Add Post List Success");
-
-                                }
-                                else
-                                {
-                                    SaveLog($"[Warning] MessageFcunction::AddFriendPost Add Post List Fail");
-                                }
+                                SaveLog($"[Info] MessageFcunction::AddFriendPost Add Post List:{sKey} Success");
 
                             }
+                            else
+                            {
+                                SaveLog($"[Warning] MessageFcunction::AddFriendPost Add Post List:{sKey} Fail");
+                            }
+
 
                         }
                         else
@@ -206,10 +208,7 @@ namespace Service.Source
                             List<string> showList = new List<string>();
                             showList.Add(postID);
 
-                            JObject jsPostList = new JObject();
-                            jsPostList.Add("PostList", JArray.FromObject(showList));
-
-                            if (GetRedis((int)Connect.RedisDB.emRedisDB_Post).StringSet(sKey, jsPostList.ToString()))
+                            if (GetRedis((int)Connect.RedisDB.emRedisDB_Post).StringSet(sKey, JArray.FromObject(showList).ToString()))
                             {
                                 ret = true;
 
@@ -233,6 +232,82 @@ namespace Service.Source
             catch (Exception ex)
             {
                 SaveLog($"[Error] MessageFcunction::AddFriendPost Catch Error Msg:{ex.Message}");
+            }
+
+            return ret;
+        }
+
+        /// <summary>
+        /// 刪除會員好友的塗鴉牆列表
+        /// </summary>
+        /// <param name="memeberID"></param>
+        /// <param name="post"></param>
+        private bool DeleteFriendPost(string memeberID, string postID)
+        {
+            bool ret = false;
+
+            try
+            {
+                UserInfo userInfo = GetSql().Queryable<UserInfo>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == memeberID).Single();
+
+                if (userInfo != null)
+                {
+                    JArray jsData = JArray.Parse(userInfo.FriendList);
+
+                    List<string> updateList = jsData.ToObject<List<string>>();
+
+                    // 需同時更新自己的塗鴉牆顯示列表
+                    updateList.Add(memeberID);
+
+                    for (int idx = 0; idx < updateList.Count(); idx++)
+                    {
+                        string sKey = $"PostShowList_" + updateList[idx];
+
+                        if (GetRedis((int)Connect.RedisDB.emRedisDB_Post).KeyExists(sKey))
+                        {
+                            string postShowListInfo = GetRedis((int)Connect.RedisDB.emRedisDB_Post).StringGet(sKey);
+
+                            JArray jsPostList = JArray.Parse(postShowListInfo);
+                            List<string> showList = jsPostList.ToObject<List<string>>();
+
+                            if (showList.Contains(postID))
+                            {
+                                showList.Remove(postID);
+
+                                if (GetRedis((int)Connect.RedisDB.emRedisDB_Post).StringSet(sKey, JArray.FromObject(showList).ToString()))
+                                {
+                                    ret = true;
+
+                                    SaveLog($"[Info] MessageFcunction::DeleteFriendPost Delete Post List:{sKey} Success");
+
+                                }
+                                else
+                                {
+                                    SaveLog($"[Warning] MessageFcunction::DeleteFriendPost Delete Post List:{sKey} Fail");
+                                }
+                            }
+                            else
+                            {
+                                SaveLog($"[Warning] MessageFcunction::DeleteFriendPost Delete Post List Fail");
+                            }
+
+                        }
+                        else
+                        {
+                            SaveLog($"[Warning] MessageFcunction::DeleteFriendPost Can Not Find Post List:{sKey}");
+
+                        }
+                    }
+                }
+                else
+                {
+                    SaveLog($"[Info] MessageFcunction::DeleteFriendPost Can Not Find Member:{memeberID}");
+                }
+
+            }
+            catch (Exception ex)
+            {
+                SaveLog($"[Error] MessageFcunction::DeleteFriendPost Catch Error Msg:{ex.Message}");
             }
 
             return ret;
@@ -280,7 +355,6 @@ namespace Service.Source
                     // 寫入資料庫
                     if (GetSql().Insertable(newPost).With(SqlSugar.SqlWith.TabLockX).ExecuteCommand() > 0)
                     {
-
                         rData.Result = (int)CreateNewPostResult.ResultDefine.emResult_Success;
 
                         SaveLog($"[Info] MessageFcunction::OnCreateNewPost Create New Post Success");
@@ -315,10 +389,39 @@ namespace Service.Source
                 GetSql().CommitTran();
 
                 // 建立Redis 會員貼文
-                GetRedis((int)Connect.RedisDB.emRedisDB_Post).HashSet($"PostInfo_" + newPost.PostID, hashTransfer.TransToHashEntryArray(newPost));
+                {
+                    JObject jsNewPost = new JObject();
+                    jsNewPost.Add("MemberID", newPost.MemberID);
+                    jsNewPost.Add("CreateDate", newPost.CreateDate);
+                    jsNewPost.Add("Place", newPost.Place);
+                    jsNewPost.Add("Photo", newPost.Photo);
+                    jsNewPost.Add("Content", newPost.Content);
+
+                    JArray jsLikeList = new JArray();
+                    jsNewPost.Add("LikeList", jsLikeList.ToString());
+
+                    GetRedis((int)Connect.RedisDB.emRedisDB_Post).StringSet($"PostInfo_" + newPost.PostID, jsNewPost.ToString());
+                }
 
                 // 建立Redis 會員的貼文ID列表
-                GetRedis((int)Connect.RedisDB.emRedisDB_Post).HashSet($"PostList_" + newPost.MemberID, newPost.PostID, newPost.PostID);
+                {
+                    string sPostList = "[]";
+                    
+                    if (GetRedis((int)Connect.RedisDB.emRedisDB_Post).KeyExists($"PostList_" + newPost.MemberID))
+                    {
+                        sPostList = GetRedis((int)Connect.RedisDB.emRedisDB_Post).StringGet($"PostList_" + newPost.MemberID);
+                    }
+
+                    JArray jsMemberPostList = JArray.Parse(sPostList);
+                    List<string> memberPostList = jsMemberPostList.ToObject<List<string>>();
+
+                    memberPostList.Add(newPost.PostID);
+
+                    JArray jsNewList = JArray.FromObject(memberPostList);
+
+                    GetRedis((int)Connect.RedisDB.emRedisDB_Post).StringSet($"PostList_" + newPost.MemberID, jsNewList.ToString());
+
+                }
 
                 AddFriendPost(newPost.MemberID, newPost.PostID);
 
@@ -410,7 +513,17 @@ namespace Service.Source
                 GetSql().CommitTran();
 
                 // 更新Redis 會員貼文
-                GetRedis((int)Connect.RedisDB.emRedisDB_Post).HashSet($"PostInfo_" + post.PostID, hashTransfer.TransToHashEntryArray(post));
+                {
+                    JObject jsNewPost = new JObject();
+                    jsNewPost.Add("MemberID", post.MemberID);
+                    jsNewPost.Add("CreateDate", post.CreateDate);
+                    jsNewPost.Add("Place", post.Place);
+                    jsNewPost.Add("Photo", post.Photo);
+                    jsNewPost.Add("Content", post.Content);
+                    jsNewPost.Add("LikeList", post.LikeList);
+
+                    GetRedis((int)Connect.RedisDB.emRedisDB_Post).StringSet($"PostInfo_" + post.PostID, jsNewPost.ToString());
+                }
             }
             else
             {
@@ -496,10 +609,35 @@ namespace Service.Source
                 GetSql().CommitTran();
 
                 // 刪除Redus 會員的貼文
-                GetRedis((int)Connect.RedisDB.emRedisDB_Post).KeyDelete($"PostInfo_" + packet.PostID);
+                {
+                    if (GetRedis((int)Connect.RedisDB.emRedisDB_Post).KeyExists($"PostInfo_" + packet.PostID))
+                    {
+                        GetRedis((int)Connect.RedisDB.emRedisDB_Post).KeyDelete($"PostInfo_" + packet.PostID);
+                    }
+                }
 
                 // 刪除Redis 會員的貼文列表
-                GetRedis((int)Connect.RedisDB.emRedisDB_Post).HashDelete($"PostList_" + packet.MemberID, packet.PostID);
+                {
+                    if (GetRedis((int)Connect.RedisDB.emRedisDB_Post).KeyExists($"PostList_" + packet.MemberID))
+                    {
+                        string sPostList = GetRedis((int)Connect.RedisDB.emRedisDB_Post).StringGet($"PostList_" + packet.MemberID);
+
+                        JArray jsMemberPostList = JArray.Parse(sPostList);
+                        List<string> memberPostList = jsMemberPostList.ToObject<List<string>>();
+
+                        if (memberPostList.Contains(packet.PostID))
+                        {
+                            memberPostList.Remove(packet.PostID);
+
+                        }
+
+                        JArray jsNewList = JArray.FromObject(memberPostList);
+
+                        GetRedis((int)Connect.RedisDB.emRedisDB_Post).StringSet($"PostList_" + packet.MemberID, jsNewList.ToString());
+                    }
+                }
+
+                DeleteFriendPost(packet.MemberID, packet.PostID);
 
             }
             else
@@ -594,7 +732,18 @@ namespace Service.Source
                 GetSql().CommitTran();
 
                 // 更新Redis 會員貼文
-                GetRedis((int)Connect.RedisDB.emRedisDB_Post).HashSet($"PostInfo_" + post.PostID, hashTransfer.TransToHashEntryArray(post));
+                {
+                    JObject jsNewPost = new JObject();
+                    jsNewPost.Add("MemberID", post.MemberID);
+                    jsNewPost.Add("CreateDate", post.CreateDate);
+                    jsNewPost.Add("Place", post.Place);
+                    jsNewPost.Add("Photo", post.Photo);
+                    jsNewPost.Add("Content", post.Content);
+                    jsNewPost.Add("LikeList", post.LikeList);
+
+                    GetRedis((int)Connect.RedisDB.emRedisDB_Post).StringSet($"PostInfo_" + post.PostID, jsNewPost.ToString());
+                }
+
             }
             else
             {
@@ -688,7 +837,17 @@ namespace Service.Source
                 GetSql().CommitTran();
 
                 // 更新Redis 會員貼文
-                GetRedis((int)Connect.RedisDB.emRedisDB_Post).HashSet($"PostInfo_" + post.PostID, hashTransfer.TransToHashEntryArray(post));
+                {
+                    JObject jsNewPost = new JObject();
+                    jsNewPost.Add("MemberID", post.MemberID);
+                    jsNewPost.Add("CreateDate", post.CreateDate);
+                    jsNewPost.Add("Place", post.Place);
+                    jsNewPost.Add("Photo", post.Photo);
+                    jsNewPost.Add("Content", post.Content);
+                    jsNewPost.Add("LikeList", post.LikeList);
+
+                    GetRedis((int)Connect.RedisDB.emRedisDB_Post).StringSet($"PostInfo_" + post.PostID, jsNewPost.ToString());
+                }
             }
             else
             {
@@ -698,6 +857,74 @@ namespace Service.Source
 
             JObject jsMain = new JObject();
             jsMain.Add("CmdID", (int)S2C_CmdID.emReduceLikeResult);
+            jsMain.Add("Data", JsonConvert.DeserializeObject<JObject>(JsonConvert.SerializeObject(rData)));
+
+            ret = jsMain.ToString();
+
+            return ret;
+        }
+
+        /// <summary>
+        /// 更新塗鴉牆列表
+        /// </summary>
+        /// <param name="data"> 封包資料 </param>
+        /// <returns> 結果 </returns>
+        public string OnUpdatePostShowList(string data)
+        {
+            string ret = "";
+
+            UpdatePostShowList packet = JsonConvert.DeserializeObject<UpdatePostShowList>(data);
+
+            UpdatePostShowListResult rData = new UpdatePostShowListResult();
+
+            try
+            {
+                UserInfo userInfo = GetSql().Queryable<UserInfo>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).Single();
+
+                // 會員存在
+                if (userInfo != null)
+                {
+                    JArray jaFriendList = JArray.Parse(userInfo.FriendList);
+
+                    JObject jsInfo = new JObject();
+                    jsInfo.Add("MemberID", userInfo.MemberID);
+                    jsInfo.Add("FriendList", jaFriendList);
+                    jsInfo.Add("MaxCount", 50);
+
+                    List<string> postShowList = algorithm.GetMemberPostShowList(AlgorithmType.ByDateTime, jsInfo.ToString());
+
+                    if (GetRedis((int)Connect.RedisDB.emRedisDB_Post).StringSet($"PostShowList_{userInfo.MemberID}", JArray.FromObject(postShowList).ToString()))
+                    {
+                        rData.Result = (int)UpdatePostShowListResult.ResultDefine.emResult_Success;
+
+                        SaveLog($"[Info] MessageFcunction::OnUpdatePostShowList Create Post Show List Success");
+
+                    }
+                    else
+                    {
+                        rData.Result = (int)UpdatePostShowListResult.ResultDefine.emResult_Fail;
+
+                        SaveLog($"[Warning] MessageFcunction::OnUpdatePostShowList Create Post Show List Fail");
+                    }
+
+                }
+                else
+                {
+                    rData.Result = (int)UpdatePostShowListResult.ResultDefine.emResult_Fail;
+
+                    SaveLog($"[Info] MessageFcunction::OnUpdatePostShowList Can Not Find Member:{packet.MemberID}");
+                }
+
+            }
+            catch (Exception ex)
+            {
+                rData.Result = (int)UpdatePostShowListResult.ResultDefine.emResult_Fail;
+
+                SaveLog($"[Error] MessageFcunction::OnUpdatePostShowList Catch Error Msg:{ex.Message}");
+            }
+
+            JObject jsMain = new JObject();
+            jsMain.Add("CmdID", (int)S2C_CmdID.emUpdatePostShowListResult);
             jsMain.Add("Data", JsonConvert.DeserializeObject<JObject>(JsonConvert.SerializeObject(rData)));
 
             ret = jsMain.ToString();

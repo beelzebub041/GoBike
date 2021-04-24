@@ -129,6 +129,7 @@ namespace Service.Source
                 AddMsgFunc((int)C2S_CmdID.emDeletePost, msgFunc.OnDeletePost);
                 AddMsgFunc((int)C2S_CmdID.emAddLike, msgFunc.OnAddLike);
                 AddMsgFunc((int)C2S_CmdID.emReduceLike, msgFunc.OnReduceLike);
+                AddMsgFunc((int)C2S_CmdID.emUpdatePostShowList, msgFunc.OnUpdatePostShowList);
 
                 qTimer.Start();
 
