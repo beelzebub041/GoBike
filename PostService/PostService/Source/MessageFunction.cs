@@ -343,8 +343,8 @@ namespace Service.Source
 
                     // 建立貼文
                     newPost.PostID     = "DbPst-" + guidList[0];        // 取GUID前8碼
-                    newPost.MemberID = packet.MemberID;
-                    newPost.Photo      = packet.Photo;
+                    newPost.MemberID   = packet.MemberID;
+                    newPost.Photo      = packet.Photo != null ? packet.Photo : "[]";
                     newPost.Content    = packet.Content;
                     newPost.LikeList   = "[]";
                     newPost.CreateDate = dateTime;

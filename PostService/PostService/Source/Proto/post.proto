@@ -1,0 +1,22 @@
+﻿syntax = "proto3";
+package PostProto;
+
+service Post {
+  rpc CreateNewPost (NewPostInfo) returns (CreateResult) {}
+}
+
+message NewPostInfo {
+
+	string MemberID = 1;
+
+	string Photo = 2;
+
+	string Content = 3;
+
+}
+
+message CreateResult {
+
+	int32 Result = 1;
+
+}

@@ -20,7 +20,7 @@ namespace Service.Source
         /// <summary>
         /// 版本號
         /// </summary>
-        private readonly string version = "Post003";
+        private readonly string version = "Post004";
 
         /// <summary>
         /// Loger 物件
@@ -37,7 +37,7 @@ namespace Service.Source
         /// </summary>
         private ControlCenter()
         {
-
+            
         }
 
         /// <summary>
@@ -81,7 +81,7 @@ namespace Service.Source
 
                 if (MessageProcessor.Instance.Initialize(logger) && clientHandler.Initialize(logger, MessageProcessor.Instance.AddQueue) &&
                     DataBaseConnect.Instance.Initialize(logger) && DataBaseConnect.Instance.Connect() && 
-                    RedisConnect.Instance.Initialize(logger) && RedisConnect.Instance.Connect())
+                    RedisConnect.Instance.Initialize(logger) && RedisConnect.Instance.Connect() && GRPCServer.Instance.Initialize(logger))
                 {
                     result = true;
 
