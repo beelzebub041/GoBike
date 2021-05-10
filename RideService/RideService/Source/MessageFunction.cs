@@ -24,6 +24,8 @@ using StackExchange.Redis;
 using RidePacket.ClientToServer;
 using RidePacket.ServerToClient;
 
+using PostProto;
+
 namespace Service.Source
 {
     class MessageFunction
@@ -308,6 +310,25 @@ namespace Service.Source
 
                 // DB 交易提交
                 GetSql().CommitTran();
+
+                try
+                {
+                    // 傳送資料到Post Service, 建立貼文
+                    var postClient = GRPCClient.Instance.GetClient();
+
+                    NewPostInfo postInfo = new NewPostInfo();
+                    postInfo.MemberID = newRecord.MemberID;
+                    postInfo.Photo = newRecord.Photo;
+                    postInfo.Content = newRecord.ShareContent;
+
+                    var reply = postClient.CreateNewPost(postInfo);
+                }
+                catch (Exception postEx)
+                {
+                    SaveLog($"[Error] Controller::OnCreateRideRecord, Post GRPC Catch Error, Msg:{postEx.Message}");
+
+                }
+
             }
             else
             {

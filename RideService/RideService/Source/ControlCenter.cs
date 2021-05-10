@@ -20,7 +20,7 @@ namespace Service.Source
         /// <summary>
         /// 版本號
         /// </summary>
-        private readonly string version = "Ride022";
+        private readonly string version = "Ride023";
 
         /// <summary>
         /// Loger 物件
@@ -81,9 +81,9 @@ namespace Service.Source
 
                 if (MessageProcessor.Instance.Initialize(logger) && clientHandler.Initialize(logger, MessageProcessor.Instance.AddQueue) &&
                     DataBaseConnect.Instance.Initialize(logger) && DataBaseConnect.Instance.Connect() && 
-                    RedisConnect.Instance.Initialize(logger) && RedisConnect.Instance.Connect())
+                    RedisConnect.Instance.Initialize(logger) && RedisConnect.Instance.Connect() && GRPCClient.Instance.Initialize(logger))
                 {
-                    result = true;
+                    result = GRPCClient.Instance.CreateClient();
 
                     SaveLog($"[Info] ControlCenter::Initialize, Success");
                 }

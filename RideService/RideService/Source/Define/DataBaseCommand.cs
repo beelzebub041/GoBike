@@ -36,6 +36,29 @@ namespace DataBaseDef
 
     }
 
+    // 使用者帳戶
+    public class UserAccount_New
+    {   
+        // 唯一ID
+        public string UUID { get; set; }
+
+        // 會員ID
+        public string MemberID { get; set; }
+
+        // Token
+        public string Token { get; set; }
+
+        // 推播Token
+        public string NotifyToken { get; set; }
+
+        // 註冊來源
+        public int RegisterSource { get; set; }
+
+        // 註冊日期
+        public string RegisterDate { get; set; }
+
+    }
+
     // 使用者資料
     public class UserInfo
     {
@@ -314,6 +337,32 @@ namespace DataBaseDef
 
         // 暫存日期
         public string StorageDate { get; set; }
+
+    }
+
+    // 貼文資料
+    public class PostInfo
+    {
+        // 貼文ID
+        public string PostID { get; set; }
+
+        // 發文的MemberID
+        public string MemberID { get; set; }
+
+        // 建立日期
+        public string CreateDate { get; set; }
+
+        // 地點
+        public string Place { get; set; }
+
+        // 圖片
+        public string Photo { get; set; }
+
+        // 內文
+        public string Content { get; set; }
+
+        // 點讚列表
+        public string LikeList { get; set; }
 
     }
 
