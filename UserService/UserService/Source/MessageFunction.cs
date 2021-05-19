@@ -25,6 +25,8 @@ using UserPacket.ClientToServer;
 using UserPacket.ServerToClient;
 using FirebaseAdmin.Auth;
 
+using PostProto;
+
 namespace Service.Source
 {
     class MessageFunction
@@ -896,8 +898,8 @@ namespace Service.Source
             UpdateFriendListResult rData = new UpdateFriendListResult();
             rData.Action = packet.Action;
 
-            UserInfo userInfo_Invite = null;
-            UserInfo userInfo_Friend = null;
+            UserInfo userInfo_Invite = null;    // 邀請者
+            UserInfo userInfo_Friend = null;    // 被邀請者
 
             try
             {
@@ -976,13 +978,16 @@ namespace Service.Source
                                     {
                                         if (packet.Action == (int)UpdateFriendList.ActionDefine.emAction_Add)
                                         {
-                                            UserAccount invitedAccount = GetSql().Queryable<UserAccount>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).Single();
-                                            
-                                            string sTitle = $"好友通知";
+                                            UserAccount friendAccount = GetSql().Queryable<UserAccount>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.FriendID).Single();
 
-                                            string sNotifyMsg = $"{invitedAccount.NotifyToken} 已新增您為好友";
+                                            if (friendAccount != null)
+                                            {
+                                                string sTitle = $"好友通知";
 
-                                            ntMsg.NotifyMsgToDevice(userInfo_Friend.NickName, sTitle, sNotifyMsg, (int)NotifyID.User_AddFriend);
+                                                string sNotifyMsg = $"{userInfo_Invite.NickName} 將您加入好友";
+
+                                                ntMsg.NotifyMsgToDevice(friendAccount.NotifyToken, sTitle, sNotifyMsg, (int)NotifyID.User_AddFriend);
+                                            }
                                         }
                                     }
                                 }
@@ -1031,6 +1036,21 @@ namespace Service.Source
 
                 GetRedis((int)Connect.RedisDB.emRedisDB_User).HashSet($"UserInfo_" + userInfo_Invite.MemberID, hashTransfer.TransToHashEntryArray(userInfo_Invite));
                 GetRedis((int)Connect.RedisDB.emRedisDB_User).HashSet($"UserInfo_" + userInfo_Friend.MemberID, hashTransfer.TransToHashEntryArray(userInfo_Friend));
+
+                try
+                {
+                    // 傳送資料到Post Service, 更新塗鴉牆
+                    var postClient = GRPCClient.Instance.GetClient();
+
+                    UpdateMemberPostShowList updateInfo = new UpdateMemberPostShowList();
+                    updateInfo.MemberID = packet.MemberID;
+
+                    var reply = postClient.UpdatePostShowListFun(updateInfo);
+                }
+                catch (Exception postEx)
+                {
+                    SaveLog($"[Error] Controller::OnUpdateFriendList, Post GRPC Catch Error, Msg:{postEx.Message}");
+                }
             }
             else
             {
