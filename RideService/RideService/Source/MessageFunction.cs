@@ -318,10 +318,25 @@ namespace Service.Source
 
                     NewPostInfo postInfo = new NewPostInfo();
                     postInfo.MemberID = newRecord.MemberID;
-                    postInfo.Photo = newRecord.Photo;
                     postInfo.Content = newRecord.ShareContent;
 
-                    var reply = postClient.CreateNewPost(postInfo);
+                    List<string> postPhotoList = new List<string>();
+                    postPhotoList.Add(packet.Photo);
+
+                    JArray jsShareContent = JArray.Parse(packet.ShareContent);
+                    List<JArray> shareContentList = jsShareContent.ToObject<List<JArray>>();
+
+                    foreach (JArray a in shareContentList)
+                    {
+                        postPhotoList.Add(a[1].ToString());
+                    }
+
+                    JArray jaPhotoList = new JArray();
+                    jaPhotoList.Add(string.Join(",", postPhotoList));
+
+                    postInfo.Photo = jaPhotoList.ToString();
+
+                    var reply = postClient.CreateNewPostFun(postInfo);
                 }
                 catch (Exception postEx)
                 {
