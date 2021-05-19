@@ -43,14 +43,23 @@ namespace PostProto {
     }
 
     static readonly grpc::Marshaller<global::PostProto.NewPostInfo> __Marshaller_PostProto_NewPostInfo = grpc::Marshallers.Create(__Helper_SerializeMessage, context => __Helper_DeserializeMessage(context, global::PostProto.NewPostInfo.Parser));
-    static readonly grpc::Marshaller<global::PostProto.CreateResult> __Marshaller_PostProto_CreateResult = grpc::Marshallers.Create(__Helper_SerializeMessage, context => __Helper_DeserializeMessage(context, global::PostProto.CreateResult.Parser));
+    static readonly grpc::Marshaller<global::PostProto.CreateNewPostResult> __Marshaller_PostProto_CreateNewPostResult = grpc::Marshallers.Create(__Helper_SerializeMessage, context => __Helper_DeserializeMessage(context, global::PostProto.CreateNewPostResult.Parser));
+    static readonly grpc::Marshaller<global::PostProto.UpdateMemberPostShowList> __Marshaller_PostProto_UpdateMemberPostShowList = grpc::Marshallers.Create(__Helper_SerializeMessage, context => __Helper_DeserializeMessage(context, global::PostProto.UpdateMemberPostShowList.Parser));
+    static readonly grpc::Marshaller<global::PostProto.UpdateShowListResult> __Marshaller_PostProto_UpdateShowListResult = grpc::Marshallers.Create(__Helper_SerializeMessage, context => __Helper_DeserializeMessage(context, global::PostProto.UpdateShowListResult.Parser));
 
-    static readonly grpc::Method<global::PostProto.NewPostInfo, global::PostProto.CreateResult> __Method_CreateNewPost = new grpc::Method<global::PostProto.NewPostInfo, global::PostProto.CreateResult>(
+    static readonly grpc::Method<global::PostProto.NewPostInfo, global::PostProto.CreateNewPostResult> __Method_CreateNewPostFun = new grpc::Method<global::PostProto.NewPostInfo, global::PostProto.CreateNewPostResult>(
         grpc::MethodType.Unary,
         __ServiceName,
-        "CreateNewPost",
+        "CreateNewPostFun",
         __Marshaller_PostProto_NewPostInfo,
-        __Marshaller_PostProto_CreateResult);
+        __Marshaller_PostProto_CreateNewPostResult);
+
+    static readonly grpc::Method<global::PostProto.UpdateMemberPostShowList, global::PostProto.UpdateShowListResult> __Method_UpdatePostShowListFun = new grpc::Method<global::PostProto.UpdateMemberPostShowList, global::PostProto.UpdateShowListResult>(
+        grpc::MethodType.Unary,
+        __ServiceName,
+        "UpdatePostShowListFun",
+        __Marshaller_PostProto_UpdateMemberPostShowList,
+        __Marshaller_PostProto_UpdateShowListResult);
 
     /// <summary>Service descriptor</summary>
     public static global::Google.Protobuf.Reflection.ServiceDescriptor Descriptor
@@ -62,7 +71,12 @@ namespace PostProto {
     [grpc::BindServiceMethod(typeof(Post), "BindService")]
     public abstract partial class PostBase
     {
-      public virtual global::System.Threading.Tasks.Task<global::PostProto.CreateResult> CreateNewPost(global::PostProto.NewPostInfo request, grpc::ServerCallContext context)
+      public virtual global::System.Threading.Tasks.Task<global::PostProto.CreateNewPostResult> CreateNewPostFun(global::PostProto.NewPostInfo request, grpc::ServerCallContext context)
+      {
+        throw new grpc::RpcException(new grpc::Status(grpc::StatusCode.Unimplemented, ""));
+      }
+
+      public virtual global::System.Threading.Tasks.Task<global::PostProto.UpdateShowListResult> UpdatePostShowListFun(global::PostProto.UpdateMemberPostShowList request, grpc::ServerCallContext context)
       {
         throw new grpc::RpcException(new grpc::Status(grpc::StatusCode.Unimplemented, ""));
       }
@@ -92,21 +106,37 @@ namespace PostProto {
       {
       }
 
-      public virtual global::PostProto.CreateResult CreateNewPost(global::PostProto.NewPostInfo request, grpc::Metadata headers = null, global::System.DateTime? deadline = null, global::System.Threading.CancellationToken cancellationToken = default(global::System.Threading.CancellationToken))
+      public virtual global::PostProto.CreateNewPostResult CreateNewPostFun(global::PostProto.NewPostInfo request, grpc::Metadata headers = null, global::System.DateTime? deadline = null, global::System.Threading.CancellationToken cancellationToken = default(global::System.Threading.CancellationToken))
       {
-        return CreateNewPost(request, new grpc::CallOptions(headers, deadline, cancellationToken));
+        return CreateNewPostFun(request, new grpc::CallOptions(headers, deadline, cancellationToken));
       }
-      public virtual global::PostProto.CreateResult CreateNewPost(global::PostProto.NewPostInfo request, grpc::CallOptions options)
+      public virtual global::PostProto.CreateNewPostResult CreateNewPostFun(global::PostProto.NewPostInfo request, grpc::CallOptions options)
       {
-        return CallInvoker.BlockingUnaryCall(__Method_CreateNewPost, null, options, request);
+        return CallInvoker.BlockingUnaryCall(__Method_CreateNewPostFun, null, options, request);
       }
-      public virtual grpc::AsyncUnaryCall<global::PostProto.CreateResult> CreateNewPostAsync(global::PostProto.NewPostInfo request, grpc::Metadata headers = null, global::System.DateTime? deadline = null, global::System.Threading.CancellationToken cancellationToken = default(global::System.Threading.CancellationToken))
+      public virtual grpc::AsyncUnaryCall<global::PostProto.CreateNewPostResult> CreateNewPostFunAsync(global::PostProto.NewPostInfo request, grpc::Metadata headers = null, global::System.DateTime? deadline = null, global::System.Threading.CancellationToken cancellationToken = default(global::System.Threading.CancellationToken))
       {
-        return CreateNewPostAsync(request, new grpc::CallOptions(headers, deadline, cancellationToken));
+        return CreateNewPostFunAsync(request, new grpc::CallOptions(headers, deadline, cancellationToken));
       }
-      public virtual grpc::AsyncUnaryCall<global::PostProto.CreateResult> CreateNewPostAsync(global::PostProto.NewPostInfo request, grpc::CallOptions options)
+      public virtual grpc::AsyncUnaryCall<global::PostProto.CreateNewPostResult> CreateNewPostFunAsync(global::PostProto.NewPostInfo request, grpc::CallOptions options)
       {
-        return CallInvoker.AsyncUnaryCall(__Method_CreateNewPost, null, options, request);
+        return CallInvoker.AsyncUnaryCall(__Method_CreateNewPostFun, null, options, request);
+      }
+      public virtual global::PostProto.UpdateShowListResult UpdatePostShowListFun(global::PostProto.UpdateMemberPostShowList request, grpc::Metadata headers = null, global::System.DateTime? deadline = null, global::System.Threading.CancellationToken cancellationToken = default(global::System.Threading.CancellationToken))
+      {
+        return UpdatePostShowListFun(request, new grpc::CallOptions(headers, deadline, cancellationToken));
+      }
+      public virtual global::PostProto.UpdateShowListResult UpdatePostShowListFun(global::PostProto.UpdateMemberPostShowList request, grpc::CallOptions options)
+      {
+        return CallInvoker.BlockingUnaryCall(__Method_UpdatePostShowListFun, null, options, request);
+      }
+      public virtual grpc::AsyncUnaryCall<global::PostProto.UpdateShowListResult> UpdatePostShowListFunAsync(global::PostProto.UpdateMemberPostShowList request, grpc::Metadata headers = null, global::System.DateTime? deadline = null, global::System.Threading.CancellationToken cancellationToken = default(global::System.Threading.CancellationToken))
+      {
+        return UpdatePostShowListFunAsync(request, new grpc::CallOptions(headers, deadline, cancellationToken));
+      }
+      public virtual grpc::AsyncUnaryCall<global::PostProto.UpdateShowListResult> UpdatePostShowListFunAsync(global::PostProto.UpdateMemberPostShowList request, grpc::CallOptions options)
+      {
+        return CallInvoker.AsyncUnaryCall(__Method_UpdatePostShowListFun, null, options, request);
       }
       /// <summary>Creates a new instance of client from given <c>ClientBaseConfiguration</c>.</summary>
       protected override PostClient NewInstance(ClientBaseConfiguration configuration)
@@ -120,7 +150,8 @@ namespace PostProto {
     public static grpc::ServerServiceDefinition BindService(PostBase serviceImpl)
     {
       return grpc::ServerServiceDefinition.CreateBuilder()
-          .AddMethod(__Method_CreateNewPost, serviceImpl.CreateNewPost).Build();
+          .AddMethod(__Method_CreateNewPostFun, serviceImpl.CreateNewPostFun)
+          .AddMethod(__Method_UpdatePostShowListFun, serviceImpl.UpdatePostShowListFun).Build();
     }
 
     /// <summary>Register service method with a service binder with or without implementation. Useful when customizing the  service binding logic.
@@ -129,7 +160,8 @@ namespace PostProto {
     /// <param name="serviceImpl">An object implementing the server-side handling logic.</param>
     public static void BindService(grpc::ServiceBinderBase serviceBinder, PostBase serviceImpl)
     {
-      serviceBinder.AddMethod(__Method_CreateNewPost, serviceImpl == null ? null : new grpc::UnaryServerMethod<global::PostProto.NewPostInfo, global::PostProto.CreateResult>(serviceImpl.CreateNewPost));
+      serviceBinder.AddMethod(__Method_CreateNewPostFun, serviceImpl == null ? null : new grpc::UnaryServerMethod<global::PostProto.NewPostInfo, global::PostProto.CreateNewPostResult>(serviceImpl.CreateNewPostFun));
+      serviceBinder.AddMethod(__Method_UpdatePostShowListFun, serviceImpl == null ? null : new grpc::UnaryServerMethod<global::PostProto.UpdateMemberPostShowList, global::PostProto.UpdateShowListResult>(serviceImpl.UpdatePostShowListFun));
     }
 
   }

@@ -81,10 +81,10 @@ namespace Connect
             return ret;
         }
 
-        // 實現CreateNewPost
-        public override Task<CreateResult> CreateNewPost(NewPostInfo request, ServerCallContext context)
+        // 實現onCreateNewPost
+        public override Task<CreateNewPostResult> CreateNewPostFun(NewPostInfo request, ServerCallContext context)
         {
-            CreateResult ret = new CreateResult();
+            CreateNewPostResult ret = new CreateNewPostResult();
             ret.Result = 0;
 
             try
@@ -115,7 +115,43 @@ namespace Connect
             {
                 Console.WriteLine($"{ex.Message}");
 
-                SaveLog($"[Error] gRpcImpl::CreateNewPost, Catch Error, Msg:{ex.Message}");
+                SaveLog($"[Error] gRpcImpl::CreateNewPostFun, Catch Error, Msg:{ex.Message}");
+
+            }
+
+            return Task.FromResult(ret);
+        }
+
+        public override Task<UpdateShowListResult> UpdatePostShowListFun(UpdateMemberPostShowList request, ServerCallContext context)
+        {
+            UpdateShowListResult ret = new UpdateShowListResult();
+            ret.Result = 0;
+
+            try
+            {
+                UpdatePostShowList rData = new UpdatePostShowList
+                {
+                    MemberID = request.MemberID
+                };
+
+                string sData = JsonConvert.SerializeObject(rData);
+
+                JObject jsMain = new JObject();
+
+                jsMain.Add("CmdID", (int)C2S_CmdID.emUpdatePostShowList);
+                jsMain.Add("Data", JsonConvert.DeserializeObject<JObject>(sData));
+
+                MsgInfo info = new MsgInfo(jsMain.ToString(), this.SendToClient);
+
+                this.addQueue?.Invoke(info);
+
+                ret.Result = 1;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"{ex.Message}");
+
+                SaveLog($"[Error] gRpcImpl::UpdatePostShowListFun, Catch Error, Msg:{ex.Message}");
 
             }
 

@@ -2,7 +2,9 @@
 package PostProto;
 
 service Post {
-  rpc CreateNewPost (NewPostInfo) returns (CreateResult) {}
+  rpc CreateNewPostFun (NewPostInfo) returns (CreateNewPostResult) {}
+
+  rpc UpdatePostShowListFun (UpdateMemberPostShowList) returns (UpdateShowListResult) {}
 }
 
 message NewPostInfo {
@@ -15,7 +17,20 @@ message NewPostInfo {
 
 }
 
-message CreateResult {
+message CreateNewPostResult {
+
+	int32 Result = 1;
+
+}
+
+
+message UpdateMemberPostShowList {
+
+	string MemberID = 1;
+
+}
+
+message UpdateShowListResult {
 
 	int32 Result = 1;
 
