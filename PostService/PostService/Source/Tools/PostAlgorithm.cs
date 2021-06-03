@@ -21,6 +21,67 @@ namespace Tools.PostAlgorithm
         ByDateTime = 0,         // 依時間新到舊排序
     }
 
+    public class DateTimeComparer : IComparer<string>
+    {
+        public int Compare(string baseTime, string compareTieme)
+        {
+            int ret = 0;
+
+            DateTime time_base = new DateTime();
+
+            DateTime time_compare = new DateTime();
+
+            // baseTime parse 失敗
+            if (!DateTime.TryParse(baseTime, out time_base))
+            {
+                // compareTieme parse 失敗
+                if (!DateTime.TryParse(compareTieme, out time_compare))
+                {
+                    // 回傳相等
+                    ret = 0;
+                }
+                // compareTieme parse 成功
+                else
+                {
+                    // 表示compareTieme 比較大
+                    ret = -1;
+                }
+            }
+            // baseTime parse 成功
+            else
+            {
+                // compareTieme parse 失敗
+                if (!DateTime.TryParse(compareTieme, out time_compare))
+                {
+                    // 表示baseTime 比較大
+                    ret = 1;
+                }
+                // compareTieme parse 成功
+                else
+                {
+                    if (time_base > time_compare)
+                    {
+                        // 表示baseTime 比較大
+                        ret = 1;
+                    }
+                    else if (time_base < time_compare)
+                    {
+                        // 表示compareTieme 比較大
+                        ret = -1;
+                    }
+                    else
+                    {   
+                        // 相等
+                        ret = 0;
+                    }
+
+                }
+            }
+
+            return ret;
+        }
+    }
+
     class PostAlgorithm
     {
         // ==================== Delegate ==================== //
@@ -194,7 +255,7 @@ namespace Tools.PostAlgorithm
             }
 
             return ret;
-        }
+        } 
 
         private List<string> GetPostShowListByDateTime(string jsonInfo)
         {
@@ -234,7 +295,7 @@ namespace Tools.PostAlgorithm
                         postInfoList.AddRange(friendPostInfoList);
                     }
 
-                    postInfoList = postInfoList.OrderByDescending(data => data.CreateDate).ToList();
+                    postInfoList = postInfoList.OrderByDescending(data => DateTime.Parse(data.CreateDate)).ToList();
 
                     if (maxCount == -1)
                     {

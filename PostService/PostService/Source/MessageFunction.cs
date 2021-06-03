@@ -186,7 +186,7 @@ namespace Service.Source
                             JArray jsPostList = JArray.Parse(postShowListInfo);
                             List<string> showList = jsPostList.ToObject<List<string>>();
 
-                            showList.Add(postID);
+                            showList.Insert(0, postID);
 
                             if (GetRedis((int)Connect.RedisDB.emRedisDB_Post).StringSet(sKey, JArray.FromObject(showList).ToString()))
                             {
