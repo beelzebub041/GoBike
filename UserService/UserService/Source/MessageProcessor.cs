@@ -131,6 +131,7 @@ namespace Service.Source
                 AddMsgFunc((int)C2S_CmdID.emUpdateFriendList, msgFunc.OnUpdateFriendList);
                 AddMsgFunc((int)C2S_CmdID.emUpdateBlackList, msgFunc.OnUpdateBlackList);
                 AddMsgFunc((int)C2S_CmdID.emUpdateNotifyToken, msgFunc.OnUpdateNotifyToken);
+                AddMsgFunc((int)C2S_CmdID.emGetNewFriendList,msgFunc.onGetNewFriendList);
 
                 qTimer.Start();
 

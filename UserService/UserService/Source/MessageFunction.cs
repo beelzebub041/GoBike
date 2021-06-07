@@ -1037,6 +1037,31 @@ namespace Service.Source
                 GetRedis((int)Connect.RedisDB.emRedisDB_User).HashSet($"UserInfo_" + userInfo_Invite.MemberID, hashTransfer.TransToHashEntryArray(userInfo_Invite));
                 GetRedis((int)Connect.RedisDB.emRedisDB_User).HashSet($"UserInfo_" + userInfo_Friend.MemberID, hashTransfer.TransToHashEntryArray(userInfo_Friend));
 
+                // 若為新增好友, 則加到Redis的新增好友列表中
+                if (packet.Action == (int)UpdateFriendList.ActionDefine.emAction_Add)
+                {
+                    string dateTime = DateTime.UtcNow.ToString("yyyy-MM-dd hh:mm:ss");
+
+                    string sKey = $"NewFriendList_" + packet.MemberID;
+
+                    string sNewFriendList = "[]";
+
+                    if (GetRedis((int)Connect.RedisDB.emRedisDB_User).KeyExists(sKey))
+                    {
+                        sNewFriendList = GetRedis((int)Connect.RedisDB.emRedisDB_User).StringGet(sKey);
+                    }
+
+                    JArray jsNewFriendList = JArray.Parse(sNewFriendList);
+
+                    JArray jsNewFriendInfo = new JArray();
+                    jsNewFriendInfo.Add(packet.FriendID);
+                    jsNewFriendInfo.Add(dateTime);
+
+                    jsNewFriendList.Add(jsNewFriendInfo);
+
+                    GetRedis((int)Connect.RedisDB.emRedisDB_User).StringSet(sKey, jsNewFriendList.ToString());
+                }
+
                 try
                 {
                     // 傳送資料到Post Service, 更新塗鴉牆
@@ -1045,7 +1070,11 @@ namespace Service.Source
                     UpdateMemberPostShowList updateInfo = new UpdateMemberPostShowList();
                     updateInfo.MemberID = packet.MemberID;
 
-                    var reply = postClient.UpdatePostShowListFun(updateInfo);
+                    if (postClient != null)
+                    {
+                        var reply = postClient.UpdatePostShowListFun(updateInfo);
+                    }
+
                 }
                 catch (Exception postEx)
                 {
@@ -1308,6 +1337,88 @@ namespace Service.Source
 
             JObject jsMain = new JObject();
             jsMain.Add("CmdID", (int)S2C_CmdID.emUpdateNotifyTokenResult);
+            jsMain.Add("Data", JsonConvert.DeserializeObject<JObject>(JsonConvert.SerializeObject(rData)));
+
+            ret = jsMain.ToString();
+
+            return ret;
+        }
+
+        /// <summary>
+        /// 取得新增好友列表
+        /// </summary>
+        /// <param name="data"> 封包資料 </param>
+        /// <returns> 結果 </returns>
+        public string onGetNewFriendList(string data)
+        {
+            string ret = "";
+
+            GetNewFriendList packet = JsonConvert.DeserializeObject<GetNewFriendList>(data);
+
+            GetNewFriendListResult rData = new GetNewFriendListResult();
+
+            UserInfo userInfo = GetSql().Queryable<UserInfo>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).Single(); 
+
+            try
+            {
+                // 有找到會員資料
+                if (userInfo != null)
+                {
+                    JArray jaNewFriendList = new JArray();
+                    
+                    string sKey = $"NewFriendList_" + packet.MemberID;
+
+                    if (GetRedis((int)Connect.RedisDB.emRedisDB_User).KeyExists(sKey))
+                    {
+                        string sNewFriendList = GetRedis((int)Connect.RedisDB.emRedisDB_User).StringGet(sKey);
+
+                        JArray jsNewFriendList = JArray.Parse(sNewFriendList);
+                        JArray jsNewFriendList_New = JArray.Parse(sNewFriendList);
+
+                        foreach (JArray jsInfo in jsNewFriendList)
+                        {
+                            string sFriendMemberID = jsInfo[0].ToString();
+                            DateTime stAddTime = DateTime.Parse(jsInfo[1].ToString());
+
+                            TimeSpan Diff_dates = DateTime.UtcNow.Subtract(stAddTime);
+
+                            // 未超過6小時
+                            if (Diff_dates.TotalHours < 6)
+                            {
+                                jaNewFriendList.Add(sFriendMemberID);
+                            }
+                            // 超過6小時, 從Redis的紀錄中刪除
+                            else
+                            {
+                                jsNewFriendList_New.Remove(jsInfo);
+                            }
+                        }
+
+                        GetRedis((int)Connect.RedisDB.emRedisDB_User).StringSet(sKey, jsNewFriendList_New.ToString());
+                    }
+
+                    rData.Result = (int)GetNewFriendListResult.ResultDefine.emResult_Success;
+
+                    rData.FriendList = jaNewFriendList.ToString();
+
+                }
+                else
+                {
+                    rData.Result = (int)GetNewFriendListResult.ResultDefine.emResult_Fail;
+
+                    SaveLog($"[Error] MessageFcunction::onGetNewFriendList Can Not Find Member:{packet.MemberID}");
+                }
+
+            }
+            catch (Exception ex)
+            {
+                SaveLog($"[Error] MessageFcunction::onGetNewFriendList Catch Error, Msg:{ex.Message}");
+
+                rData.Result = (int)GetNewFriendListResult.ResultDefine.emResult_Fail;
+            }
+
+            JObject jsMain = new JObject();
+            jsMain.Add("CmdID", (int)S2C_CmdID.emGetNewFriendListResult);
             jsMain.Add("Data", JsonConvert.DeserializeObject<JObject>(JsonConvert.SerializeObject(rData)));
 
             ret = jsMain.ToString();

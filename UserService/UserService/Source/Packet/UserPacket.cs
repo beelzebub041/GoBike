@@ -10,6 +10,7 @@ namespace UserPacket.ServerToClient
         emUpdateFriendListResult,
         emUpdateBlackListResult,
         emUpdateNotifyTokenResult,
+        emGetNewFriendListResult,
     }
 
     // 使用者註冊結果
@@ -149,6 +150,26 @@ namespace UserPacket.ServerToClient
         public int Result { get; set; }
     }
 
+    /*
+     * 取得新增好友列表結果
+     */
+    class GetNewFriendListResult
+    {
+        // 結果定義
+        public enum ResultDefine : int
+        {
+            emResult_Fail = 0,          // 0: 失敗
+            emResult_Success,           // 1: 成功
+        }
+
+        // 結果
+        public int Result { get; set; }
+
+        // 新增好友列表
+        public string FriendList { get; set; }
+
+    }
+
 }
 
 namespace UserPacket.ClientToServer
@@ -162,6 +183,7 @@ namespace UserPacket.ClientToServer
         emUpdateFriendList,
         emUpdateBlackList,
         emUpdateNotifyToken,
+        emGetNewFriendList,
     }
 
     // ======================= User ======================= //
@@ -350,6 +372,16 @@ namespace UserPacket.ClientToServer
 
         // 使用者資料
         public string NotifyToken { get; set; }
+
+    }
+
+    /*
+     * 取得新增好友列表
+     */
+    class GetNewFriendList
+    {
+        // 會員ID
+        public string MemberID { get; set; }
 
     }
 
