@@ -3,32 +3,14 @@ namespace UserPacket.ServerToClient
 {
     public enum S2C_CmdID : int
     {
-        emUserRegisteredResult = 1001,
-        emUserLoginResult,
+        emUserLoginResult = 1001,
         emUpdateUserInfoResult,
-        emUpdatePasswordResult,
         emUpdateFriendListResult,
         emUpdateBlackListResult,
         emUpdateNotifyTokenResult,
         emGetNewFriendListResult,
     }
 
-    // 使用者註冊結果
-    class UserRegisteredResult
-    {   
-        // 結果定義
-        public enum ResultDefine : int
-        {
-            emResult_Fail = 0,          // 0: 註冊失敗
-            emResult_Success,           // 1: 註冊成功
-            emResult_AccountRepeat,     // 2: 帳號重複
-            emResult_PwdError,          // 3: 密碼錯誤
-            emResult_FormatError,       // 4: 帳號格式不符
-        }
-
-        // 結果
-        public int Result { get; set; }
-    }
 
     // 使用者登入結果
     class UserLoginResult
@@ -63,30 +45,6 @@ namespace UserPacket.ServerToClient
 
         // 結果
         public int Result { get; set; }
-    }
-
-    // 更新密碼結果
-    class UpdatePasswordResult
-    {
-        // 結果定義
-        public enum ResultDefine : int
-        {
-            emResult_Fail = 0,          // 0: 更新失敗
-            emResult_Success,           // 1: 更新成功
-            emResult_OldPwdError,       // 2: 舊密碼錯誤
-        }
-
-        /**
-         * 動作
-         * 0: 無動作
-         * 1: 更新密碼
-         * 2: 忘記密碼
-         */
-        public int Action { get; set; }
-
-        // 結果
-        public int Result { get; set; }
-
     }
 
     // 更新好友列表結果
@@ -176,10 +134,8 @@ namespace UserPacket.ClientToServer
 {
     public enum C2S_CmdID : int
     {
-        emUserRegistered = 1001,
-        emUserLogin,
+        emUserLogin = 1001,
         emUpdateUserInfo,
-        emUpdatePassword,
         emUpdateFriendList,
         emUpdateBlackList,
         emUpdateNotifyToken,
@@ -189,39 +145,29 @@ namespace UserPacket.ClientToServer
     // ======================= User ======================= //
 
     /*
-    * 使用者註冊
-    */
-    class UserRegistered
-    {
-        // Email
-        public string Email { get; set; }
-
-        // 密碼
-        public string Password { get; set; }
-
-        // 確認密碼
-        public string CheckPassword { get; set; }
-
-        // FB Token
-        public string FBToken { get; set; }
-
-        // Google Token
-        public string GoogleToken { get; set; }
-
-        // 註冊來源
-        public int RegisterSource { get; set; }
-    }
-
-    /*
     * 使用者登入
     */
     class UserLogin
     {
-        // Email
+        // Token
+        public string Token { get; set; }
+
+        // 信箱
         public string Email { get; set; }
 
-        // 密碼
-        public string Password { get; set; }
+        // 頭像路徑
+        public string Avatar { get; set; }
+
+        // 暱稱
+        public string NickName { get; set; }
+
+        // 登入來源
+        /*
+         * Normal = 0
+         * FB= 1
+         * Google = 2
+         */
+        public int LoginSource { get; set; }
 
     }
 
@@ -230,6 +176,9 @@ namespace UserPacket.ClientToServer
      */
     class UpdateInfo
     {
+        // 信箱
+        public string Email { get; set; }
+
         // 暱稱
         public string NickName { get; set; }
 
@@ -275,33 +224,6 @@ namespace UserPacket.ClientToServer
 
         // 使用者資料
         public UpdateInfo UpdateData { get; set; }
-
-    }
-
-    /*
-    * 更新密碼
-    */
-    class UpdatePassword
-    {
-        // 動作定義
-        public enum ActionDefine : int
-        {
-            emAction_None = 0,          // 0: 無動作
-            emAction_UpdatePwd,         // 1: 更新密碼
-            emAction_ForgetPwd,         // 2: 忘記密碼
-        }
-
-        // 動作
-        public int Action { get; set; }
-
-        // 使用者索引
-        public string MemberID { get; set; }
-
-        // 密碼
-        public string Password { get; set; }
-
-        // 新密碼
-        public string NewPassword { get; set; }
 
     }
 

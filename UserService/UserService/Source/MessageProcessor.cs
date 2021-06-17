@@ -124,10 +124,8 @@ namespace Service.Source
 
             if (msgFunc.Initialize(logger))
             {
-                AddMsgFunc((int)C2S_CmdID.emUserRegistered, msgFunc.OnCreateNewAccount);
                 AddMsgFunc((int)C2S_CmdID.emUserLogin, msgFunc.OnUserLogin);
                 AddMsgFunc((int)C2S_CmdID.emUpdateUserInfo, msgFunc.OnUpdateUserInfo);
-                AddMsgFunc((int)C2S_CmdID.emUpdatePassword, msgFunc.OnUpdatePassword);
                 AddMsgFunc((int)C2S_CmdID.emUpdateFriendList, msgFunc.OnUpdateFriendList);
                 AddMsgFunc((int)C2S_CmdID.emUpdateBlackList, msgFunc.OnUpdateBlackList);
                 AddMsgFunc((int)C2S_CmdID.emUpdateNotifyToken, msgFunc.OnUpdateNotifyToken);
