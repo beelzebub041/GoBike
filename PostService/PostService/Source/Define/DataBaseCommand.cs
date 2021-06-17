@@ -10,43 +10,11 @@ namespace DataBaseDef
     // 使用者帳戶
     public class UserAccount
     {
-        // 會員ID
-        public string MemberID { get; set; }
-
-        // Email
-        public string Email { get; set; }
-
-        // 密碼
-        public string Password { get; set; }
-
-        // FB Token
-        public string FBToken { get; set; }
-
-        // Google Token
-        public string GoogleToken { get; set; }
-		
-		// 推播Token
-        public string NotifyToken { get; set; }
-
-        // 註冊來源
-        public int RegisterSource { get; set; }
-
-        // 註冊日期
-        public string RegisterDate { get; set; }
-
-    }
-
-    // 使用者帳戶
-    public class UserAccount_New
-    {   
-        // 唯一ID
-        public string UUID { get; set; }
+        // FireBase回傳的ID
+        public string UID { get; set; }
 
         // 會員ID
         public string MemberID { get; set; }
-
-        // Token
-        public string Token { get; set; }
 
         // 推播Token
         public string NotifyToken { get; set; }
@@ -64,6 +32,9 @@ namespace DataBaseDef
     {
         // 會員ID
         public string MemberID { get; set; }
+
+        // 信箱
+        public string Email { get; set; }
 
         // 暱稱
         public string NickName { get; set; }
