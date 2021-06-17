@@ -10,22 +10,13 @@ namespace DataBaseDef
     // 使用者帳戶
     public class UserAccount
     {
+        // FireBase回傳的ID
+        public string UID { get; set; }
+
         // 會員ID
         public string MemberID { get; set; }
 
-        // Email
-        public string Email { get; set; }
-
-        // 密碼
-        public string Password { get; set; }
-
-        // FB Token
-        public string FBToken { get; set; }
-
-        // Google Token
-        public string GoogleToken { get; set; }
-		
-		// 推播Token
+        // 推播Token
         public string NotifyToken { get; set; }
 
         // 註冊來源
@@ -41,6 +32,9 @@ namespace DataBaseDef
     {
         // 會員ID
         public string MemberID { get; set; }
+
+        // 信箱
+        public string Email { get; set; }
 
         // 暱稱
         public string NickName { get; set; }
@@ -314,6 +308,32 @@ namespace DataBaseDef
 
         // 暫存日期
         public string StorageDate { get; set; }
+
+    }
+
+    // 貼文資料
+    public class PostInfo
+    {
+        // 貼文ID
+        public string PostID { get; set; }
+
+        // 發文的MemberID
+        public string MemberID { get; set; }
+
+        // 建立日期
+        public string CreateDate { get; set; }
+
+        // 地點
+        public string Place { get; set; }
+
+        // 圖片
+        public string Photo { get; set; }
+
+        // 內文
+        public string Content { get; set; }
+
+        // 點讚列表
+        public string LikeList { get; set; }
 
     }
 
