@@ -320,19 +320,16 @@ namespace Service.Source
                     postInfo.MemberID = newRecord.MemberID;
                     postInfo.Content = newRecord.ShareContent;
 
-                    List<string> postPhotoList = new List<string>();
-                    postPhotoList.Add(packet.Photo);
+                    JArray jaPhotoList = new JArray();
+                    jaPhotoList.Add(packet.Photo);
 
                     JArray jsShareContent = JArray.Parse(packet.ShareContent);
                     List<JArray> shareContentList = jsShareContent.ToObject<List<JArray>>();
 
                     foreach (JArray a in shareContentList)
                     {
-                        postPhotoList.Add(a[1].ToString());
+                        jaPhotoList.Add(a[1].ToString());
                     }
-
-                    JArray jaPhotoList = new JArray();
-                    jaPhotoList.Add(string.Join(",", postPhotoList));
 
                     postInfo.Photo = jaPhotoList.ToString();
 
