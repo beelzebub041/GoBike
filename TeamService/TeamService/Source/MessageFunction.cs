@@ -1597,6 +1597,7 @@ namespace Service.Source
                                 newTeamAct.Title = packet.Title;
                                 newTeamAct.MeetTime = packet.MeetTime;
                                 newTeamAct.TotalDistance = packet.TotalDistance;
+                                newTeamAct.LoadMap = packet.LoadMap;
                                 newTeamAct.MaxAltitude = packet.MaxAltitude;
                                 newTeamAct.Route = packet.Route;
 
@@ -1656,7 +1657,8 @@ namespace Service.Source
                                         teamAct.ActDate = packet.ActDate == null ? teamAct.ActDate : packet.ActDate;
                                         teamAct.Title = packet.Title == null ? teamAct.Title : packet.Title;
                                         teamAct.MeetTime = packet.MeetTime == null ? teamAct.MeetTime : packet.MeetTime;
-                                        teamAct.TotalDistance = packet.TotalDistance == 0 ? teamAct.TotalDistance : packet.TotalDistance;
+                                        teamAct.TotalDistance = packet.TotalDistance == null ? teamAct.TotalDistance : packet.TotalDistance;
+                                        teamAct.LoadMap = packet.LoadMap == null ? teamAct.LoadMap : packet.LoadMap;
                                         teamAct.MaxAltitude = packet.MaxAltitude == 0 ? teamAct.MaxAltitude : packet.MaxAltitude;
                                         teamAct.Route = packet.Route == null ? teamAct.Route : packet.Route;
 

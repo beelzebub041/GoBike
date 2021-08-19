@@ -522,7 +522,10 @@ namespace TeamPacket.ClientToServer
         public string MeetTime { get; set; }
 
         // 總距離
-        public float TotalDistance { get; set; }
+        public string TotalDistance { get; set; }
+
+        // 道路線圖
+        public string LoadMap { get; set; }
 
         // 最高海拔
         public float MaxAltitude { get; set; }
