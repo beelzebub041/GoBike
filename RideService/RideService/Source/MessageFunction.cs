@@ -318,7 +318,7 @@ namespace Service.Source
 
                     NewPostInfo postInfo = new NewPostInfo();
                     postInfo.MemberID = newRecord.MemberID;
-                    postInfo.Content = newRecord.ShareContent;
+                    postInfo.Content = newRecord.Title;
 
                     JArray jaPhotoList = new JArray();
                     jaPhotoList.Add(packet.Photo);
