@@ -434,6 +434,19 @@ namespace Service.Source
                                         // 舊副隊長加入車隊隊員列表中
                                         UpdateTeamMemberList(memberID, teamID, 1, false);
                                     }
+
+                                    string targetID = memberID;
+
+                                    UserAccount account = GetSql().Queryable<UserAccount>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == targetID).Single();
+
+                                    if (account != null)
+                                    {
+                                        string sTitle = $"系統公告";
+
+                                        string sNotifyMsg = action == 1 ? $"您被委任為 {teamData.TeamName} 副隊長" : action == -1 ? $"{teamData.TeamName} 取消您的副隊長職務" : "Error";
+
+                                        ntMsg.NotifyMsgToDevice(account.NotifyToken, sTitle, sNotifyMsg, (int)NotifyID.Team_NewBulletin);
+                                    }
                                 }
                                 else
                                 {
