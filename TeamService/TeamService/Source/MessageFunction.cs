@@ -1253,46 +1253,49 @@ namespace Service.Source
 
                 GetRedis((int)Connect.RedisDB.emRedisDB_Team).HashSet($"TeamData_" + teamData.TeamID, hashTransfer.TransToHashEntryArray(teamData));
 
-                UserInfo userInfo = GetSql().Queryable<UserInfo>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).Single();
-
-                JArray jsViceLeader = JArray.Parse(teamData.TeamViceLeaderIDs);
-                List<string> notifyTargrtList = jsViceLeader.ToObject<List<string>>();
-                notifyTargrtList.Add(teamData.Leader);
-
-                // 通知隊長與副隊長
-                for (int idx = 0; idx < notifyTargrtList.Count(); idx++)
+                if ((packet.Action == (int)UpdateApplyJoinList.ActionDefine.emResult_Add))
                 {
-                    string targetID = notifyTargrtList[idx];
+                    UserInfo userInfo = GetSql().Queryable<UserInfo>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).Single();
 
-                    UserAccount account = GetSql().Queryable<UserAccount>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == targetID).Single();
+                    JArray jsViceLeader = JArray.Parse(teamData.TeamViceLeaderIDs);
+                    List<string> notifyTargrtList = jsViceLeader.ToObject<List<string>>();
+                    notifyTargrtList.Add(teamData.Leader);
 
-                    if (account != null && userInfo != null)
+                    // 通知隊長與副隊長
+                    for (int idx = 0; idx < notifyTargrtList.Count(); idx++)
                     {
-                        string action = teamData.ExamineStatus == 1 ? "申請加入" : "加入";
+                        string targetID = notifyTargrtList[idx];
 
-                        string sTitle = $"系統公告";
+                        UserAccount account = GetSql().Queryable<UserAccount>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == targetID).Single();
 
-                        string sNotifyMsg = $"{userInfo.NickName} {action} {teamData.TeamName}";
+                        if (account != null && userInfo != null)
+                        {
+                            string action = teamData.ExamineStatus == 1 ? "申請加入" : "加入";
 
-                        int id = teamData.ExamineStatus == 1 ? (int)NotifyID.Team_MemberJoinTeam : (int)NotifyID.Team_MemberJoined;
+                            string sTitle = $"系統公告";
 
-                        ntMsg.NotifyMsgToDevice(account.NotifyToken, sTitle, sNotifyMsg, id);
+                            string sNotifyMsg = $"{userInfo.NickName} {action} {teamData.TeamName}";
+
+                            int id = teamData.ExamineStatus == 1 ? (int)NotifyID.Team_MemberJoinTeam : (int)NotifyID.Team_MemberJoined;
+
+                            ntMsg.NotifyMsgToDevice(account.NotifyToken, sTitle, sNotifyMsg, id);
+                        }
+
                     }
 
-                }
-
-                // 若未開審核, 通知加入的成員 加入成功
-                if (teamData.ExamineStatus != 1)
-                {
-                    UserAccount joinMemberAccount = GetSql().Queryable<UserAccount>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).Single();
-
-                    if (joinMemberAccount != null)
+                    // 若未開審核, 通知加入的成員 加入成功
+                    if (teamData.ExamineStatus != 1)
                     {
-                        string sTitle = $"提示";
+                        UserAccount joinMemberAccount = GetSql().Queryable<UserAccount>().With(SqlSugar.SqlWith.RowLock).Where(it => it.MemberID == packet.MemberID).Single();
 
-                        string sNotifyMsg = $"加入車隊 {teamData.TeamName} 成功";
+                        if (joinMemberAccount != null)
+                        {
+                            string sTitle = $"提示";
 
-                        ntMsg.NotifyMsgToDevice(joinMemberAccount.NotifyToken, sTitle, sNotifyMsg, (int)NotifyID.Team_MemberJoined);
+                            string sNotifyMsg = $"加入車隊 {teamData.TeamName} 成功";
+
+                            ntMsg.NotifyMsgToDevice(joinMemberAccount.NotifyToken, sTitle, sNotifyMsg, (int)NotifyID.Team_MemberJoined);
+                        }
                     }
                 }
 
